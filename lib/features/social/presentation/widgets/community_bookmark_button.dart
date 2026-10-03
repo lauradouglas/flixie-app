@@ -1,3 +1,6 @@
+import 'package:provider/provider.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
+import '../../data/activity_state_batch.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import '../../data/community_service.dart';
@@ -23,6 +26,7 @@ class CommunityBookmarkButton extends StatefulWidget {
 class _CommunityBookmarkButtonState extends State<CommunityBookmarkButton> {
   bool? _saved;
   bool _busy = false, _failed = false;
+  int _generation = 0;
   @override
   void initState() {
     super.initState();
@@ -34,10 +38,24 @@ class _CommunityBookmarkButtonState extends State<CommunityBookmarkButton> {
   }
 
   Future<void> _load() async {
+    final generation = ++_generation;
+    final viewer = context.read<AuthProvider?>()?.dbUser?.id;
     setState(() => _failed = false);
     try {
-      final value = await widget.service.isSaved(widget.item);
-      if (mounted) setState(() => _saved = value);
+      final value = viewer == null
+          ? await widget.service.isSaved(widget.item)
+          : (await ActivityStateBatch.load(
+                  viewer: viewer,
+                  owner: widget.item.userId,
+                  type: widget.item.type.value,
+                  id: widget.item.id,
+                  community: true))['saved'] ==
+              true;
+      if (mounted &&
+          generation == _generation &&
+          viewer == context.read<AuthProvider?>()?.dbUser?.id) {
+        setState(() => _saved = value);
+      }
     } catch (_) {
       if (mounted) setState(() => _failed = true);
     }
@@ -49,6 +67,7 @@ class _CommunityBookmarkButtonState extends State<CommunityBookmarkButton> {
     setState(() => _busy = true);
     try {
       await widget.service.save(widget.item, next);
+      ActivityStateBatch.clear();
       if (mounted) {
         setState(() => _saved = next);
         widget.onChanged?.call(next);

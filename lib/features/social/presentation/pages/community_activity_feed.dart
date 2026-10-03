@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import '../../data/starred_people.dart';
 import 'dart:async';
 import '../widgets/community_watchlist_button.dart';
@@ -287,7 +288,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                                 icon: const Icon(Icons.close))
                           ]),
                           const Text(
-                              'Share your existing and future film and show reviews, including ratings, and public personal lists with everyone on Flixie. Watch history, watchlists and watch plans stay out of Around Flixie. Turning this off removes your posts from Around Flixie; Friends is unchanged.'),
+                              'Share your existing and future film and show reviews, including ratings, and public personal lists with everyone on Flixie. Watch history, watchlists and watch plans stay out of Around Flixie. Turning this off stops sharing reviews and lists through Around Flixie and community review feeds; Friends is unchanged. Discussions and public replies you publish are separate and remain until you delete them.'),
                           if (_settingsError != null)
                             TextButton(
                                 onPressed: () async {
@@ -379,7 +380,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return RefreshIndicator(
+    return FlixieRefresh(
         onRefresh: _refresh,
         child: ListView(
           key: PageStorageKey('community-feed-${widget.initialFollowing}'),
@@ -455,34 +456,36 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                     icon: const Icon(Icons.tune)),
             ]),
             OverflowBar(
-              alignment: MainAxisAlignment.spaceBetween,
-              overflowAlignment: OverflowBarAlignment.end,
-              children: [
-              if (!_savedOnly)
-                DropdownButton<String>(
-                    value: _sort,
-                    underline: const SizedBox.shrink(),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'for-you', child: Text('For you')),
-                      DropdownMenuItem(value: 'latest', child: Text('Latest')),
-                      DropdownMenuItem(value: 'popular', child: Text('Popular'))
-                    ],
-                    onChanged: (value) {
-                      if (value != null) _query(sort: value);
-                    })
-              else
-                const Text('Saved posts',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-              TextButton.icon(
-                  onPressed: () => _query(saved: !_savedOnly),
-                  icon:
-                      Icon(_savedOnly ? Icons.bookmark : Icons.bookmark_border),
-                  label: const Text('Saved')),
-            ]),
+                alignment: MainAxisAlignment.spaceBetween,
+                overflowAlignment: OverflowBarAlignment.end,
+                children: [
+                  if (!_savedOnly)
+                    DropdownButton<String>(
+                        value: _sort,
+                        underline: const SizedBox.shrink(),
+                        items: const [
+                          DropdownMenuItem(
+                              value: 'for-you', child: Text('For you')),
+                          DropdownMenuItem(
+                              value: 'latest', child: Text('Latest')),
+                          DropdownMenuItem(
+                              value: 'popular', child: Text('Popular'))
+                        ],
+                        onChanged: (value) {
+                          if (value != null) _query(sort: value);
+                        })
+                  else
+                    const Text('Saved posts',
+                        style: TextStyle(fontWeight: FontWeight.w700)),
+                  TextButton.icon(
+                      onPressed: () => _query(saved: !_savedOnly),
+                      icon: Icon(
+                          _savedOnly ? Icons.bookmark : Icons.bookmark_border),
+                      label: const Text('Saved')),
+                ]),
             Divider(
                 height: 1, color: context.colors.medium.withValues(alpha: .35)),
-            if (_loading)
+            if (_loading && _items.isEmpty)
               const ActivityRowsSkeleton()
             else ...[
               if (_items.isEmpty && _error == null)
@@ -554,7 +557,8 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
               if (_cursor != null && _error == null)
                 TextButton(
                     onPressed: _loadingMore ? null : () => _load(more: true),
-                    child: Text(_loadingMore ? 'Loading…' : 'Show more')),
+                    child: LoadingActionLabel(
+                        loading: _loadingMore, text: 'Show more')),
             ],
           ],
         ));

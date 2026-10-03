@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/features/watchlist/domain/release_status.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -429,6 +430,11 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       final watchlist = (userWatchlist ?? const <WatchlistMovie>[])
           .where((item) => item.removed != true)
           .toList();
+      for (final entry in (userShowWatchlist ?? const []).whereType<Map>()) {
+        final id = int.tryParse('${entry['showId']}');
+        final summary = id == null ? null : ShowService.cachedSummary(id);
+        if (summary != null) _showDetails[id!] = summary;
+      }
       final showWatchlist = (userShowWatchlist ?? const [])
           .whereType<Map>()
           .map((item) => _WatchlistShowEntry.fromJson(
@@ -1679,8 +1685,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         ],
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: FlixieColors.primary))
+          ? const ContentListSkeleton(label: 'Loading watchlist')
           : _buildContent(),
     );
   }
@@ -1904,7 +1909,10 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                 'Some titles were left out because we couldn’t check the content you want to avoid.')),
       if (_friendsOnly && (_loadingFriends || _hasPendingEnrichment))
         const Padding(
-            padding: EdgeInsets.all(16), child: Text('Checking friends…')),
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: ContentPlaceholder(
+                label: 'Loading friends',
+                style: ContentPlaceholderStyle.compact)),
       if (_friendsOnly &&
           !_loadingFriends &&
           !_hasPendingEnrichment &&
@@ -1931,6 +1939,18 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     ];
 
     if (items.isEmpty) {
+      if (_experienceLoading ||
+          (_selectedTab == 1 &&
+              (_loadingWatchProviderAvailability ||
+                  _loadingShowWatchProviderAvailability))) {
+        return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+          ...header,
+          const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: ContentPlaceholder(
+                  label: 'Loading watchlist picks', rows: 3)),
+        ]);
+      }
       final emptyLabel = _experienceLoading
           ? 'Finding your picks…'
           : _experienceError != null
@@ -2264,10 +2284,15 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           !pending && !_recommendationsByMovieId.containsKey(item.movieId),
       onRetryFriends: () => _retryEnrichment(item),
       recommendations: _recommendationsByMovieId[item.movieId] ?? const [],
-      onTap: () => context.push(movieDetailPath(
-        item.movieId,
-        source: DetailSource.watchlist,
-      )),
+      onTap: () => context.push(
+          movieDetailPath(
+            item.movieId,
+            source: DetailSource.watchlist,
+          ),
+          extra: {
+            'title': item.movie?.title,
+            'poster': item.movie?.posterPath
+          }),
       onMarkAsWatched: () => _markAsWatched(item),
       onAddToFavourites: () => _addToFavorites(item),
       onAddToList: () => _showAddToListSheet(item),
@@ -2277,8 +2302,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   }
 
   Widget _buildShowWatchlistRow(_WatchlistShowEntry item) {
-    void details() => context
-        .push(showDetailPath(item.showId, source: DetailSource.watchlist));
+    void details() => context.push(
+        showDetailPath(item.showId, source: DetailSource.watchlist),
+        extra: {'title': item.title, 'poster': item.posterPath});
     return WatchlistMovieRow(
       isShow: true,
       watchlistItem: WatchlistMovie(
@@ -3115,10 +3141,8 @@ class _FriendsViewing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Text('Checking friends…',
-              style: TextStyle(color: context.colors.light)));
+      return const ContentPlaceholder(
+          label: 'Loading friends', style: ContentPlaceholderStyle.compact);
     }
     if (failed) {
       return TextButton.icon(
@@ -3340,10 +3364,9 @@ class _WatchProvidersInline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Text('Checking availability…',
-              style: TextStyle(color: context.colors.light)));
+      return const ContentPlaceholder(
+          label: 'Loading availability',
+          style: ContentPlaceholderStyle.providers);
     }
     if (failed) {
       return TextButton.icon(

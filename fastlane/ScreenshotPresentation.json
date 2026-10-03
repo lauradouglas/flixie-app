@@ -1,0 +1,41 @@
+{
+  "locale": "en-GB",
+  "background": "120A24",
+  "accent": "B9A0FF",
+  "font": "assets/fonts/Manrope-VariableFont_wght.ttf",
+  "screens": [
+    {
+      "scene": "01-home",
+      "headline": "Movies, TV\n& friends."
+    },
+    {
+      "scene": "06-interstellar",
+      "headline": "See what your\nfriends think.",
+      "android_headline": "Find your film.\nSee where to watch."
+    },
+    {
+      "scene": "03-watchlist",
+      "headline": "Your next watch.\nAll in one place."
+    },
+    {
+      "scene": "04-watch-plan",
+      "headline": "Make movie\nnight happen."
+    },
+    {
+      "scene": "08-rating",
+      "headline": "Every watch.\nYour own rating."
+    },
+    {
+      "scene": "07-the-newsroom",
+      "headline": "Never lose\nyour place."
+    },
+    {
+      "scene": "05-community",
+      "headline": "Find your\nfilm people."
+    },
+    {
+      "scene": "02-profile",
+      "headline": "Your favourites.\nYour film identity."
+    }
+  ]
+}

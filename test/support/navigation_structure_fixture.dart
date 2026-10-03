@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/app/router/router.dart';
 
-GoRouter navigationStructureFixture() => GoRouter(routes: [
+GoRouter navigationStructureFixture(
+        {Future<void> Function(String)? onRefresh}) =>
+    GoRouter(routes: [
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => MainNavigationShell(navigationShell: shell),
         branches: [
           for (final path in ['/', '/search', '/plans', '/social', '/profile'])
             StatefulShellBranch(routes: [
-              GoRoute(path: path, builder: (_, __) => _Destination(path: path))
+              GoRoute(
+                  path: path,
+                  builder: (_, __) =>
+                      _Destination(path: path, onRefresh: onRefresh))
             ]),
         ],
       ),
@@ -22,7 +27,8 @@ GoRouter navigationStructureFixture() => GoRouter(routes: [
     ]);
 
 class _Destination extends StatefulWidget {
-  const _Destination({required this.path});
+  const _Destination({required this.path, this.onRefresh});
+  final Future<void> Function(String)? onRefresh;
   final String path;
   @override
   State<_Destination> createState() => _DestinationState();
@@ -47,12 +53,16 @@ class _DestinationState extends State<_Destination> {
             controller: query,
             decoration: const InputDecoration(labelText: 'Search titles')),
         Expanded(
-            child: ListView.builder(
-                controller: scroll,
-                itemExtent: 64,
-                itemCount: 50,
-                itemBuilder: (_, i) => ListTile(
-                    title: Text('Film $i'),
-                    onTap: () => context.push('/detail')))),
+            child: RefreshIndicator(
+                onRefresh: () async {
+                  await widget.onRefresh?.call(widget.path);
+                },
+                child: ListView.builder(
+                    controller: scroll,
+                    itemExtent: 64,
+                    itemCount: 50,
+                    itemBuilder: (_, i) => ListTile(
+                        title: Text('Film $i'),
+                        onTap: () => context.push('/detail'))))),
       ])));
 }

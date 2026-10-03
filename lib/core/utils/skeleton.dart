@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -31,7 +32,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     );
-    _anim = Tween<double>(begin: 0.3, end: 0.65).animate(
+    _anim = Tween<double>(begin: 0.22, end: 0.38).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
   }
@@ -514,13 +515,18 @@ class GroupWatchRequestsSkeleton extends StatelessWidget {
 }
 
 class MediaDetailScreenSkeleton extends StatelessWidget {
-  const MediaDetailScreenSkeleton({super.key});
+  const MediaDetailScreenSkeleton({super.key, this.title, this.poster});
+  final String? title;
+  final String? poster;
 
   @override
   Widget build(BuildContext context) {
     final posterWidth =
         (MediaQuery.sizeOf(context).width * .42).clamp(140.0, 168.0);
     final posterHeight = posterWidth * 1.5;
+    final titleBelow = title != null &&
+        MediaQuery.sizeOf(context).width < 600 &&
+        MediaQuery.textScalerOf(context).scale(1) > 1.3;
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 28),
@@ -532,31 +538,52 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SkeletonBox(
-                    width: posterWidth,
-                    height: posterHeight,
-                    borderRadius: 0,
-                  ),
+                  if (poster != null && poster!.isNotEmpty)
+                    CachedNetworkImage(
+                      imageUrl: poster!.startsWith('http')
+                          ? poster!
+                          : 'https://image.tmdb.org/t/p/w342$poster',
+                      width: posterWidth,
+                      height: posterHeight,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) =>
+                          const SkeletonBox(borderRadius: 0),
+                      errorWidget: (_, __, ___) =>
+                          const SkeletonBox(borderRadius: 0),
+                    )
+                  else
+                    SkeletonBox(
+                        width: posterWidth,
+                        height: posterHeight,
+                        borderRadius: 0),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Padding(
-                      padding: EdgeInsets.only(top: 58, right: 14),
+                      padding: const EdgeInsets.only(top: 58, right: 14),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SkeletonBox(width: 92, height: 28, borderRadius: 14),
-                          SizedBox(height: 12),
-                          SkeletonBox(height: 31, borderRadius: 7),
-                          SizedBox(height: 7),
-                          SkeletonBox(width: 156, height: 31, borderRadius: 7),
-                          SizedBox(height: 13),
-                          SkeletonBox(width: 178, height: 16),
-                          SizedBox(height: 10),
-                          SkeletonBox(width: 164, height: 16),
-                          SizedBox(height: 10),
-                          SkeletonBox(width: 142, height: 16),
-                          SizedBox(height: 13),
-                          Wrap(
+                          const SkeletonBox(
+                              width: 92, height: 28, borderRadius: 14),
+                          const SizedBox(height: 12),
+                          if (title != null && !titleBelow)
+                            Text(title!,
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall)
+                          else ...[
+                            const SkeletonBox(height: 31, borderRadius: 7),
+                            const SizedBox(height: 7),
+                            const SkeletonBox(
+                                width: 156, height: 31, borderRadius: 7),
+                          ],
+                          const SizedBox(height: 13),
+                          const SkeletonBox(width: 178, height: 16),
+                          const SizedBox(height: 10),
+                          const SkeletonBox(width: 164, height: 16),
+                          const SizedBox(height: 10),
+                          const SkeletonBox(width: 142, height: 16),
+                          const SizedBox(height: 13),
+                          const Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: [
@@ -581,7 +608,7 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
               const Positioned(
                 top: 12,
                 left: 12,
-                child: SkeletonBox(width: 44, height: 44, borderRadius: 22),
+                child: BackButton(),
               ),
               const Positioned(
                 top: 12,
@@ -590,6 +617,11 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
               ),
             ],
           ),
+          if (titleBelow)
+            Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Text(title!,
+                    style: Theme.of(context).textTheme.headlineSmall)),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 14, 16, 0),
             child: Column(
@@ -723,4 +755,145 @@ class ActivityRowsSkeleton extends StatelessWidget {
             ),
         ])),
       );
+}
+
+/// Public card content stays visible while the authoritative detail loads.
+class MediaDetailPreview extends StatelessWidget {
+  const MediaDetailPreview({super.key, required this.title, this.poster});
+  final String title;
+  final String? poster;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+        child: MediaDetailScreenSkeleton(title: title, poster: poster),
+      );
+}
+
+/// Quiet content shapes; the loading announcement is available to screen readers.
+enum ContentPlaceholderStyle { rows, posters, providers, review, compact }
+
+class ContentPlaceholder extends StatelessWidget {
+  const ContentPlaceholder(
+      {super.key,
+      this.label = 'Loading content',
+      this.style = ContentPlaceholderStyle.rows,
+      this.rows = 3});
+  final String label;
+  final ContentPlaceholderStyle style;
+  final int rows;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: label,
+        child: ExcludeSemantics(
+            child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: switch (style) {
+            ContentPlaceholderStyle.compact => const Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                    widthFactor: .55, child: SkeletonBox(height: 16))),
+            ContentPlaceholderStyle.providers =>
+              const Wrap(spacing: 10, runSpacing: 10, children: [
+                SkeletonBox(width: 48, height: 48),
+                SkeletonBox(width: 48, height: 48),
+                SkeletonBox(width: 48, height: 48)
+              ]),
+            ContentPlaceholderStyle.posters => SizedBox(
+                height: 166,
+                child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 4,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (_, __) =>
+                        const SkeletonBox(width: 110, height: 166))),
+            ContentPlaceholderStyle.review => const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(width: 140, height: 16),
+                    SizedBox(height: 14),
+                    SkeletonBox(height: 12),
+                    SizedBox(height: 8),
+                    FractionallySizedBox(
+                        widthFactor: .75, child: SkeletonBox(height: 12)),
+                    SizedBox(height: 18),
+                  ]),
+            ContentPlaceholderStyle.rows => Column(children: [
+                for (var i = 0; i < rows; i++)
+                  const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Row(children: [
+                        SkeletonBox(width: 44, height: 44, borderRadius: 22),
+                        SizedBox(width: 12),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              FractionallySizedBox(
+                                  widthFactor: .65,
+                                  child: SkeletonBox(height: 14)),
+                              SizedBox(height: 9),
+                              FractionallySizedBox(
+                                  widthFactor: .4,
+                                  child: SkeletonBox(height: 10)),
+                            ])),
+                      ])),
+              ]),
+          },
+        )),
+      );
+}
+
+class ContentListSkeleton extends StatelessWidget {
+  const ContentListSkeleton({super.key, this.label = 'Loading content'});
+  final String label;
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: ContentPlaceholder(label: label, rows: 6));
+}
+
+/// Keeps pagination labels stable while a user-initiated request runs.
+class LoadingActionLabel extends StatelessWidget {
+  const LoadingActionLabel(
+      {super.key, required this.loading, required this.text});
+  final bool loading;
+  final String text;
+  @override
+  Widget build(BuildContext context) => Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          children: [
+            Text(text),
+            if (loading)
+              const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, semanticsLabel: 'Loading')),
+          ]);
+}
+
+class ChatContentSkeleton extends StatelessWidget {
+  const ChatContentSkeleton({super.key});
+  @override
+  Widget build(BuildContext context) => Semantics(
+      label: 'Loading messages',
+      child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(children: [
+            for (var i = 0; i < 5; i++)
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: Align(
+                      alignment: i.isEven
+                          ? Alignment.centerLeft
+                          : Alignment.centerRight,
+                      child: FractionallySizedBox(
+                          widthFactor: i.isEven ? .7 : .5,
+                          child: SkeletonBox(
+                              height: i.isEven ? 64 : 42, borderRadius: 14)))),
+          ])));
 }

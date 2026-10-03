@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,12 +30,12 @@ void main() {
     await http.runWithClient(() async {
       await tester.pumpWidget(card());
       expect(find.text('Private review title'), findsNothing);
-      expect(find.text('Loading review…'), findsOneWidget);
+      expect(find.byType(ContentPlaceholder), findsOneWidget);
       response.complete(
           http.Response('[{"id":"author","username":"Author"}]', 200));
       await tester.pumpAndSettle();
       expect(find.text('Private review title'), findsNothing);
-      expect(find.text('Loading review…'), findsNothing);
+      expect(find.byType(ContentPlaceholder), findsNothing);
       await tester.pumpWidget(const SizedBox());
     }, () => MockClient((_) => response.future));
   });

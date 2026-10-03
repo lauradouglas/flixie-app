@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/settings/presentation/widgets/around_flixie_sharing_setting.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'setup_profile_favourites.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
@@ -18,7 +20,6 @@ import 'package:flixie_app/features/home/data/recommendation_service.dart';
 import 'package:flixie_app/features/library_import/data/library_import_controller.dart';
 import 'package:flixie_app/features/library_import/presentation/library_import_screen.dart';
 import '../../data/setup_service.dart';
-import 'auth_ui.dart';
 import 'signup_screen.dart' show SignupCountryPickerSheet;
 
 // Retained for callers using the standalone favourite selector.
@@ -40,6 +41,7 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 0;
+  bool _favouritesAdded = false;
   List<SetupCommunitySuggestion> _communityChoices = [];
   final Set<int> _selectedCommunities = {};
   bool _loadingCommunities = false;
@@ -130,7 +132,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _error = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    if (step == 3) _loadCommunities();
+    if (step == 5) _loadCommunities();
     if (step == 2) {
       EpisodeSpoilerPreference.instance.load().catchError((Object _) {});
       _loadPicks();
@@ -222,8 +224,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _picksError = null;
     });
     try {
-      final picks =
-          await widget.service.recommendations(_taste.values.toList());
+      final picks = _favouritesAdded
+          ? await widget.service.favouriteRecommendations(_userId)
+          : await widget.service.recommendations(_taste.values.toList());
       if (!mounted || revision != _picksRevision) return;
       setState(() {
         _picks = picks;
@@ -313,12 +316,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'What stays with you?',
       'Make it an easy yes.',
       'Your picks.',
+      'Your favourites.',
+      'Sharing & spoilers.',
       'Good films start conversations.'
     ];
     const subtitles = [
       'Pick up to three films or shows you love. We’ll start there.',
       'Choose where you watch. We’ll put available picks first.',
       'A few places to start. Save what catches your eye.',
+      'Bring the films you love onto your profile. This is optional.',
+      'Choose what you share and what you see. You can change these in Settings.',
       'Browse a conversation before deciding to join. This part is optional.'
     ];
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
@@ -351,46 +358,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     child: FlixieWordmark()),
                               ),
                             ),
-                            if (_step != 2)
-                              Flexible(
-                                  child: Text(
-                                      _step < 2
-                                          ? '${_step + 1} of 2'
-                                          : _step == 2
-                                              ? 'Your picks'
-                                              : 'Optional',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall)),
+                            Text('${_step + 1} of 6',
+                                style: Theme.of(context).textTheme.bodySmall),
                           ]),
                           const SizedBox(height: 12),
-                          if (_step < 2)
-                            TweenAnimationBuilder<double>(
-                              tween: Tween(begin: 0.5, end: (_step + 1) / 2),
-                              duration: reduceMotion
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 280),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, value, _) => Row(
-                                children: List.generate(
-                                    2,
-                                    (index) => Expanded(
-                                          child: Padding(
-                                            padding: EdgeInsets.only(
-                                                right: index == 1 ? 0 : 5),
-                                            child: LinearProgressIndicator(
-                                              key: ValueKey(
-                                                  'setup-progress-$index'),
-                                              minHeight: 3,
-                                              borderRadius:
-                                                  BorderRadius.circular(3),
-                                              value: (value * 2 - index)
-                                                  .clamp(0.0, 1.0),
-                                            ),
+                          TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0.5, end: (_step + 1) / 6),
+                            duration: reduceMotion
+                                ? Duration.zero
+                                : const Duration(milliseconds: 280),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, _) => Row(
+                              children: List.generate(
+                                  6,
+                                  (index) => Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                              right: index == 5 ? 0 : 5),
+                                          child: LinearProgressIndicator(
+                                            key: ValueKey(
+                                                'setup-progress-$index'),
+                                            minHeight: 3,
+                                            borderRadius:
+                                                BorderRadius.circular(3),
+                                            value: (value * 6 - index)
+                                                .clamp(0.0, 1.0),
                                           ),
-                                        )),
-                              ),
+                                        ),
+                                      )),
                             ),
+                          ),
                           if (widget.returnTo != null)
                             TextButton.icon(
                               onPressed: _busy
@@ -452,7 +449,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           if (_step == 0) ..._tastes(),
                           if (_step == 1) ..._watching(),
                           if (_step == 2) ..._results(),
-                          if (_step == 3) ..._communities(),
+                          if (_step == 3) ..._favourites(),
+                          if (_step == 4) ..._sharingPreferences(),
+                          if (_step == 5) ..._communities(),
                         ],
                       )),
                 ))));
@@ -466,7 +465,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final label = switch (_step) {
       0 => 'Continue',
       1 => _country == null ? 'Choose country' : 'Show my first picks',
-      2 => 'Find my kind of people',
+      2 => 'Continue to favourites',
+      3 => 'Continue to sharing',
+      4 => 'Find my kind of people',
       _ => _selectedCommunities.isEmpty
           ? 'Explore Flixie'
           : 'Join ${_selectedCommunities.length} & explore',
@@ -474,11 +475,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final secondary = switch (_step) {
       0 => 'Skip taste picks',
       1 => 'Skip services for now',
+      2 => 'Skip picks',
+      3 => 'Skip favourites',
       _ => 'I’ll explore on my own',
     };
     final VoidCallback? advance = _busy ||
             (_step == 1 && _loading) ||
-            (_step == 3 &&
+            (_step == 5 &&
                 _loadingCommunities &&
                 _selectedCommunities.isNotEmpty)
         ? null
@@ -497,7 +500,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   });
                 }
               case 2:
-                _move(3);
+              case 3:
+              case 4:
+                _move(_step + 1);
               default:
                 _joinCommunities();
             }
@@ -537,28 +542,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       _savedPicksSummary(),
                       const SizedBox(height: 10),
                     ],
-                    if (_step <= 2)
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xff8050e8),
-                            textStyle: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14))),
-                        onPressed: advance,
-                        child: _busy
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
-                            : Text(label),
-                      )
-                    else
-                      PrimaryButton(
-                          label: label, isLoading: _busy, onPressed: advance),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xff8050e8),
+                          textStyle: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14))),
+                      onPressed: advance,
+                      child: _busy
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(label),
+                    ),
                     TextButton(
                       onPressed: _busy
                           ? null
@@ -568,6 +568,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   _saveTaste(skip: true);
                                 case 1:
                                   _showPicks();
+                                case 2:
+                                case 3:
+                                  _move(_step + 1);
                                 default:
                                   _selectedCommunities.clear();
                                   _finish('/');
@@ -881,22 +884,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
         const SizedBox(height: 16),
         if (_searching)
-          Semantics(
-            liveRegion: true,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Column(
-                children: [
-                  const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2)),
-                  const SizedBox(height: 10),
-                  Text(_shows ? 'Loading shows…' : 'Loading movies…'),
-                ],
-              ),
-            ),
-          ),
+          const ContentPlaceholder(
+              label: 'Loading titles', style: ContentPlaceholderStyle.posters),
         if (_searchError != null)
           TextButton(onPressed: _findTitles, child: Text(_searchError!)),
         if (!_searching && _browse.isEmpty && _searchError == null)
@@ -1124,27 +1113,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               'No picks available yet. Explore Flixie or try choosing a few more titles.'),
         if (!_searching)
           for (final title in _rankedPicks) _pickRow(title),
-        const SizedBox(height: 24),
-        if (_taste.isEmpty)
-          TextButton(
-              onPressed: _busy ? null : () => _finish('/profile'),
-              child:
-                  const Text('Make your profile more you · choose favourites')),
-        if (_taste.isNotEmpty)
-          SetupProfileFavourites(
-            titles: _taste.values.toList(),
-            save: (title) => widget.service.addProfileFavourite(_userId, title),
-            onSaved: () => context.read<AuthProvider>().markActivityChanged(),
-            onBusyChanged: (busy) {
-              if (mounted) setState(() => _busy = busy);
-            },
-          ),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: const Text('Privacy and spoilers'),
-          subtitle: const Text('Keep or adjust your current preferences'),
-          children: _preferences(),
-        ),
         if (_added.isNotEmpty)
           Semantics(
               liveRegion: true,
@@ -1154,6 +1122,50 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     'Yours to come back to. Find your saved picks in Watchlist.',
                     style: TextStyle(color: context.colors.secondary)),
               )),
+      ];
+  List<Widget> _favourites() => [
+        const SizedBox(height: 24),
+        if (_taste.isEmpty)
+          TextButton(
+              onPressed: _busy ? null : () => _finish('/profile'),
+              child:
+                  const Text('Make your profile more you · choose favourites')),
+        if (_taste.isNotEmpty)
+          SetupProfileFavourites(
+            key: const ValueKey('signup-favourites'),
+            enabled: !_busy,
+            titles: _taste.values.toList(),
+            save: (title) => widget.service.addProfileFavourite(_userId, title),
+            onSaved: () {
+              _favouritesAdded = true;
+              context.read<AuthProvider>().markActivityChanged();
+              RecommendationService.invalidateCache(userId: _userId);
+            },
+            onBusyChanged: (busy) {
+              if (mounted) {
+                setState(() => _busy = busy);
+                if (!busy && _favouritesAdded) _loadPicks();
+              }
+            },
+          ),
+      ];
+  List<Widget> _sharingPreferences() => [
+        const SizedBox(height: 16),
+        AroundFlixieSharingSetting(
+          key: ValueKey('signup-sharing-$_userId'),
+          enabled: !_busy,
+          contentPadding: EdgeInsets.zero,
+          load: widget.service.sharing,
+          save: widget.service.setSharing,
+          onBusyChanged: (busy) {
+            if (mounted) setState(() => _busy = busy);
+          },
+        ),
+        const SizedBox(height: 28),
+        Text('Your viewing preferences',
+            style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        ..._preferences(),
       ];
   Widget _posterGrid(List<SetupTitle> titles, {required bool picking}) =>
       LayoutBuilder(builder: (context, constraints) {
@@ -1319,7 +1331,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _pickRow(SetupTitle title) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 20),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

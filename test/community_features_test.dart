@@ -181,9 +181,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Films'));
     await tester.pumpAndSettle();
-    expect(service.queries.last, 'films:latest:false');
+    expect(service.queries.last, 'films:for-you:false');
     expect(service.cursors.last, isNull);
-    await tester.tap(find.text('Latest'));
+    await tester.tap(find.text('For you'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Popular').last);
     await tester.pumpAndSettle();
@@ -204,7 +204,7 @@ void main() {
     await tester.tap(find.text('Show bio and favourites'));
     await tester.pumpAndSettle();
     expect(service.prefs['communityProfileDetails'], true);
-    expect(find.text('Reply notifications'), findsOneWidget);
+    expect(find.text('Replies and mentions'), findsOneWidget);
     service.fail = true;
     await tester.ensureVisible(find.text('Reaction notifications'));
     await tester.tap(find.text('Reaction notifications'));

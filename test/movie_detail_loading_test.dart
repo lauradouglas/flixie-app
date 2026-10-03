@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,7 +24,7 @@ class GuestAuth extends ChangeNotifier implements AuthProvider {
 class DelayedMovies extends MovieService {
   final core = <int, Completer<Movie>>{};
   var reviews = Completer<List<Review>>();
-  final providers = Completer<List<WatchProvider>>();
+  var providers = Completer<List<WatchProvider>>();
   int creditCalls = 0;
   @override
   Future<Movie> getMovieById(int id, {String? userId}) =>
@@ -98,7 +99,7 @@ void main() {
     expect(find.text('Useful movie'), findsWidgets);
     expect(movies.reviews.isCompleted, false);
     expect(movies.providers.isCompleted, false);
-    expect(find.text('Loading watch providers…'), findsOneWidget);
+    expect(find.byType(ContentPlaceholder), findsOneWidget);
     // The core is useful at virtual t=100ms. Full loading is still pending.
     await tester.pump(const Duration(milliseconds: 4900));
     movies.providers.complete([]);
@@ -191,5 +192,38 @@ void main() {
     expect(find.text('Current movie'), findsWidgets);
     expect(find.text('Old movie'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+      'refresh retains resolved sections while replacement requests are pending',
+      (tester) async {
+    final auth = GuestAuth();
+    final movies = DelayedMovies();
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(app(auth, movies, '1'));
+    movies.core[1]!.complete(const Movie(id: 1, title: 'Alien'));
+    movies.providers.complete([]);
+    movies.reviews.complete([]);
+    await tester.pump();
+    await tester.pump();
+    movies.providers = Completer<List<WatchProvider>>();
+    movies.reviews = Completer<List<Review>>();
+    movies.core[1] = Completer<Movie>();
+    final refresh = tester
+        .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+        .onRefresh();
+    await tester.pump();
+    expect(find.text('Alien'), findsWidgets);
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is ContentPlaceholder && w.label == 'Loading watch providers'),
+        findsNothing);
+    movies.core[1]!.complete(const Movie(id: 1, title: 'Alien refreshed'));
+    movies.providers.complete([]);
+    movies.reviews.complete([]);
+    await refresh;
+    await tester.pump();
+    expect(find.text('Alien refreshed'), findsWidgets);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
   });
 }

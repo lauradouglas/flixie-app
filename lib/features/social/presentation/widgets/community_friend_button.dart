@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -74,7 +75,9 @@ class CommunityFriendButton extends StatelessWidget {
               : state == CommunityConnection.outgoing
                   ? Icons.schedule
                   : Icons.person_add_alt_1_outlined),
-          label: Text(label),
+          label: state == CommunityConnection.unknown && !connections.failed
+              ? const SizedBox(width: 72, height: 14, child: SkeletonBox())
+              : Text(label),
           onPressed: busy
               ? null
               : state == CommunityConnection.unknown && connections.failed

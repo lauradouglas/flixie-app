@@ -105,6 +105,10 @@ docs/product-ideas.md
 /fastlane/README.md
 /fastlane/Preview.html
 /fastlane/screenshots/
+/fastlane/screenshot-manifests/
+/fastlane/metadata/android/*/images/phoneScreenshots/
+/fastlane/metadata/android/*/images/sevenInchScreenshots/
+/fastlane/metadata/android/*/images/tenInchScreenshots/
 /fastlane/test_output/
 /.bundle/
 /vendor/bundle/
@@ -112,3 +116,11 @@ docs/product-ideas.md
 /design/app-ux-review-2026-09-26
 /design
 /design
+
+# Separate private dashboard repository
+/admin-dashboard/
+
+# Generated App Store compositions (native originals are kept separately).
+/fastlane/store-presentation/
+
+/fastlane/store-presentation-android/

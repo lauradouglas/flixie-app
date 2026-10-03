@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import '../../data/starred_people.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter/material.dart';
@@ -79,7 +80,7 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
   @override
   Widget build(BuildContext context) {
     final ranked = StarredPeople.instance.rank(_items);
-    return RefreshIndicator(
+    return FlixieRefresh(
       onRefresh: () => _load(),
       child: _loading
           ? ListView(

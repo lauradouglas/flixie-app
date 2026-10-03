@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
+import 'package:flixie_app/core/storage/library_image_warmup.dart';
 import 'package:flixie_app/features/home/presentation/widgets/home_watchlist_action.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/find_tonights_film_section.dart';
@@ -175,7 +177,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final activityVersion = _authProvider?.activityVersion ?? -1;
     if (userId != _loadedForUserId || activityVersion != _lastActivityVersion) {
       _lastActivityVersion = activityVersion;
-      _loadAll(showFullLoading: userId != _loadedForUserId);
+      if (userId == _loadedForUserId) {
+        RecommendationService.invalidateCache(userId: userId);
+      }
+      _loadAll(
+        showFullLoading: userId != _loadedForUserId,
+        refreshRecommendations: userId == _loadedForUserId,
+      );
     }
   }
 
@@ -318,6 +326,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       unawaited(_precacheInitialHomeImages(trendingMovies));
       if (user != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) unawaited(_warmLibraryImages(user));
+        });
+      }
+      if (user != null) {
         unawaited(_loadHeroFriendInteractions(trendingMovies, user.id));
       }
     } catch (e) {
@@ -333,6 +346,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               : null;
         });
       }
+    }
+  }
+
+  String? _libraryImagesWarmedFor;
+  Future<void> _warmLibraryImages(models.User user) async {
+    if (_libraryImagesWarmedFor == user.id) return;
+    _libraryImagesWarmedFor = user.id;
+    // Sequential, bounded decoding avoids competing with the Home hero.
+    for (final url in libraryPosterWarmupUrls(user)) {
+      if (!mounted || context.read<AuthProvider>().dbUser?.id != user.id) {
+        return;
+      }
+      await precacheImage(CachedNetworkImageProvider(url), context,
+          onError: (_, __) {});
     }
   }
 
@@ -773,6 +800,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
 
+    final generation = _homeLoadGeneration;
+    bool current() =>
+        mounted &&
+        generation == _homeLoadGeneration &&
+        context.read<AuthProvider>().dbUser?.id == userId;
     setState(() => _isLoadingRecommendations = true);
     try {
       final recommendations =
@@ -780,7 +812,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         userId,
         refresh: true,
       );
-      if (!mounted) return;
+      if (!current()) return;
       setState(() {
         _forYouMovies = recommendations.take(20).toList();
         _forYouPage.value = 0;
@@ -794,7 +826,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } catch (error) {
       logger.w('[HomeScreen] recommendation refresh failed: $error');
-      if (mounted) {
+      if (mounted && current()) {
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(
             type: FlixieToastType.error,
@@ -804,7 +836,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoadingRecommendations = false);
+      if (current()) setState(() => _isLoadingRecommendations = false);
     }
   }
 
@@ -868,7 +900,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final analytics = context.read<AnalyticsController>();
     final user = authProvider.dbUser;
     if (user == null) {
-      context.push(movieDetailPath(movie.id, source: DetailSource.trending));
+      context.push(movieDetailPath(movie.id, source: DetailSource.trending),
+          extra: {'title': movie.name, 'poster': movie.poster});
       return;
     }
     final movieId = movie.id;
@@ -1093,7 +1126,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      body: RefreshIndicator(
+      body: FlixieRefresh(
         color: FlixieColors.primary,
         backgroundColor: context.colors.background,
         onRefresh: _refreshAll,
@@ -1315,8 +1348,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (compact) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         InkWell(
-            onTap: () => context
-                .push(movieDetailPath(movie.id, source: DetailSource.trending)),
+            onTap: () => context.push(
+                movieDetailPath(movie.id, source: DetailSource.trending),
+                extra: {'title': movie.name, 'poster': movie.poster}),
             borderRadius: BorderRadius.circular(10),
             child: Semantics(
                 button: true,
@@ -1379,6 +1413,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: InkWell(
         onTap: () => context.push(
           movieDetailPath(movie.id, source: DetailSource.trending),
+          extra: {'title': movie.name, 'poster': movie.poster},
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

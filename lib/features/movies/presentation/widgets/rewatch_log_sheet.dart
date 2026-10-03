@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
@@ -146,7 +147,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                         if (!snapshot.hasData) {
                           return const Padding(
                               padding: EdgeInsets.only(bottom: 16),
-                              child: Text('Checking your watch plans…'));
+                              child: ContentPlaceholder(
+                                  label: 'Loading watch plans',
+                                  style: ContentPlaceholderStyle.compact));
                         }
                         if (snapshot.data!.isEmpty) {
                           return const SizedBox.shrink();

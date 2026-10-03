@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flixie_app/core/api/retry_read.dart';
 import 'package:flixie_app/features/movies/data/media_review_service.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
@@ -35,6 +36,13 @@ class ShowService {
     int showId,
   ) async {
     await ApiClient.delete('/users/$userId/shows/$showId/continue-watching');
+  }
+
+  static Future<TvShow> getShowSummary(int id) async {
+    final data =
+        await ApiClient.get('/shows/id/$id', queryParams: {'summary': 'true'});
+    if (data is! Map<String, dynamic>) throw StateError('Show unavailable');
+    return TvShow.fromJson(data);
   }
 
   static Future<TvShow> getShowById(int id, {String? userId}) async {
@@ -79,11 +87,97 @@ class ShowService {
     );
   }
 
+  static final _summaries = <int, ({TvShow show, DateTime at})>{};
+  static final _summaryLoads = <int, Future<TvShow?>>{};
+
+  static TvShow? cachedSummary(int id) {
+    final entry = _summaries[id];
+    if (entry == null ||
+        DateTime.now().difference(entry.at) > const Duration(minutes: 10)) {
+      _summaries.remove(id);
+      return null;
+    }
+    return entry.show;
+  }
+
+  static void clearSummaryCache() {
+    _summaryGeneration++;
+    _summaries.clear();
+    _summaryLoads.clear();
+  }
+
+  static int _summaryGeneration = 0;
+
+  /// Public metadata only. Shared by startup warming and watchlist pages.
   static Future<List<TvShow>> getShowsByIds(List<int> ids) async {
-    final data = await ApiClient.post('/shows/by-ids', body: {'ids': ids});
-    return (data as List<dynamic>)
-        .map((e) => TvShow.fromJson(e as Map<String, dynamic>))
+    final unique = ids.where((id) => id > 0).toSet();
+    final missing = unique
+        .where(
+            (id) => cachedSummary(id) == null && !_summaryLoads.containsKey(id))
         .toList();
+    final generation = _summaryGeneration;
+    final pending = <int, Completer<TvShow?>>{};
+    for (final id in missing) {
+      final completer = Completer<TvShow?>();
+      pending[id] = completer;
+      _summaryLoads[id] = completer.future;
+    }
+    final waits = [
+      for (final id in unique)
+        if (cachedSummary(id) case final show?)
+          Future<TvShow?>.value(show)
+        else
+          _summaryLoads[id]!,
+    ];
+    if (missing.isNotEmpty) {
+      unawaited(() async {
+        for (var start = 0; start < missing.length; start += 25) {
+          final chunk = missing.skip(start).take(25).toList();
+          final found = <int, TvShow>{};
+          try {
+            if (generation == _summaryGeneration) {
+              final data =
+                  await ApiClient.post('/shows/by-ids', body: {'ids': chunk});
+              for (final row in data as List<dynamic>) {
+                final show = TvShow.fromJson(row as Map<String, dynamic>);
+                if (chunk.contains(show.id)) found[show.id] = show;
+              }
+            }
+          } catch (_) {
+            // A missing result remains retryable; callers retain their fallback.
+          }
+          for (final id in chunk) {
+            final show = found[id];
+            if (generation == _summaryGeneration) {
+              if (show != null && show.name != 'Unknown Show') {
+                _summaries[id] = (show: show, at: DateTime.now());
+                while (_summaries.length > 200) {
+                  _summaries.remove(_summaries.keys.first);
+                }
+              }
+              _summaryLoads.remove(id);
+            }
+            pending[id]!
+                .complete(generation == _summaryGeneration ? show : null);
+          }
+        }
+      }());
+    }
+    return (await Future.wait(waits)).whereType<TvShow>().toList();
+  }
+
+  static Future<void> warmLibrarySummaries(Iterable<dynamic> entries) async {
+    final ids = entries
+        .whereType<Map>()
+        .where((entry) => entry['removed'] != true)
+        .map((entry) => int.tryParse(
+            '${entry['showId'] ?? (entry['show'] as Map?)?['id']}'))
+        .whereType<int>()
+        .where((id) => id > 0)
+        .toSet()
+        .take(20)
+        .toList();
+    if (ids.isNotEmpty) await getShowsByIds(ids);
   }
 
   static Future<TvShowCredits> getShowCredits(int showId) async {

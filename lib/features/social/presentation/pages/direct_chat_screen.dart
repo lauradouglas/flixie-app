@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
@@ -244,9 +245,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     if (_loading) {
       return Scaffold(
         backgroundColor: context.colors.background,
-        body: const Center(
-          child: CircularProgressIndicator(color: FlixieColors.primary),
-        ),
+        body: const ChatContentSkeleton(),
       );
     }
 
@@ -317,11 +316,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: FlixieColors.primary,
-                    ),
-                  );
+                  return const ChatContentSkeleton();
                 }
                 final messages = snapshot.data ?? [];
                 if (messages.isEmpty) {

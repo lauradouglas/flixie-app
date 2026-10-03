@@ -3,6 +3,40 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/navigation_structure_fixture.dart';
 
 void main() {
+  testWidgets(
+      'active nav taps scroll and refresh each tab without refreshing inactive tabs',
+      (t) async {
+    final refreshed = <String>[];
+    final router = navigationStructureFixture(onRefresh: (path) async {
+      refreshed.add(path);
+    });
+    addTearDown(router.dispose);
+    await t.pumpWidget(MaterialApp.router(routerConfig: router));
+    await t.pumpAndSettle();
+    final labels = ['Home', 'Discover', 'Plans', 'Social', 'Profile'];
+    final paths = ['/', '/search', '/plans', '/social', '/profile'];
+    for (var i = 0; i < labels.length; i++) {
+      if (i > 0) {
+        await t.tap(find.text(labels[i]));
+        await t.pumpAndSettle();
+        expect(refreshed.length, i,
+            reason: 'Switching tabs must retain state without refreshing');
+      }
+      await t.enterText(find.byType(TextField), 'Alien');
+      t.testTextInput.hide();
+      await t.drag(find.byType(ListView), const Offset(0, -600));
+      await t.pumpAndSettle();
+      final position =
+          t.state<ScrollableState>(find.byType(Scrollable).last).position;
+      expect(position.pixels, greaterThan(0));
+      await t.tap(find.text(labels[i]));
+      await t.pumpAndSettle();
+      expect(position.pixels, 0);
+      expect(refreshed, paths.take(i + 1).toList());
+      expect(find.text('Alien'), findsOneWidget);
+    }
+  });
+
   testWidgets('tab switches and detail returns retain query and scroll',
       (t) async {
     final router = navigationStructureFixture();

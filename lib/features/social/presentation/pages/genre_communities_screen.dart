@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -228,7 +229,7 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
             g.name.toLowerCase().contains(_search.toLowerCase()))
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
-    return RefreshIndicator(
+    return FlixieRefresh(
         onRefresh: _load,
         child: CustomScrollView(
           key: const PageStorageKey('genre-communities'),

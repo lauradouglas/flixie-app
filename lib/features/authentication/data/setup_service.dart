@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/social/data/community_service.dart';
+import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/social/data/genre_community_service.dart';
 import 'package:flixie_app/features/social/data/community_space_service.dart';
 import 'package:flixie_app/core/auth/referral_attribution_store.dart';
@@ -65,6 +67,20 @@ class SetupCommunitySuggestion {
 
 class SetupService {
   const SetupService();
+  Future<bool> sharing() => const CommunityService().sharing();
+  Future<void> setSharing(bool value) =>
+      const CommunityService().setSharing(value);
+  Future<List<SetupTitle>> favouriteRecommendations(String userId) async {
+    final data = await ApiClient.get('/users/$userId/recommendations',
+        queryParams: const {'refresh': 'true'});
+    return (data as List)
+        .map((row) => MovieShort.fromJson(Map<String, dynamic>.from(row)))
+        .take(6)
+        .map((m) => SetupTitle(m.id, m.name, m.poster,
+            reason: 'Based on your favourites and movie taste'))
+        .toList();
+  }
+
   Future<List<GenreCommunity>> communities() =>
       const GenreCommunityService().list();
   Future<Map<String, dynamic>?> conversation(int id) async {

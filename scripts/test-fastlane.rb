@@ -10,9 +10,10 @@ module UI
 end
 
 class LaneHarness
-  attr_reader :calls, :lanes
+  attr_reader :calls, :lanes, :shell_environments
   def initialize
     @calls = []
+    @shell_environments = []
     @lanes = {}
     instance_eval(File.read(File.expand_path('../fastlane/Fastfile', __dir__)),
                   File.expand_path('../fastlane/Fastfile', __dir__))
@@ -33,9 +34,13 @@ class LaneHarness
   def build(options); run(@platform, :build, options); end
   def promote(options); run(@platform, :promote, options); end
   def release_file(path); File.expand_path(path, File.expand_path('..', __dir__)); end
-  def sh(command); @calls << [:shell, Shellwords.split(command).join(" ")]; end
+  def sh(command)
+    @shell_environments << ENV.to_h
+    @calls << [:shell, Shellwords.split(command).join(" ")]
+  end
   def app_store_connect_api_key(**options); @calls << [:key, options]; :fake_key; end
   def upload_to_testflight(**options); @calls << [:apple, options]; end
+  def upload_to_app_store(**options); @calls << [:apple_screenshots, options]; end
   def upload_to_play_store(**options); @calls << [:play, options]; end
 end
 
@@ -48,6 +53,20 @@ class FastlaneTest < Minitest::Test
   end
   def teardown
     ENV.replace(@previous_env)
+  end
+  def test_screenshot_sdk_process_does_not_inherit_fastlane_bundle
+    ENV['BUNDLE_GEMFILE'] = '/tmp/fastlane-only-Gemfile'
+    ENV['BUNDLE_PATH'] = '/tmp/fastlane-only-gems'
+    @runner.run(:ios, :screenshots)
+    child_env = @runner.shell_environments.fetch(0)
+    refute child_env.key?('BUNDLE_GEMFILE')
+    refute child_env.key?('BUNDLE_PATH')
+    assert_equal '/tmp/fastlane-only-Gemfile', ENV['BUNDLE_GEMFILE']
+  end
+  def test_tablet_capture_passes_category_without_uploading
+    @runner.run(:android, :screenshots, type: 'sevenInchScreenshots')
+    assert_equal [:shell], @runner.calls.map(&:first)
+    assert_includes @runner.calls.first.last, '--android-type sevenInchScreenshots'
   end
   def test_internal_draft_builds_production_entrypoint
     @runner.run(:android, :draft, build_number: '123')
@@ -103,5 +122,54 @@ class FastlaneTest < Minitest::Test
     @runner.flutter_release('ipa', '123')
     assert_includes @runner.calls.last.last, '--export-method=app-store'
     assert_includes @runner.calls.last.last, '--target=lib/main.dart'
+  end
+
+  def test_screenshot_capture_is_separate_from_build_and_upload
+    [:ios, :android].each do |platform|
+      runner = LaneHarness.new
+      runner.run(platform, :screenshots, device: 'dedicated-device')
+      assert_equal [:shell], runner.calls.map(&:first)
+      assert_includes runner.calls.first.last, "store-screenshots.py #{platform} --device dedicated-device"
+    end
+  end
+
+  def test_ios_screenshots_validate_then_upload_without_submission
+    ENV['APP_STORE_CONNECT_KEY_ID'] = 'fake'
+    ENV['APP_STORE_CONNECT_ISSUER_ID'] = 'fake'
+    ENV['APP_STORE_CONNECT_KEY_FILE'] = '/tmp/fake.p8'
+    @runner.run(:ios, :upload_screenshots)
+    assert_equal [:shell, :key, :apple_screenshots], @runner.calls.map(&:first)
+    assert_includes @runner.calls.first.last, 'prepare-store-screenshots.py --validate'
+    upload = @runner.calls.last.last
+    assert upload[:screenshots_path].end_with?('/fastlane/store-presentation')
+    assert upload[:skip_binary_upload]
+    assert upload[:skip_metadata]
+    assert_equal true, upload[:skip_app_version_update]
+    assert_equal false, upload[:run_precheck_before_submit]
+    assert_equal false, upload[:submit_for_review]
+    assert_equal false, upload[:automatic_release]
+  end
+
+  def test_ios_presentation_is_separate_from_capture_and_upload
+    @runner.run(:ios, :prepare_screenshots)
+    assert_equal [:shell], @runner.calls.map(&:first)
+    assert_includes @runner.calls.first.last, 'prepare-store-screenshots.py'
+  end
+
+  def test_android_presentation_does_not_upload
+    @runner.run(:android, :prepare_screenshots)
+    assert_equal [:shell], @runner.calls.map(&:first)
+    assert_includes @runner.calls.first.last, 'prepare-store-screenshots.py android'
+  end
+
+  def test_android_screenshots_upload_only_images
+    @runner.run(:android, :upload_screenshots)
+    assert_equal [:shell, :play], @runner.calls.map(&:first)
+    assert_includes @runner.calls.first.last, "prepare-store-screenshots.py android --validate"
+    upload = @runner.calls.last.last
+    assert upload[:metadata_path].end_with?("/fastlane/store-presentation-android")
+    assert_equal false, upload[:skip_upload_screenshots]
+    [:skip_upload_aab, :skip_upload_apk, :skip_upload_metadata,
+     :skip_upload_images, :skip_upload_changelogs].each { |key| assert upload[key] }
   end
 end

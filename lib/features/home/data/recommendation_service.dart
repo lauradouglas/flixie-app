@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flixie_app/features/authentication/data/setup_service.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -60,44 +61,106 @@ class RecommendationService {
   /// Per-user cache for /recommendations/from-highly-rated.
   static final Map<String, _CachedHighlyRated> _highlyRatedCache = {};
 
-  static Future<List<MovieShort>> getUserRecommendations(
-    String userId, {
-    bool refresh = false,
-  }) async {
-    final cached = _userRecsCache[userId];
-    if (!refresh && cached != null && !cached.isExpired) {
-      apiLogger.d('getUserRecommendations [$userId] - serving from cache');
-      return cached.movies;
-    }
+  static final Map<String, Map<bool, Future<List<MovieShort>>>> _pending = {};
+  static final Map<String, Future<List<MovieShort>>> _latest = {};
+  static final Map<String, _SeedOrdering> _seedOrdering = {};
+  static int _session = -1;
+  static int _generation = 0;
+  static final Set<String> _refreshRequired = {};
 
-    apiLogger.d(
-        'GET /users/$userId/recommendations${refresh ? '?refresh=true' : ''}');
-    final data = await ApiClient.get(
-      '/users/$userId/recommendations',
-      queryParams: refresh ? const {'refresh': 'true'} : null,
-    );
+  static Future<Set<int>> _loadSeedOrdering(String userId) async {
+    final generation = _generation;
+    final revision = ApiClient.tokenRevision;
+    final seeds = (await SetupTasteStore.load(userId))
+        .where((seed) => !seed.isShow)
+        .take(5)
+        .toList();
+    if (generation != _generation || revision != ApiClient.tokenRevision) {
+      throw StateError('Recommendation viewer changed');
+    }
+    final signature = jsonEncode(seeds.map((seed) => seed.toJson()).toList());
+    final cached = _seedOrdering[userId];
+    if (cached != null &&
+        cached.signature == signature &&
+        DateTime.now().difference(cached.fetchedAt) < _cacheTtl) {
+      return cached.ids;
+    }
+    if (seeds.isEmpty) return {};
+    final ids = const SetupService()
+        .recommendations(seeds)
+        .then((items) => items.map((item) => item.id).toSet());
+    final entry = _SeedOrdering(signature, ids, DateTime.now());
+    _seedOrdering[userId] = entry;
+    try {
+      final result = await ids;
+      if (revision != ApiClient.tokenRevision &&
+          identical(_seedOrdering[userId], entry)) {
+        _seedOrdering.remove(userId);
+      }
+      return result;
+    } catch (_) {
+      if (identical(_seedOrdering[userId], entry)) _seedOrdering.remove(userId);
+      rethrow;
+    }
+  }
+
+  static Future<List<MovieShort>> getUserRecommendations(String userId,
+      {bool refresh = false}) async {
+    if (_session != ApiClient.tokenRevision) {
+      invalidateCache();
+      _session = ApiClient.tokenRevision;
+    }
+    refresh = refresh || _refreshRequired.contains(userId);
+    final cached = _userRecsCache[userId];
+    if (!refresh && cached != null && !cached.isExpired) return cached.movies;
+    final requests = _pending.putIfAbsent(userId, () => {});
+    final existing = requests[refresh];
+    if (existing != null) return existing;
+    final revision = ApiClient.tokenRevision;
+    final request = _fetchUserRecommendations(userId, refresh);
+    requests[refresh] = request;
+    _latest[userId] = request;
+    try {
+      final movies = await request;
+      if (revision != ApiClient.tokenRevision ||
+          !identical(_pending[userId], requests)) {
+        throw StateError('Recommendation viewer changed');
+      }
+      if (identical(_latest[userId], request)) {
+        _refreshRequired.remove(userId);
+        _userRecsCache[userId] =
+            _CachedUserRecs(movies: movies, fetchedAt: DateTime.now());
+      }
+      return movies;
+    } finally {
+      if (identical(_latest[userId], request)) _latest.remove(userId);
+      if (identical(requests[refresh], request)) requests.remove(refresh);
+      if (identical(_pending[userId], requests) && requests.isEmpty) {
+        _pending.remove(userId);
+      }
+    }
+  }
+
+  static Future<List<MovieShort>> _fetchUserRecommendations(
+      String userId, bool refresh) async {
+    // Start optional taste ordering alongside the feed, and handle its error
+    // immediately so a failing feed cannot leave an unobserved future behind.
+    final relatedFuture =
+        _loadSeedOrdering(userId).catchError((Object _) => <int>{});
+    final data = await ApiClient.get('/users/$userId/recommendations',
+        requestScope: 'recommendations:$_generation',
+        queryParams: refresh
+            ? const {'refresh': 'true', 'refreshProfile': 'false'}
+            : null);
     final movies = (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
         .toList();
-    // Reorder only server-eligible candidates: never restore a watched or
-    // dismissed title excluded by the recommendation service.
-    try {
-      final related =
-          (await SetupService.movieSeeds(userId)).map((m) => m.id).toSet();
-      if (related.isNotEmpty) {
-        final preferred = movies.where((m) => related.contains(m.id)).toList();
-        final remaining = movies.where((m) => !related.contains(m.id)).toList();
-        movies
-          ..clear()
-          ..addAll(preferred)
-          ..addAll(remaining);
-      }
-    } catch (_) {
-      /* Keep server recommendations if local taste is unavailable. */
-    }
-    _userRecsCache[userId] =
-        _CachedUserRecs(movies: movies, fetchedAt: DateTime.now());
-    return movies;
+    final related = await relatedFuture;
+    // Only reorder eligible server results; never resurrect an excluded title.
+    return [
+      ...movies.where((movie) => related.contains(movie.id)),
+      ...movies.where((movie) => !related.contains(movie.id)),
+    ];
   }
 
   static Future<RecommendationFromHighlyRatedResponse?>
@@ -140,10 +203,19 @@ class RecommendationService {
 
   /// Clears all recommendation caches (e.g. after the user rates a movie).
   static void invalidateCache({String? userId}) {
+    _generation++;
     if (userId != null) {
+      _refreshRequired.add(userId);
+      _pending.remove(userId);
+      _latest.remove(userId);
+      _seedOrdering.remove(userId);
       _userRecsCache.remove(userId);
       _highlyRatedCache.remove(userId);
     } else {
+      _refreshRequired.clear();
+      _pending.clear();
+      _latest.clear();
+      _seedOrdering.clear();
       _userRecsCache.clear();
       _highlyRatedCache.clear();
     }
@@ -185,4 +257,11 @@ class _CachedHighlyRated {
 
   bool get isExpired =>
       DateTime.now().difference(fetchedAt) > RecommendationService._cacheTtl;
+}
+
+class _SeedOrdering {
+  final String signature;
+  final Future<Set<int>> ids;
+  final DateTime fetchedAt;
+  _SeedOrdering(this.signature, this.ids, this.fetchedAt);
 }

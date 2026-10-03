@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/core/widgets/notification_opt_in.dart';
@@ -306,7 +307,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     super.dispose();
   }
 
+  int _loadGeneration = 0;
   Future<void> _load({bool showSpinner = false}) async {
+    final generation = ++_loadGeneration;
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) {
       setState(() => _loading = false);
@@ -315,21 +318,24 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     if (showSpinner) setState(() => _loading = true);
     setState(() => _error = null);
     try {
-      final requests = await RequestService.getWatchRequests(userId);
-      final hydrated = await Future.wait(
-        requests.map((request) async {
-          try {
-            final state = await RequestService.getWatchRequestState(
-              watchRequestId: request.id,
-              userId: userId,
-            );
-            return state.request;
-          } catch (e) {
-            logger.w('[WatchRequestsScreen] state load failed: $e');
-            return request;
-          }
-        }),
-      );
+      final requests =
+          await RequestService.getWatchRequests(userId, includeHomeState: true);
+      if (!mounted ||
+          generation != _loadGeneration ||
+          context.read<AuthProvider>().dbUser?.id != userId) {
+        return;
+      }
+      setState(() {
+        _all = List.of(requests);
+        _loading = false;
+      });
+      _applyFilter();
+      final hydrated = List<WatchRequest>.of(requests);
+      if (!mounted ||
+          generation != _loadGeneration ||
+          context.read<AuthProvider>().dbUser?.id != userId) {
+        return;
+      }
       for (final request in hydrated) {
         final scheduledFor = request.scheduledFor;
         if (scheduledFor != null && scheduledFor.isAfter(DateTime.now())) {
@@ -367,7 +373,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       }
     } catch (e) {
       logger.e('[WatchRequestsScreen] load error: $e');
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() {
           if (_all.isEmpty) _error = 'Failed to load Watch Plans.';
           _loading = false;
@@ -1260,11 +1266,20 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
         : null;
     final directBody = _loading
         ? const WatchRequestsSkeleton()
-        : _error != null
-            ? _buildError()
-            : _filtered.isEmpty
-                ? _buildEmpty()
-                : _buildRequestsList(isFocused);
+        : _error != null || _filtered.isEmpty
+            ? FlixieRefresh(
+                onRefresh: _load,
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _error != null ? _buildError() : _buildEmpty(),
+                    ),
+                  ],
+                ),
+              )
+            : _buildRequestsList(isFocused);
     final body = isFocused
         ? directBody
         : Column(
@@ -1492,7 +1507,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     if (isFocused ||
         _statusFilter != WatchPlanFilter.active ||
         _searchController.text.trim().isNotEmpty) {
-      return RefreshIndicator(
+      return FlixieRefresh(
         onRefresh: _load,
         color: FlixieColors.primary,
         child: ListView.separated(
@@ -1541,7 +1556,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     addSection('Ready to wrap up', 'The planned time has passed',
         sections.readyToWrapUp);
 
-    return RefreshIndicator(
+    return FlixieRefresh(
       onRefresh: _load,
       color: FlixieColors.primary,
       child: ListView(

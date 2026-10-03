@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flixie_app/app/theme/appearance_controller.dart';
@@ -59,6 +60,7 @@ Future<void> _activateFirebaseAppCheck() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  ApiClient.initializeTransport();
 
   try {
     // Initialize Firebase only if not already initialized
@@ -159,7 +161,7 @@ void main() async {
           create: (_) => WatchRequestCache(),
           update: (_, auth, cache) {
             final requestCache = cache ?? WatchRequestCache();
-            requestCache.syncUser(auth.dbUser?.id);
+            requestCache.syncUser(auth.dbUser?.id, deferWarm: true);
             return requestCache;
           },
         ),

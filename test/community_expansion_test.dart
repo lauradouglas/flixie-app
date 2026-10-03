@@ -23,7 +23,8 @@ class ExpansionFixture extends fixtures.FixtureCommunity {
           String filter = "all",
           String sort = "latest",
           String? owner,
-          bool saved = false}) async =>
+          bool saved = false,
+          int? limit}) async =>
       newPost
           ? CommunityPage([fixtures.fixture("new")], null)
           : await super.load(

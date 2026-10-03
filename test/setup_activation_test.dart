@@ -27,6 +27,14 @@ class ActivationAuth extends TestAuth {
 class ActivationFixture extends SetupFixture {
   final favourites = <String>[];
   final joins = <int>[];
+  int favouriteRefreshes = 0;
+  @override
+  Future<List<SetupTitle>> favouriteRecommendations(String userId) async {
+    expect(favourites, isNotEmpty);
+    favouriteRefreshes++;
+    return super.favouriteRecommendations(userId);
+  }
+
   @override
   Future<Map<String, dynamic>?> conversation(int id) async => {
         'id': 'local-thread',
@@ -142,6 +150,8 @@ void main() {
     expect(find.text('Saved'), findsOneWidget);
     expect(find.text('1 saved for later').hitTestable(), findsOneWidget);
     expect(find.text('Waiting for you in Watchlist.'), findsOneWidget);
+    await tap(t, 'Continue to favourites');
+    await tap(t, 'Continue to sharing');
     await tap(t, 'Find my kind of people');
     expect(find.text('Which Alien would you watch again?'), findsOneWidget);
     await tap(t, 'Read the conversation');
@@ -154,7 +164,8 @@ void main() {
     final service = ActivationFixture();
     await mount(t, service);
     await picks(t);
-    await tap(t, 'Make your profile more you');
+    await tap(t, 'Continue to favourites');
+    expect(find.text('Add your favourites'), findsOneWidget);
     expect(service.favourites, isEmpty);
     final choice = find.widgetWithText(CheckboxListTile, 'Fixture movie');
     expect(t.widget<CheckboxListTile>(choice).value, false);
@@ -166,10 +177,40 @@ void main() {
     expect(service.favourites, ['movie:1']);
     expect(find.text('Added to your profile'), findsOneWidget);
   });
+  testWidgets(
+      'quick add reuses taste movies and sharing requires a separate opt-in',
+      (t) async {
+    final service = ActivationFixture();
+    await mount(t, service);
+    await picks(t);
+    expect(service.favourites, isEmpty);
+    expect(service.sharingWrites, isEmpty);
+    await tap(t, 'Continue to favourites');
+    await t.ensureVisible(find.text('Add your favourites'));
+    await t.pumpAndSettle();
+    await captureActivation(t, 'signup-favourites');
+    await tap(t, 'Add my movie picks to favourites');
+    expect(service.favourites, ['movie:1']);
+    expect(service.sharingWrites, isEmpty);
+    expect(service.favouriteRefreshes, 1);
+    await tap(t, 'Continue to sharing');
+    final toggle =
+        find.widgetWithText(SwitchListTile, 'Share on Around Flixie');
+    await t.ensureVisible(toggle);
+    await t.pumpAndSettle();
+    await captureActivation(t, 'signup-sharing');
+    expect(t.widget<SwitchListTile>(toggle).value, false);
+    await t.tap(toggle);
+    await t.pumpAndSettle();
+    expect(service.sharingWrites, [true]);
+    expect(t.widget<SwitchListTile>(toggle).value, true);
+  });
   testWidgets('joining is explicit; skipping setup can reach Home', (t) async {
     final service = ActivationFixture();
     await mount(t, service);
     await picks(t);
+    await tap(t, 'Continue to favourites');
+    await tap(t, 'Continue to sharing');
     await tap(t, 'Find my kind of people');
     await tap(t, 'Horror');
     expect(service.joins, isEmpty);
@@ -182,6 +223,8 @@ void main() {
     await mount(t, service);
     await tap(t, 'Skip taste picks');
     await tap(t, 'Skip services for now');
+    await tap(t, 'Skip picks');
+    await tap(t, 'Skip favourites');
     await tap(t, 'I’ll explore on my own');
     expect(find.text('Home destination'), findsOneWidget);
     expect(service.taste, isEmpty);
@@ -205,15 +248,13 @@ void main() {
         if (title.id == 2 && fail) throw StateError('offline');
       },
     )))));
-    await tap(t, 'Make your profile more you');
-    await tap(t, 'Alien');
-    await tap(t, 'Obsession');
-    await tap(t, 'Add selected to my profile');
+    expect(find.text('Add your favourites'), findsOneWidget);
+    await tap(t, 'Add my movie picks to favourites');
     expect(attempts, [348, 2]);
     expect(find.textContaining('Your successful choices are saved'),
         findsOneWidget);
     fail = false;
-    await tap(t, 'Add selected to my profile');
+    await tap(t, 'Add my movie picks to favourites');
     expect(attempts, [348, 2, 2]);
   });
   for (final size in [
@@ -231,8 +272,11 @@ void main() {
       await picks(t);
       expect(t.takeException(), isNull);
       await captureActivation(t, '${size.width.toInt()}-picks-large');
-      await tap(t, 'Make your profile more you');
+      expect(find.text('Add your favourites'), findsNothing);
+      await tap(t, 'Continue to favourites');
+      expect(find.text('Add your favourites'), findsOneWidget);
       expect(t.takeException(), isNull);
+      await tap(t, 'Continue to sharing');
       await tap(t, 'Find my kind of people');
       expect(t.takeException(), isNull);
     });

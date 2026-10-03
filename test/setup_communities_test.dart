@@ -81,6 +81,8 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'Continue');
     await tap(tester, 'Skip services for now');
+    await tap(tester, 'Continue to favourites');
+    await tap(tester, 'Continue to sharing');
     await tap(tester, 'Find my kind of people');
   }
 
@@ -196,6 +198,8 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'Skip taste picks');
     await tap(tester, 'Skip services for now');
+    await tap(tester, 'Continue to favourites');
+    await tap(tester, 'Continue to sharing');
     await tester.tap(find.text('Find my kind of people'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

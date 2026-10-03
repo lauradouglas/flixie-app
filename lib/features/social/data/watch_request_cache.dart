@@ -1,3 +1,4 @@
+import 'package:flutter/scheduler.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flutter/foundation.dart';
@@ -43,7 +44,7 @@ class WatchRequestCache extends ChangeNotifier {
   List<GroupWatchRequest> forGroup(String groupId) =>
       List.unmodifiable(_byGroup[groupId] ?? const <GroupWatchRequest>[]);
 
-  void syncUser(String? userId) {
+  void syncUser(String? userId, {bool deferWarm = false}) {
     if (_userId == userId) return;
     _userId = userId;
     _generation++;
@@ -58,8 +59,17 @@ class WatchRequestCache extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    _preload(userId);
-    _preloadDirect();
+    void warm() {
+      if (_disposed || _userId != userId) return;
+      _preload(userId);
+      _preloadDirect();
+    }
+
+    if (deferWarm) {
+      SchedulerBinding.instance.addPostFrameCallback((_) => warm());
+    } else {
+      warm();
+    }
   }
 
   Future<void> _preload(String userId) async {

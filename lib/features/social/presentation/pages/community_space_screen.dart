@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -359,7 +360,7 @@ class _SpaceCollectionState extends State<SpaceCollection> {
             if (_next != null && _error == null)
               TextButton(
                   onPressed: _more ? null : () => _load(more: true),
-                  child: Text(_more ? 'Loading…' : 'Load more')),
+                  child: LoadingActionLabel(loading: _more, text: 'Load more')),
           ]));
   Widget _thread(Map<String, dynamic> row) {
     final user =

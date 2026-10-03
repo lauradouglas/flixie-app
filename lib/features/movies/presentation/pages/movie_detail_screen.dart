@@ -77,12 +77,16 @@ class MovieDetailScreen extends StatefulWidget {
     required this.movieId,
     this.fromMovieMatch = false,
     this.source = DetailSource.unknown,
+    this.initialTitle,
+    this.initialPoster,
     this.recommendation,
   });
 
   final String movieId;
   final bool fromMovieMatch;
   final DetailSource source;
+  final String? initialTitle;
+  final String? initialPoster;
   final RecommendationAttribution? recommendation;
 
   @override
@@ -571,6 +575,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     }
   }
 
+  final Set<String> _loadedSections = {};
+
   Future<void> _optional<T>(
       String key, Future<T> Function() fetch, void Function(T) apply) async {
     final generation = _loadGeneration;
@@ -592,6 +598,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       if (!current()) return;
       setState(() {
         apply(value);
+        _loadedSections.add(key);
         _sectionStates.remove(key);
       });
     } catch (error) {
@@ -603,21 +610,31 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   Widget _optionalSection(String key, String label, Widget child) {
     final state = _sectionStates[key];
-    if (state == null) return child;
+    if (state == null ||
+        (state == 'loading' && _loadedSections.contains(key))) {
+      return child;
+    }
+    if (state == 'loading') {
+      if (child is SizedBox && child.child == null) {
+        return const SizedBox.shrink();
+      }
+      return ContentPlaceholder(
+          label: 'Loading $label',
+          style: switch (key) {
+            'providers' => ContentPlaceholderStyle.providers,
+            'credits' ||
+            'images' ||
+            'similar' =>
+              ContentPlaceholderStyle.posters,
+            'reviews' => ContentPlaceholderStyle.review,
+            _ => ContentPlaceholderStyle.rows,
+          });
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
-        if (state == 'loading') ...[
-          SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, semanticsLabel: 'Loading $label')),
-          const SizedBox(width: 12),
-        ],
         Expanded(
-            child: Text(
-                state == 'loading' ? 'Loading $label…' : 'Couldn’t load $label',
+            child: Text('Couldn’t load $label',
                 style: TextStyle(color: context.colors.medium))),
         if (state == 'error')
           TextButton(
@@ -645,25 +662,28 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       _error = null;
       _sectionStates.clear();
       _sectionRetries.clear();
-      _similar = [];
-      _cast = [];
-      _director = null;
-      _writers = [];
-      _producers = [];
-      _watchProviders = [];
-      _movieImages = const MovieImages();
-      _userRating = null;
-      _userRecommends = null;
-      _reviews = [];
-      _friendsActivity = [];
-      _friendSummary = null;
-      _friendRecommendation = null;
-      _movieWatchHistory = [];
-      _watchHistoryLoaded = false;
-      _myListsContainingMovie = [];
-      _friendsListsContainingMovie = [];
-      _userProviderIds = {};
-      _userProviderMatchKeys = {};
+      if (_movie == null) {
+        _loadedSections.clear();
+        _similar = [];
+        _cast = [];
+        _director = null;
+        _writers = [];
+        _producers = [];
+        _watchProviders = [];
+        _movieImages = const MovieImages();
+        _userRating = null;
+        _userRecommends = null;
+        _reviews = [];
+        _friendsActivity = [];
+        _friendSummary = null;
+        _friendRecommendation = null;
+        _movieWatchHistory = [];
+        _watchHistoryLoaded = false;
+        _myListsContainingMovie = [];
+        _friendsListsContainingMovie = [];
+        _userProviderIds = {};
+        _userProviderMatchKeys = {};
+      }
     });
     final core = service.getMovieById(id);
     final optional = <Future<void>>[
@@ -1391,7 +1411,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: context.colors.background,
-        body: const SafeArea(child: MediaDetailScreenSkeleton()),
+        body: widget.initialTitle != null
+            ? MediaDetailPreview(
+                title: widget.initialTitle!, poster: widget.initialPoster)
+            : const SafeArea(child: MediaDetailScreenSkeleton()),
       );
     }
 
@@ -2410,11 +2433,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                 ),
                 _DashboardTile(
                   title: 'Your rating',
-                  value: _sectionStates['rating'] == 'loading'
-                      ? 'Loading…'
-                      : _userRating != null
-                          ? '${_userRating!}/10'
-                          : '+ Rate',
+                  loading: _sectionStates['rating'] == 'loading' &&
+                      !_loadedSections.contains('rating'),
+                  value: _userRating != null ? '${_userRating!}/10' : '+ Rate',
                   icon: Icons.star_rounded,
                   color: context.colors.warning,
                   onTap:
@@ -2781,10 +2802,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   /// CTA change with the latest entry, rather than mixing a movie-level rating
   /// with a separate watch-history action.
   Widget _buildWatchEntryStatusRow() {
-    if (_watchHistoryLoading) {
-      return const Padding(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: Text('Loading your watch history…'));
+    if (_watchHistoryLoading && !_watchHistoryLoaded) {
+      return const ContentPlaceholder(
+          label: 'Loading watch history',
+          style: ContentPlaceholderStyle.compact);
     }
     if (_sectionStates['history'] == 'error') {
       return TextButton.icon(
@@ -3314,8 +3335,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (userId == null) return const SizedBox.shrink();
     final movieId = int.tryParse(widget.movieId);
     final loading = _friendSummaryLoading || _friendRecommendationLoading;
-    if (loading && _friendsActivity.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+    if (loading &&
+        _friendsActivity.isEmpty &&
+        !_loadedSections.contains('friend summary')) {
+      return const ContentPlaceholder(
+          label: 'Loading friend activity', rows: 1);
     }
     if (_friendsActivity.isEmpty && _friendSummary?.friendCount != null) {
       return const SizedBox.shrink();
@@ -5018,8 +5042,10 @@ class _DashboardTile extends StatelessWidget {
     required this.icon,
     required this.color,
     this.onTap,
+    this.loading = false,
   });
 
+  final bool loading;
   final String title;
   final String value;
   final IconData icon;
@@ -5041,17 +5067,20 @@ class _DashboardTile extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 18),
           const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: context.colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              height: 1.08,
+          if (loading)
+            const SkeletonBox(width: 52, height: 16)
+          else
+            Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: context.colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                height: 1.08,
+              ),
             ),
-          ),
           const SizedBox(height: 4),
           Text(
             title,

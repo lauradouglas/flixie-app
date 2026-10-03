@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'genre_communities_screen.dart';
 import '../widgets/social_activity_view.dart';
 import '../widgets/people_directory.dart';
@@ -330,12 +332,24 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ContentListSkeleton();
     }
 
     if (_error != null) {
-      return Center(
-        child: Text(_error!, style: TextStyle(color: context.colors.medium)),
+      return FlixieRefresh(
+        onRefresh: _load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Text(_error!,
+                    style: TextStyle(color: context.colors.medium)),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -346,7 +360,7 @@ class _FriendsSubViewState extends State<_FriendsSubView> {
             .toList() ??
         const <FriendshipUser>[];
 
-    return RefreshIndicator(
+    return FlixieRefresh(
       onRefresh: _load,
       color: FlixieColors.primary,
       child: SingleChildScrollView(
@@ -1144,12 +1158,24 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ContentListSkeleton();
     }
 
     if (_error != null) {
-      return Center(
-        child: Text(_error!, style: TextStyle(color: context.colors.medium)),
+      return FlixieRefresh(
+        onRefresh: _load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Text(_error!,
+                    style: TextStyle(color: context.colors.medium)),
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -1161,7 +1187,7 @@ class _GroupsSubViewState extends State<_GroupsSubView> {
     return Column(
       children: [
         Expanded(
-          child: RefreshIndicator(
+          child: FlixieRefresh(
             onRefresh: _load,
             color: FlixieColors.primary,
             child: _innerTab == 1
@@ -1870,7 +1896,7 @@ class _CreateGroupSheetState extends State<_CreateGroupSheet> {
         const SizedBox(height: 8),
         Expanded(
           child: _loadingFriends
-              ? const Center(child: CircularProgressIndicator())
+              ? const ContentListSkeleton()
               : filtered.isEmpty
                   ? Center(
                       child: Text(

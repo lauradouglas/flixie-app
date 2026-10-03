@@ -22,6 +22,18 @@ class ApiException implements Exception {
 
 class ApiClient {
   static http.Client? _testClient;
+  static http.Client? _transport;
+
+  /// Application-owned transport. Tests can still override requests explicitly
+  /// or use runWithClient before application initialisation.
+  static void initializeTransport({http.Client? client}) {
+    _transport ??= client ?? http.Client();
+  }
+
+  static void closeTransport() {
+    _transport?.close();
+    _transport = null;
+  }
 
   /// Native frame callbacks do not retain runWithClient's zone. Device tests
   /// supply a client explicitly and restore null in tearDown. Caller owns it.
@@ -118,8 +130,7 @@ class ApiClient {
       try {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
-          message =
-              decoded['error'] as String? ??
+          message = decoded['error'] as String? ??
               decoded['message'] as String? ??
               response.body;
           code = decoded['code'] as String?;
@@ -265,7 +276,8 @@ class ApiClient {
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
       try {
-        final response = await (_testClient?.get ?? http.get)(uri, headers: headers)
+        final response = await ((_testClient ?? _transport)?.get ??
+                http.get)(uri, headers: headers)
             .timeout(_timeout);
         apiLogger.d('Response ${response.statusCode}');
         return _parseResponse(response);
@@ -314,12 +326,11 @@ class ApiClient {
       authenticated: true,
       requestLabel: 'POST $path',
       request: () async {
-        final response = await (_testClient?.post ?? http.post)(
-              _buildUri(path),
-              headers: _headers(),
-              body: body != null ? jsonEncode(body) : null,
-            )
-            .timeout(timeout ?? _timeout);
+        final response = await ((_testClient ?? _transport)?.post ?? http.post)(
+          _buildUri(path),
+          headers: _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        ).timeout(timeout ?? _timeout);
         return _parseResponse(response);
       },
     );
@@ -330,12 +341,11 @@ class ApiClient {
       authenticated: true,
       requestLabel: 'PUT $path',
       request: () async {
-        final response = await (_testClient?.put ?? http.put)(
-              _buildUri(path),
-              headers: _headers(),
-              body: body != null ? jsonEncode(body) : null,
-            )
-            .timeout(_timeout);
+        final response = await ((_testClient ?? _transport)?.put ?? http.put)(
+          _buildUri(path),
+          headers: _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        ).timeout(_timeout);
         return _parseResponse(response);
       },
     );
@@ -346,12 +356,12 @@ class ApiClient {
       authenticated: true,
       requestLabel: 'PATCH $path',
       request: () async {
-        final response = await (_testClient?.patch ?? http.patch)(
-              _buildUri(path),
-              headers: _headers(),
-              body: body != null ? jsonEncode(body) : null,
-            )
-            .timeout(_timeout);
+        final response =
+            await ((_testClient ?? _transport)?.patch ?? http.patch)(
+          _buildUri(path),
+          headers: _headers(),
+          body: body != null ? jsonEncode(body) : null,
+        ).timeout(_timeout);
         return _parseResponse(response);
       },
     );
@@ -367,9 +377,10 @@ class ApiClient {
         if (body != null) {
           request.body = jsonEncode(body);
         }
-        final response = await (_testClient?.send(request) ?? request.send())
-            .then(http.Response.fromStream)
-            .timeout(_timeout);
+        final response =
+            await ((_testClient ?? _transport)?.send(request) ?? request.send())
+                .then(http.Response.fromStream)
+                .timeout(_timeout);
         return _parseResponse(response);
       },
     );

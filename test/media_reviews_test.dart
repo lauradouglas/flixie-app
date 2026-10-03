@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -135,7 +136,7 @@ void main() {
           onWriteReview: () => writes++,
         ))));
     await show(loading: true);
-    expect(find.text('Loading reviews…'), findsOneWidget);
+    expect(find.byType(ContentPlaceholder), findsOneWidget);
     expect(find.textContaining('No reviews yet'), findsNothing);
     await show(failed: true);
     expect(find.textContaining('No reviews yet'), findsNothing);

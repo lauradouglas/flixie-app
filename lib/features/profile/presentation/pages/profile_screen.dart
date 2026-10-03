@@ -1,4 +1,4 @@
-import 'package:flixie_app/features/profile/presentation/widgets/profile_scroll_view.dart';
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/monthly_watch_summary.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_poster_rail.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_library_totals.dart';
@@ -20,7 +20,6 @@ import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/continue_watching_show.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/review.dart';
-import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
 import 'package:flixie_app/models/person.dart';
@@ -44,8 +43,6 @@ import 'package:flixie_app/features/movies/data/person_service.dart';
 import 'package:flixie_app/features/home/presentation/widgets/continue_watching_carousel.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
-import 'package:flixie_app/features/social/data/group_service.dart';
-import 'package:flixie_app/features/social/data/request_service.dart';
 
 enum _ProfileTab { library, activity, stats }
 
@@ -79,8 +76,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _activityRequestRunning = false;
   List<Review> _reviews = [];
   int _reviewCount = 0;
-  List<Group> _groups = [];
-  List<WatchRequest> _watchRequests = [];
   bool _profileExtrasLoading = true;
   MovieWrapped? _wrapped;
   Map<int, Person> _directorPeople = {};
@@ -92,18 +87,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       FriendActionsController.instance;
   final ProfileLookupController _profileLookup =
       ProfileLookupController.instance;
-
-  MovieWrapped _emptyWrapped() => MovieWrapped(
-        year: DateTime.now().year,
-        totalMoviesWatched: 0,
-        rewatchCount: 0,
-        totalHoursWatched: 0,
-        topGenres: const [],
-        topDirectors: const [],
-        topMovies: const [],
-        highestRatedMovies: const [],
-        monthlyWatchCounts: const [],
-      );
 
   @override
   void didChangeDependencies() {
@@ -142,6 +125,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (userId != null &&
         (userId != _loadedForUserId || version != _lastActivityVersion)) {
       if (userId != _loadedForUserId) {
+        _statsGeneration++;
+        _statsLoading = false;
+        _wrapped = null;
+        _directorPeople = {};
         _loadAll();
       } else {
         _loadActivity();
@@ -174,10 +161,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   bool _statsFailed = false;
-  bool _socialLoadFailed = false;
 
   Future<void> _loadProfileExtras() async {
-    _socialLoadFailed = false;
     _statsFailed = false;
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
@@ -189,8 +174,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _reviews = auth.cachedReviews ?? _reviews;
         _reviewCount = _reviews.length;
-        _groups = auth.cachedGroups ?? _groups;
-        _watchRequests = auth.cachedWatchRequests ?? _watchRequests;
       });
     }
     final libraryFuture = Future.wait<Object>([
@@ -199,21 +182,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ProfileLookupController.instance
           .getUserWatchProviders(userId)
           .catchError((_) => <WatchProvider>[]),
-    ]);
-    final statsFuture = Future.wait<Object>([
-      UserService.getUserReviews(userId).catchError((_) => _reviews),
-      GroupService.getUserGroups(userId).catchError((_) {
-        _socialLoadFailed = true;
-        return _groups;
-      }),
-      RequestService.getWatchRequests(userId).catchError((_) {
-        _socialLoadFailed = true;
-        return _watchRequests;
-      }),
-      UserService.getMovieWrapped(userId, DateTime.now().year).catchError((_) {
-        _statsFailed = true;
-        return _wrapped ?? _emptyWrapped();
-      }),
     ]);
 
     try {
@@ -229,50 +197,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) setState(() => _profileExtrasLoading = false);
     }
 
+    if (_selectedTab == _ProfileTab.stats) await _loadStats();
+  }
+
+  int _statsGeneration = 0;
+  bool _statsLoading = false;
+  Future<void> _loadStats() async {
+    if (_statsLoading) return;
+    final generation = ++_statsGeneration;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null) return;
+    setState(() {
+      _statsLoading = true;
+      _statsFailed = false;
+    });
+    bool current() =>
+        mounted &&
+        generation == _statsGeneration &&
+        context.read<AuthProvider>().dbUser?.id == userId;
     try {
-      final results = await statsFuture.timeout(const Duration(seconds: 15));
-      final wrapped = results[3] as MovieWrapped;
-      if (!mounted) return;
+      final results = await Future.wait<Object>([
+        UserService.getUserReviews(userId),
+        UserService.getMovieWrapped(userId, DateTime.now().year),
+      ]);
+      if (!current()) return;
+      final wrapped = results[1] as MovieWrapped;
       setState(() {
-        if (!_statsFailed) _wrapped = wrapped;
         _reviews = results[0] as List<Review>;
         _reviewCount = _reviews.length;
+        _wrapped = wrapped;
       });
-      final directorResults = await Future.wait(
-        wrapped.topDirectors
-            .where((director) => director.personId != null)
-            .take(4)
-            .map((director) async {
-          final id = director.personId!;
-          try {
-            final person = await PersonService.getPersonById(id)
-                .timeout(const Duration(seconds: 10));
-            return (id: id, person: person);
-          } catch (_) {
-            return null;
-          }
-        }),
-      );
-      if (!mounted) return;
-      final watchRequests = results[2] as List<WatchRequest>;
+      final people = await Future.wait(wrapped.topDirectors
+          .where((director) => director.personId != null)
+          .take(4)
+          .map((director) async {
+        try {
+          final person = await PersonService.getPersonById(director.personId!)
+              .timeout(const Duration(seconds: 10));
+          return (id: director.personId!, person: person);
+        } catch (_) {
+          return null;
+        }
+      }));
+      if (!current()) return;
       setState(() {
-        _reviews = results[0] as List<Review>;
-        _reviewCount = _reviews.length;
-        _groups = results[1] as List<Group>;
-        _watchRequests = watchRequests;
-        if (!_statsFailed) _wrapped = wrapped;
         _directorPeople = {
-          for (final result
-              in directorResults.whereType<({int id, Person person})>())
-            result.id: result.person,
+          for (final entry in people.whereType<({int id, Person person})>())
+            entry.id: entry.person,
         };
       });
-      context.read<AuthProvider>().updateCachedWatchRequests(watchRequests);
-    } catch (e) {
-      logger.e('[ProfileScreen] stats extras load error: $e');
-      if (mounted) setState(() => _socialLoadFailed = true);
-      if (mounted) setState(() => _statsFailed = true);
+    } catch (_) {
+      if (current()) setState(() => _statsFailed = true);
+    } finally {
+      if (current()) setState(() => _statsLoading = false);
     }
+  }
+
+  void _selectTab(_ProfileTab tab) {
+    setState(() => _selectedTab = tab);
+    if (tab == _ProfileTab.stats && _wrapped == null) _loadStats();
   }
 
   Future<void> _removeContinueWatchingShow(ContinueWatchingShow show) async {
@@ -515,7 +498,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _ratingsLoading &&
               _profileExtrasLoading
           ? const ProfileScreenSkeleton()
-          : RefreshIndicator(
+          : FlixieRefresh(
               color: FlixieColors.primary,
               onRefresh: () async {
                 final auth = context.read<AuthProvider>();
@@ -530,7 +513,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
                 await _loadAll();
               },
-              child: ProfileScrollView(
+              child: CustomScrollView(
+                key: const PageStorageKey('profile-scroll'),
+                physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(
                       child: ProfileHeader(
@@ -571,9 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       16) *
                                   2,
                           child: _ProfileTabSelector(
-                              selected: _selectedTab,
-                              onSelected: (tab) =>
-                                  setState(() => _selectedTab = tab)))),
+                              selected: _selectedTab, onSelected: _selectTab))),
                   SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                       sliver: _selectedTab == _ProfileTab.activity
@@ -678,8 +661,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 20),
         ],
-        if (_activityLoading)
-          const LinearProgressIndicator()
+        if (_activityLoading && _activity.isEmpty)
+          const ContentPlaceholder(
+              label: 'Loading recently watched',
+              style: ContentPlaceholderStyle.posters)
         else
           _recentlyWatched(),
         const SizedBox(height: 20),
@@ -708,7 +693,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: _ratingsLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const ContentPlaceholder(label: 'Loading ratings')
                     : RatingsSection(ratings: _ratings),
               ),
             ),
@@ -817,6 +802,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           SingleChildScrollView(
+              key: const PageStorageKey('profile-activity-filters'),
               scrollDirection: Axis.horizontal,
               child: Row(children: [
                 for (final filter in _ActivityFilter.values)
@@ -838,8 +824,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           })),
               ])),
           const SizedBox(height: 12),
-          if (_activityLoading)
-            const LinearProgressIndicator()
+          if (_activityLoading && _activity.isEmpty)
+            const ContentPlaceholder(label: 'Loading activity')
           else if (_activityFailed)
             TextButton.icon(
                 onPressed: _loadActivity,
@@ -863,8 +849,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? null
                         : () => _loadActivity(more: true),
                     icon: const Icon(Icons.expand_more),
-                    label: Text(
-                        _activityRequestRunning ? 'Loading…' : 'Load 20 more'))
+                    label: LoadingActionLabel(
+                        loading: _activityRequestRunning, text: 'Load 20 more'))
                 : filtered.isEmpty
                     ? const SizedBox.shrink()
                     : Center(
@@ -902,14 +888,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (_wrapped?.insights != null)
               SliverToBoxAdapter(
                   child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                padding: const EdgeInsets.only(top: 4, bottom: 12),
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _SocialSectionHeader(
                           title: 'This month',
-                          onSeeAll: () =>
-                              setState(() => _selectedTab = _ProfileTab.stats),
+                          onSeeAll: () => context.push('/stats'),
                           actionLabel: 'View stats'),
                       MonthlyWatchSummary(
                         movies: (_wrapped!.insights!['monthMovies'] as num?)
@@ -950,7 +935,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (user?.id != null)
               SliverToBoxAdapter(
                   child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: EdgeInsets.zero,
                 child: Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
@@ -966,7 +951,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _ProfileStatsContent(
         wrapped: _wrapped,
         failed: _statsFailed,
-        onRetry: _loadProfileExtras,
+        onRetry: _loadStats,
         ratings: _ratings,
         reviewCount: _reviewCount,
         favoriteGenres: favoriteGenres,
@@ -1127,7 +1112,7 @@ class _ProfileStatsContent extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
               label: const Text('Couldn’t load stats. Retry'))
-          : const Center(child: CircularProgressIndicator());
+          : const ContentPlaceholder(label: 'Loading statistics');
     }
     final average = ratings.isEmpty
         ? '–'
@@ -1615,20 +1600,8 @@ class _ProfileExtrasLoadingIndicator extends StatelessWidget {
   const _ProfileExtrasLoadingIndicator();
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'Updating the rest of your profile…',
-            style: TextStyle(color: context.colors.medium),
-          ),
-        ],
-      );
+  Widget build(BuildContext context) => const ContentPlaceholder(
+      label: 'Loading profile details', style: ContentPlaceholderStyle.compact);
 }
 
 class _WatchProvidersSummary extends StatelessWidget {
@@ -1949,11 +1922,7 @@ class _ProfileTabsDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
           BuildContext context, double shrinkOffset, bool overlapsContent) =>
-      ColoredBox(
-          color: context.colors.background,
-          child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: child));
+      ColoredBox(color: context.colors.background, child: child);
   @override
   bool shouldRebuild(covariant _ProfileTabsDelegate oldDelegate) => true;
 }

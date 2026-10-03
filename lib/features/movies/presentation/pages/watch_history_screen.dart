@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -347,7 +348,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ContentListSkeleton()
           : _error != null && _all.isEmpty
               ? Center(
                   child: SingleChildScrollView(

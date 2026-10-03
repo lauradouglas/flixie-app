@@ -90,7 +90,8 @@ class FixtureCommunity extends CommunityService {
       String filter = 'all',
       String sort = 'latest',
       String? owner,
-      bool saved = false}) async {
+      bool saved = false,
+      int? limit}) async {
     cursors.add(cursor);
     queries.add('$filter:$sort:$saved');
     if (fail) throw Exception('offline');
@@ -136,6 +137,21 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
         () => MockClient((request) async {
+              if (request.url.path == '/community/activity-state') {
+                return http.Response(
+                    jsonEncode({
+                      'items': [
+                        for (final target
+                            in jsonDecode(request.body)['targets'] as List)
+                          {
+                            ...target,
+                            'reactions': {'counts': {}, 'mine': null},
+                            'saved': false
+                          }
+                      ]
+                    }),
+                    200);
+              }
               if (request.method == 'POST') {
                 writes.add(request.url.path);
                 return http.Response(
@@ -181,13 +197,16 @@ void main() {
     expect(
         tester
             .widget<Switch>(find.descendant(
-                of: find.widgetWithText(SwitchListTile, 'Share on Around Flixie'),
+                of: find.widgetWithText(
+                    SwitchListTile, 'Share on Around Flixie'),
                 matching: find.byType(Switch)))
             .value,
         true);
     expect(find.text('Couldn’t update sharing. Please try again.'),
         findsOneWidget);
     service.fail = false;
+    await tester.ensureVisible(find.byTooltip('Close settings'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Close settings'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Show more'), 250,

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter/material.dart';
 import '../../data/community_service.dart';
 
@@ -73,15 +74,17 @@ class _CommunityFollowButtonState extends State<CommunityFollowButton> {
                   minimumSize: const Size(76, 44),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10))),
-              child: Text(_busy
-                  ? 'Saving…'
-                  : _failed
-                      ? 'Retry follow status'
-                      : _following == null
-                          ? 'Loading…'
-                          : _following!
-                              ? 'Following'
-                              : 'Follow'),
+              child: _following == null && !_failed && !_busy
+                  ? const SizedBox(width: 54, height: 14, child: SkeletonBox())
+                  : Text(_busy
+                      ? 'Saving…'
+                      : _failed
+                          ? 'Retry follow status'
+                          : _following == null
+                              ? 'Follow'
+                              : _following!
+                                  ? 'Following'
+                                  : 'Follow'),
             )
           : TextButton.icon(
               onPressed: _busy

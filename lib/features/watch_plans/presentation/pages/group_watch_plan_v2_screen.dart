@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/app/theme/flixie_typography.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -274,7 +275,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     );
   }
 
-  Widget _screenBody(GroupWatchRequest? request) => RefreshIndicator(
+  Widget _screenBody(GroupWatchRequest? request) => FlixieRefresh(
         color: FlixieColors.primary,
         onRefresh: _load,
         child: ListView(

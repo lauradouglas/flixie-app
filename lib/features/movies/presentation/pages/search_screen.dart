@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/flixie_refresh.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/collections/collection_screen.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
@@ -117,13 +119,14 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  Future<void> _loadDefaultData() async {
+  Future<void> _loadDefaultData({bool refresh = false}) async {
     setState(() {
       _defaultFailed = false;
       _isLoadingDefault = _trendingMovies.isEmpty;
     });
     try {
-      final trending = await TrendingService.getTrendingMovies();
+      final trending =
+          await TrendingService.getTrendingMovies(refresh: refresh);
       if (mounted) {
         setState(() {
           _trendingMovies = trending;
@@ -166,13 +169,14 @@ class _SearchScreenState extends State<SearchScreen> {
     _performSearch(query);
   }
 
-  Future<void> _performSearch(String query, {bool loadMore = false}) async {
+  Future<void> _performSearch(String query,
+      {bool loadMore = false, bool refresh = false}) async {
     if (query.trim().isEmpty) return;
     final requestId = ++_searchRequestId;
     final page =
         loadMore ? (_searchResults?.page ?? _entityResults?.page ?? 1) + 1 : 1;
     setState(() {
-      _isSearching = !loadMore;
+      _isSearching = !loadMore && !refresh;
       _loadingMore = loadMore;
       _searchFailed = false;
     });
@@ -270,9 +274,19 @@ class _SearchScreenState extends State<SearchScreen> {
           _buildSearchBar(),
           _buildSearchModeSelector(),
           Expanded(
-            child: _query.trim().isEmpty
-                ? _buildDefaultView()
-                : _buildSearchResultsView(),
+            child: FlixieRefresh(
+              onRefresh: () async {
+                _debounce?.cancel();
+                if (_query.trim().isEmpty) {
+                  await _loadDefaultData(refresh: true);
+                } else {
+                  await _performSearch(_query.trim(), refresh: true);
+                }
+              },
+              child: _query.trim().isEmpty
+                  ? _buildDefaultView()
+                  : _buildSearchResultsView(),
+            ),
           ),
         ],
       ),
@@ -412,7 +426,10 @@ class _SearchScreenState extends State<SearchScreen> {
         ],
         const _SectionHeader(title: 'Trending movies'),
         const SizedBox(height: 12),
-        if (_isLoadingDefault) const Center(child: CircularProgressIndicator()),
+        if (_isLoadingDefault && _trendingMovies.isEmpty)
+          const ContentPlaceholder(
+              label: 'Loading trending movies',
+              style: ContentPlaceholderStyle.posters),
         if (_defaultFailed)
           _retryMessage('Couldn’t load trending movies.', _loadDefaultData),
         LayoutBuilder(builder: (context, constraints) {
@@ -445,7 +462,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSearchResultsView() {
     if (_isSearching) {
-      return const Center(child: CircularProgressIndicator());
+      return const ContentListSkeleton(label: 'Loading search results');
     }
 
     if (_searchFailed && _searchResults == null && _entityResults == null) {
@@ -553,10 +570,12 @@ class _SearchScreenState extends State<SearchScreen> {
             query: _query.trim(),
             onTap: () {
               _saveHistory(_query);
-              context.push(showDetailPath(
-                item.show!.id,
-                source: DetailSource.search,
-              ));
+              context.push(
+                  showDetailPath(item.show!.id, source: DetailSource.search),
+                  extra: {
+                    'title': item.show!.name,
+                    'poster': item.show!.posterPath
+                  });
             },
           );
         }
@@ -566,10 +585,12 @@ class _SearchScreenState extends State<SearchScreen> {
             query: _query.trim(),
             onTap: () {
               _saveHistory(_query);
-              context.push(movieDetailPath(
-                item.movie!.id,
-                source: DetailSource.search,
-              ));
+              context.push(
+                  movieDetailPath(item.movie!.id, source: DetailSource.search),
+                  extra: {
+                    'title': item.movie!.name,
+                    'poster': item.movie!.poster
+                  });
             },
           );
         }

@@ -1,0 +1,32 @@
+{
+  "locale": "en-GB",
+  "ios": [
+    {
+      "name": "Flixie Screenshots iPhone",
+      "device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-26-5"
+    },
+    {
+      "name": "Flixie Screenshots iPad",
+      "device_type": "com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M5-16GB",
+      "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-26-5"
+    }
+  ],
+  "android": {
+    "avd": "Flixie_Patrol",
+    "size": "1080x1920",
+    "density": 420
+  },
+  "android_tablets": {
+    "sevenInchScreenshots": {
+      "avd": "Flixie_Patrol",
+      "size": "900x1600",
+      "density": 240
+    },
+    "tenInchScreenshots": {
+      "avd": "Flixie_Patrol",
+      "size": "1440x2560",
+      "density": 280
+    }
+  }
+}

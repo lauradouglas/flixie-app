@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -88,7 +89,7 @@ class _GroupInvitationDetailScreenState
         title: const Text('Group invitation'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ContentListSkeleton()
           : _error != null || _group == null
               ? Center(
                   child: Padding(

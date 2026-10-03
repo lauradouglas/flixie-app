@@ -21,6 +21,40 @@ class _Service extends CommunityService {
 }
 
 void main() {
+  testWidgets('background star failure stays in Social and retry recovers',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    var fail = true;
+    var requests = 0;
+    ApiClient.useClientForTesting(MockClient((request) async {
+      requests++;
+      return fail ? http.Response('{}', 403) : http.Response('{"ids":[]}', 200);
+    }));
+    addTearDown(() => ApiClient.useClientForTesting(null));
+    Widget screen(bool hidden) => MaterialApp(
+            home: Scaffold(
+                body: Column(children: [
+          const Text('Home'),
+          Offstage(
+              offstage: hidden,
+              child: PeopleDirectory(
+                  userId: 'star-error-fixture',
+                  friends: const [],
+                  service: _Service())),
+        ])));
+    await tester.pumpWidget(screen(true));
+    await tester.pumpAndSettle();
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.text('Couldn’t sync starred people.'), findsNothing);
+    await tester.pumpWidget(screen(false));
+    await tester.pumpAndSettle();
+    expect(find.text('Couldn’t sync starred people.'), findsOneWidget);
+    fail = false;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Couldn’t sync starred people.'), findsNothing);
+    expect(requests, greaterThanOrEqualTo(2));
+  });
   testWidgets('stars persist privately and following can be removed',
       (tester) async {
     SharedPreferences.setMockInitialValues({});

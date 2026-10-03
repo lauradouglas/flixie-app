@@ -23,6 +23,19 @@ import 'package:flixie_app/features/authentication/presentation/pages/onboarding
 import 'support/watchlist_auth.dart';
 
 class SetupFixture extends SetupService {
+  bool sharingEnabled = false;
+  final sharingWrites = <bool>[];
+  @override
+  Future<bool> sharing() async => sharingEnabled;
+  @override
+  Future<void> setSharing(bool value) async {
+    sharingWrites.add(value);
+    sharingEnabled = value;
+  }
+
+  @override
+  Future<List<SetupTitle>> favouriteRecommendations(String userId) =>
+      recommendations([]);
   @override
   Future<Map<String, dynamic>?> conversation(int id) async => null;
   @override
@@ -462,7 +475,7 @@ void main() {
     await tap(tester, 'Add to watchlist');
     expect(service.added.single.isShow, isTrue);
     expect(find.text('Saved'), findsOneWidget);
-    expect(find.text('Find my kind of people'), findsOneWidget);
+    expect(find.text('Continue to favourites'), findsOneWidget);
   });
   testWidgets(
       'taste footer edits remove choices and Continue saves remaining picks',

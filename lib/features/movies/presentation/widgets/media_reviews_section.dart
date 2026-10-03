@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/review.dart';
@@ -38,17 +39,15 @@ class MediaReviewsSection extends StatelessWidget {
                     label: const Text('Write review')),
               ]),
           const SizedBox(height: 12),
-          if (loading)
-            Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('Loading reviews…',
-                    style: TextStyle(color: context.colors.light)))
+          if (loading && reviews.isEmpty)
+            const ContentPlaceholder(
+                label: 'Loading reviews', style: ContentPlaceholderStyle.review)
           else if (failed)
             TextButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Couldn’t load reviews · Retry'))
-          else if (reviews.isEmpty)
+          else if (!loading && reviews.isEmpty)
             Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text('No reviews yet. What did you think?',

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -349,7 +350,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ContentListSkeleton()
           : Column(
               children: [
                 // Search bar
@@ -751,7 +752,7 @@ class _InviteMembersSheetState extends State<_InviteMembersSheet> {
           const SizedBox(height: 8),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const ContentListSkeleton()
                 : _loadError != null
                     ? Center(
                         child: SingleChildScrollView(

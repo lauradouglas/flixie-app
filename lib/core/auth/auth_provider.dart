@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/social/data/starred_people.dart';
 import 'package:flixie_app/features/social/data/people_cache.dart';
 import 'package:flixie_app/features/social/data/community_service.dart';
@@ -356,6 +357,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _termsVerified = false;
       _sessionGeneration++;
       _prefetchGeneration++;
+      ShowService.clearSummaryCache();
       _resumeRefreshFuture = null;
       _profileRefreshFuture = null;
       _lastResumeRefreshAt = null;
@@ -585,14 +587,25 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  /// Fetches profile/friend/home cache in parallel right after login.
+  /// Warms compact shared data after the authenticated route has painted.
   void _prefetch(String userId, {String? region}) {
+    final session = _sessionGeneration;
+    // Let the authenticated route paint before starting background warming.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || session != _sessionGeneration || _dbUser?.id != userId) {
+        return;
+      }
+      _runPrefetch(userId, region: region);
+    });
+  }
+
+  void _runPrefetch(String userId, {String? region}) {
     PeopleCache.instance.selectAccount(userId);
     unawaited(StarredPeople.instance.refresh().catchError((_) {}));
     unawaited(
         PeopleCache.instance.load(const CommunityService().followedPeople));
     // Independent of startup readiness and all other prefetch work.
-    unawaited(MilestoneCache.instance.warm(userId));
+    // Milestone details load when the milestone screen is opened.
     final session = _sessionGeneration;
     final generation = ++_prefetchGeneration;
     bool current() =>
@@ -615,6 +628,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     // Token registration is independent of home/profile prefetching. Start it
     // immediately so a slow secondary API cannot delay push notifications.
     _initializePushNotifications(_dbUser?.externalId ?? userId);
+    unawaited(ShowService.warmLibrarySummaries([
+      ...?_dbUser?.showWatchlist,
+      ...?_dbUser?.favoriteShows,
+    ]));
     final watchlistMovieIds = _dbUser?.movieWatchlist
             ?.where((item) => item.removed != true)
             .map((item) => item.movieId) ??

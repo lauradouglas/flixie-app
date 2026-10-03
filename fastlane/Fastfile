@@ -1,4 +1,5 @@
 require "shellwords"
+require "bundler"
 
 # Paths are rooted explicitly: Fastlane executes lanes from fastlane/.
 ROOT = File.expand_path("..", __dir__)
@@ -52,7 +53,51 @@ def play_options
   }
 end
 
+def capture_store_screenshots(platform, options)
+  args = ["python3", File.join(ROOT, "scripts/store-screenshots.py"), platform]
+  args += ["--device", options[:device].to_s] if options[:device]
+  args += ["--android-type", options[:type].to_s] if platform == "android" && options[:type]
+  # Flutter invokes the separately installed CocoaPods, outside this bundle.
+  clean_env = Bundler.respond_to?(:with_unbundled_env) ? :with_unbundled_env : :with_clean_env
+  Bundler.public_send(clean_env) do
+    Dir.chdir(ROOT) { sh(Shellwords.join(args)) }
+  end
+end
+
+def validate_store_screenshots(platform)
+  Dir.chdir(ROOT) do
+    sh(Shellwords.join(["python3", File.join(ROOT, "scripts/store-screenshots.py"), platform, "--validate"]))
+  end
+end
+
 platform :ios do
+  desc "Capture eight store screens on dedicated iOS simulators (no upload)"
+  lane :screenshots do |options|
+    capture_store_screenshots("ios", options)
+  end
+
+  desc "Add headlines and Flixie framing to captured iOS screenshots (no upload)"
+  lane :prepare_screenshots do
+    Dir.chdir(ROOT) do
+      sh(Shellwords.join(["python3", File.join(ROOT, "scripts/prepare-store-screenshots.py")]))
+    end
+  end
+
+  desc "Upload the validated iOS presentation without a build or review submission"
+  lane :upload_screenshots do
+    Dir.chdir(ROOT) do
+      sh(Shellwords.join(["python3", File.join(ROOT, "scripts/prepare-store-screenshots.py"), "--validate"]))
+    end
+    upload_to_app_store(
+      api_key: apple_key, app_identifier: "com.flixie.flixieApp",
+      screenshots_path: File.join(ROOT, "fastlane/store-presentation"),
+      skip_binary_upload: true, skip_metadata: true,
+      submit_for_review: false, automatic_release: false,
+      overwrite_screenshots: true, skip_app_version_update: true,
+      run_precheck_before_submit: false
+    )
+  end
+
   desc "Build a signed App Store IPA without uploading"
   lane :build do |options|
     number = release_number(options)
@@ -76,6 +121,33 @@ platform :ios do
 end
 
 platform :android do
+  desc "Capture eight store screens on a dedicated Android emulator (no upload)"
+  lane :screenshots do |options|
+    capture_store_screenshots("android", options)
+  end
+
+  desc "Add headlines and Flixie framing to Android captures (no upload)"
+  lane :prepare_screenshots do
+    Dir.chdir(ROOT) do
+      sh(Shellwords.join(["python3", File.join(ROOT, "scripts/prepare-store-screenshots.py"), "android"]))
+    end
+  end
+
+  desc "Upload validated Play presentation without a new app bundle"
+  lane :upload_screenshots do
+    Dir.chdir(ROOT) do
+      sh(Shellwords.join(["python3", File.join(ROOT, "scripts/prepare-store-screenshots.py"), "android", "--validate"]))
+    end
+    upload_to_play_store(
+      package_name: "com.flixie.app",
+      json_key: release_file(required_env("PLAY_STORE_KEY_FILE")),
+      metadata_path: File.join(ROOT, "fastlane/store-presentation-android"),
+      skip_upload_aab: true, skip_upload_apk: true,
+      skip_upload_metadata: true, skip_upload_images: true,
+      skip_upload_changelogs: true, skip_upload_screenshots: false
+    )
+  end
+
   desc "Build a signed production AAB without uploading"
   lane :build do |options|
     number = release_number(options)

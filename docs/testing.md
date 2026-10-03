@@ -70,16 +70,19 @@ just a mocked mobile test.
 
 ## Pull requests
 
-`.github/workflows/regression.yml` runs Flutter checks and Patrol iOS on pull
-requests, pushes to main and manual dispatch. Failure artifacts are uploaded.
+`.github/workflows/regression.yml` runs only when manually dispatched from
+GitHub Actions. Pushes and pull requests do not start regression tests. Manual
+runs include Flutter checks; the slower Patrol iOS simulator job is optional
+and disabled by default. Both jobs have a 20-minute timeout. Failure artifacts
+are uploaded.
 Android's native runner is configured for local/device-farm execution; Android
 device execution is not yet a CI job.
 The GitHub workflow must be pushed before it can run; local validation does not
 verify GitHub runner provisioning. Android device execution is not yet verified.
 
-After pushing this workflow, make both jobs required in the repository's branch
-protection/ruleset to block merging on failure. Merely adding the workflow does
-not change GitHub branch protection.
+Keep these optional jobs out of required branch-protection checks. If the
+workflow is disabled in GitHub, re-enable it after pushing the manual-only
+configuration before requesting a manual run.
 
 ## Baseline cleanup during setup
 

@@ -3,7 +3,6 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
-import 'auth_ui.dart';
 
 class SignupAvatarStep extends StatefulWidget {
   const SignupAvatarStep(
@@ -74,8 +73,69 @@ class _SignupAvatarStepState extends State<SignupAvatarStep> {
               onPressed: widget.saving ? null : widget.onBack,
               tooltip: 'Back',
               icon: const Icon(Icons.arrow_back_rounded))),
+      bottomNavigationBar: ColoredBox(
+        key: const ValueKey('avatar-footer-surface'),
+        color: colors.background,
+        child: SafeArea(
+          top: false,
+          minimum: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: Align(
+              heightFactor: 1,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 572),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  if (selected != null) ...[
+                    Semantics(
+                      liveRegion: true,
+                      label: '${selected.displayName} selected',
+                      child: Row(children: [
+                        portrait(selected, 32),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Text(selected.displayName,
+                                style: text.titleSmall)),
+                        Icon(Icons.check_rounded,
+                            color: colors.primaryText, size: 20),
+                      ]),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      key: const ValueKey('avatar-continue'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: FlixieColors.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(52),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                      onPressed:
+                          selected == null || widget.saving || widget.loading
+                              ? null
+                              : widget.onContinue,
+                      child: widget.saving
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Continue'),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
           top: false,
+          bottom: false,
           child: Center(
               child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 620),
@@ -196,47 +256,6 @@ class _SignupAvatarStepState extends State<SignupAvatarStep> {
                                     }).toList());
                               }),
                           ]))),
-              Container(
-                  decoration: BoxDecoration(
-                      color: colors.surfaceElevated,
-                      border:
-                          Border(top: BorderSide(color: colors.tabBarBorder))),
-                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 16),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Semantics(
-                        liveRegion: true,
-                        child: Row(children: [
-                          if (selected != null) ...[
-                            portrait(selected, 44),
-                            const SizedBox(width: 12)
-                          ],
-                          Expanded(
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                Text(
-                                    selected?.displayName ??
-                                        'Pick your favourite',
-                                    style: text.titleSmall),
-                                Text(
-                                    selected == null
-                                        ? 'This is how you’ll appear around Flixie.'
-                                        : 'Your avatar · change it anytime',
-                                    style: text.bodySmall),
-                              ])),
-                        ])),
-                    const SizedBox(height: 14),
-                    PrimaryButton(
-                        label: 'Continue',
-                        isLoading: widget.saving,
-                        onPressed:
-                            selected == null || widget.saving || widget.loading
-                                ? null
-                                : widget.onContinue),
-                    const SizedBox(height: 8),
-                    Text('Next: find your kind of films & series',
-                        style: text.bodySmall, textAlign: TextAlign.center),
-                  ])),
             ]),
           ))),
     );

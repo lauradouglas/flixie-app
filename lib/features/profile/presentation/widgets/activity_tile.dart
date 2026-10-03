@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/activity_state_batch.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/api/api_client.dart';
@@ -81,7 +82,6 @@ class _ActivityTileState extends State<ActivityTile>
     setState(() => _reactions = change.summary);
   }
 
-  static final _loads = <String, ({DateTime time, Future<dynamic> future})>{};
   String get _key => '${item.type.value}:${item.id}';
   String get _path => widget.community
       ? '/community/reactions/${item.userId}/${item.type.value}/${item.id}'
@@ -127,27 +127,23 @@ class _ActivityTileState extends State<ActivityTile>
     final actor = context.read<AuthProvider?>()?.dbUser?.id;
     if (actor == null || item.userId.isEmpty || _saving) return;
     final generation = ++_generation;
-    final cacheKey = '$actor:$_path';
-    final cached = _loads[cacheKey];
-    final future = !force &&
-            cached != null &&
-            DateTime.now().difference(cached.time).inSeconds < 20
-        ? cached.future
-        : ApiClient.get(_path);
-    if (_loads.length > 100) _loads.clear();
-    _loads[cacheKey] = (time: DateTime.now(), future: future);
     try {
-      final data = await future as Map;
-      if (mounted && generation == _generation && !_saving) {
-        setState(() => _reactions = widget.community
-            ? ActivityReactionSummary.fromJson(Map<String, dynamic>.from(data))
-            : data[_key] is Map
-                ? ActivityReactionSummary.fromJson(
-                    Map<String, dynamic>.from(data[_key]))
-                : const ActivityReactionSummary());
+      final data = await ActivityStateBatch.load(
+          viewer: actor,
+          owner: item.userId,
+          type: item.type.value,
+          id: item.id,
+          community: widget.community,
+          force: force);
+      if (mounted &&
+          generation == _generation &&
+          !_saving &&
+          actor == context.read<AuthProvider?>()?.dbUser?.id) {
+        setState(() => _reactions = ActivityReactionSummary.fromJson(
+            Map<String, dynamic>.from(data['reactions'] as Map)));
       }
     } catch (_) {
-      _loads.remove(cacheKey);
+      // Reaction failures do not hide an otherwise available activity card.
     }
   }
 
@@ -168,7 +164,7 @@ class _ActivityTileState extends State<ActivityTile>
         'activityType': item.type.value,
         'reaction': emoji
       });
-      _loads.clear();
+      ActivityStateBatch.clear();
       if (mounted) {
         _reactionChanges.value = (
           actor: actor,
@@ -251,23 +247,30 @@ class _ActivityTileState extends State<ActivityTile>
     final route = _mediaRoute();
     final payload = ActivityReplyPayload.fromActivity(item);
     if (widget.compact) {
-      final label = switch (item.type) {
-        ActivityListType.movieRating || ActivityListType.showRating => 'Rated',
-        ActivityListType.movieReview ||
-        ActivityListType.showReview =>
-          'Wrote a review',
-        ActivityListType.movieWatched ||
-        ActivityListType.showWatched =>
-          item.isRewatch ? 'Watched again' : 'Watched',
-        ActivityListType.movieWatchlist ||
-        ActivityListType.showWatchlist =>
-          'Added to watchlist',
-        ActivityListType.favoriteMovie ||
-        ActivityListType.favoriteShow ||
-        ActivityListType.favoritePerson =>
-          'Added to favourites',
-        _ => item.type.value.replaceAll('-', ' '),
-      };
+      final label = item.watchLogged &&
+              item.mediaRating != null &&
+              (item.type == ActivityListType.movieWatched ||
+                  item.type == ActivityListType.showWatched)
+          ? (item.isRewatch ? 'Watched again and rated' : 'Watched and rated')
+          : switch (item.type) {
+              ActivityListType.movieRating ||
+              ActivityListType.showRating =>
+                'Rated',
+              ActivityListType.movieReview ||
+              ActivityListType.showReview =>
+                'Wrote a review',
+              ActivityListType.movieWatched ||
+              ActivityListType.showWatched =>
+                item.isRewatch ? 'Watched again' : 'Watched',
+              ActivityListType.movieWatchlist ||
+              ActivityListType.showWatchlist =>
+                'Added to watchlist',
+              ActivityListType.favoriteMovie ||
+              ActivityListType.favoriteShow ||
+              ActivityListType.favoritePerson =>
+                'Added to favourites',
+              _ => item.type.value.replaceAll('-', ' '),
+            };
       return InkWell(
         onTap: () => showModalBottomSheet<void>(
             context: context,

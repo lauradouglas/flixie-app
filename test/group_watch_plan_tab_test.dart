@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -32,6 +33,48 @@ class _Auth extends ChangeNotifier implements AuthProvider {
 }
 
 void main() {
+  testWidgets('Plans renders collection without per-plan state requests',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final auth = _Auth();
+    addTearDown(auth.dispose);
+    var stateRequests = 0;
+    final plan = {
+      'id': 'fixture-plan',
+      'type': 'MOVIE_WATCH_REQUEST',
+      'requesterId': 'me',
+      'recipientId': 'friend',
+      'status': 'ACCEPTED',
+      'movieId': 348,
+      'movie': {'id': 348, 'title': 'Alien'},
+      'candidates': [],
+      'scheduleProposals': [],
+      'watchConfirmations': [],
+    };
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+          value: auth, child: const MaterialApp(home: WatchRequestsScreen())));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(stateRequests, 0);
+      expect(find.textContaining('Alien'), findsWidgets);
+
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Alien'), findsWidgets);
+      await tester.pumpWidget(const SizedBox());
+    },
+        () => MockClient((request) async {
+              if (request.url.path.endsWith('/state')) {
+                stateRequests++;
+                return http.Response(jsonEncode({'request': plan}), 200);
+              }
+              if (request.url.path.startsWith('/requests/')) {
+                return http.Response(jsonEncode([plan]), 200);
+              }
+              return http.Response('[]', 200);
+            }));
+  });
+
   testWidgets(
       'Groups tab embeds V2 directly and refreshes without opening another route',
       (tester) async {

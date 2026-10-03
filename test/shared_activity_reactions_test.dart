@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/activity_state_batch.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -11,6 +12,8 @@ import '../patrol_test/support/fixture_app.dart';
 import 'community_activity_feed_test.dart' as fixtures;
 
 void main() {
+  setUp(ActivityStateBatch.clear);
+  tearDown(ActivityStateBatch.clear);
   testWidgets(
       'a reaction changed in Community updates the mounted Friends card',
       (tester) async {
@@ -29,6 +32,18 @@ void main() {
         'counts': {'❤️': mine.isEmpty ? 0 : 1},
         'mine': mine.isEmpty ? null : mine
       };
+      if (request.url.path == '/community/activity-state') {
+        return http.Response(
+            jsonEncode({
+              'items': [
+                for (final target
+                    in jsonDecode(request.body)['targets'] as List)
+                  {...target, 'reactions': summary, 'saved': false}
+              ]
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'});
+      }
       return http.Response(
           jsonEncode(
               request.method == 'GET' && request.url.path.contains('/friends/')

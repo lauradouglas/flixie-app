@@ -1,3 +1,4 @@
+import '../widgets/around_flixie_sharing_setting.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/movie_rating_privacy_setting.dart';
 import '../widgets/appearance_setting.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/delete_account_button.dart';
@@ -150,6 +151,13 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 24),
+          _sectionLabel(context, 'Around Flixie sharing'),
+          _SettingsGroup(children: [
+            AroundFlixieSharingSetting(
+              key: ValueKey(context.watch<AuthProvider>().dbUser?.id),
+            )
+          ]),
           const SizedBox(height: 24),
           _sectionLabel(context, 'Preferences'),
           _SettingsGroup(
@@ -844,7 +852,9 @@ class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
                     style: TextStyle(color: context.colors.white)),
                 subtitle: Text(
                   _loadingCountries
-                      ? 'Loading countries…'
+                      ? (_selectedCountry?.name ??
+                          widget.user.country?['name']?.toString() ??
+                          'Select your country')
                       : _countryLoadFailed
                           ? 'Couldn’t load countries. Tap to retry.'
                           : _selectedCountry?.name ??

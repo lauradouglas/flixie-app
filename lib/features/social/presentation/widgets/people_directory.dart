@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/api/api_client.dart';
+import 'package:flixie_app/core/utils/app_logger.dart';
 import '../../data/people_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +31,7 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
       _loading = false,
       _failed = false,
       _saving = false;
+  bool _starsFailed = false;
   final Set<String> _busy = {};
   @override
   void initState() {
@@ -58,11 +61,19 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
   }
 
   Future<void> _readStars() async {
+    final userId = widget.userId;
     try {
       await StarredPeople.instance.refresh();
-    } catch (_) {
-      if (mounted) {
-        _message('Couldn’t sync starred people. Pull to refresh to retry.');
+      if (mounted && widget.userId == userId) {
+        setState(() => _starsFailed = false);
+      }
+    } catch (error) {
+      // Social can stay mounted behind Home. Keep background failures in the
+      // directory instead of posting a snackbar over an unrelated screen.
+      apiLogger.w(
+          'Starred people sync failed (${error is ApiException ? error.statusCode : error.runtimeType})');
+      if (mounted && widget.userId == userId) {
+        setState(() => _starsFailed = true);
       }
     }
   }
@@ -240,6 +251,14 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
             }),
       ]),
       const SizedBox(height: 16),
+      if (_starsFailed)
+        Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            children: [
+              const Text('Couldn’t sync starred people.'),
+              TextButton(onPressed: _readStars, child: const Text('Retry')),
+            ]),
       if (_showFollowing) ...[
         const Text('People whose posts appear in your Following feed'),
         if (_loading && _following.isEmpty)

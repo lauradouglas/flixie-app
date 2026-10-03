@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/navigation/navigation_retap_region.dart';
 import 'package:flixie_app/core/auth/setup_destination.dart';
 import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
 import 'package:flixie_app/features/social/presentation/pages/community_discussion_screen.dart';
@@ -462,6 +463,12 @@ GoRouter buildRouter(
           state,
           MovieDetailScreen(
             movieId: state.pathParameters['id'] ?? '0',
+            initialTitle: state.extra is Map
+                ? (state.extra as Map)['title'] as String?
+                : null,
+            initialPoster: state.extra is Map
+                ? (state.extra as Map)['poster'] as String?
+                : null,
             source: DetailSource.fromValue(
               state.uri.queryParameters['source'],
             ),
@@ -485,6 +492,12 @@ GoRouter buildRouter(
           state,
           ShowDetailScreen(
             showId: state.pathParameters['id'] ?? '0',
+            initialTitle: state.extra is Map
+                ? (state.extra as Map)['title'] as String?
+                : null,
+            initialPoster: state.extra is Map
+                ? (state.extra as Map)['poster'] as String?
+                : null,
             source: DetailSource.fromValue(
               state.uri.queryParameters['source'],
             ),
@@ -711,12 +724,20 @@ GoRouter buildRouter(
 }
 
 /// Bottom-navigation shell shown when the user is authenticated.
-class MainNavigationShell extends StatelessWidget {
+class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key, required this.navigationShell});
   final StatefulNavigationShell navigationShell;
 
   @override
+  State<MainNavigationShell> createState() => _MainNavigationShellState();
+}
+
+class _MainNavigationShellState extends State<MainNavigationShell> {
+  final _retapKey = GlobalKey<NavigationRetapRegionState>();
+
+  @override
   Widget build(BuildContext context) {
+    final navigationShell = widget.navigationShell;
     final selectedIndex = navigationShell.currentIndex;
 
     return Container(
@@ -735,11 +756,18 @@ class MainNavigationShell extends StatelessWidget {
         backgroundColor: Colors.transparent,
         // Android's navigation bar can occupy a side in landscape.
         // Pages handle their own top inset; the shell owns side protection.
-        body: SafeArea(top: false, bottom: false, child: navigationShell),
+        body: SafeArea(
+            top: false,
+            bottom: false,
+            child:
+                NavigationRetapRegion(key: _retapKey, child: navigationShell)),
         bottomNavigationBar: _FlixieNavBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) {
-            if (index == selectedIndex) return;
+            if (index == selectedIndex) {
+              unawaited(_retapKey.currentState?.refresh());
+              return;
+            }
             navigationShell.goBranch(index);
           },
         ),

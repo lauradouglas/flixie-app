@@ -52,10 +52,14 @@ class ShowDetailScreen extends StatefulWidget {
     super.key,
     required this.showId,
     this.source = DetailSource.unknown,
+    this.initialTitle,
+    this.initialPoster,
   });
 
   final String showId;
   final DetailSource source;
+  final String? initialTitle;
+  final String? initialPoster;
 
   @override
   State<ShowDetailScreen> createState() => _ShowDetailScreenState();
@@ -128,7 +132,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Future<void> _restoreSpoilerPreference() async {
     try {
-      await EpisodeSpoilerPreference.instance.load();
+      if (!EpisodeSpoilerPreference.instance.loaded) {
+        await EpisodeSpoilerPreference.instance.load();
+      }
       _spoilerPreferenceChanged();
     } catch (_) {
       // Keep spoiler protection on when storage is unavailable.
@@ -147,7 +153,35 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     }
   }
 
+  int _loadGeneration = 0;
+  bool _detailsLoading = true;
+  final Set<String> _detailErrors = {};
+  final Set<String> _pendingDetails = {};
+  final Set<String> _loadedDetails = {};
+
+  @override
+  void didUpdateWidget(covariant ShowDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.showId != widget.showId) {
+      _show = null;
+      _loadedDetails.clear();
+      _cast = [];
+      _crew = [];
+      _reviews = [];
+      _watchProviders = [];
+      _friendSummary = null;
+      _myListsContainingShow = [];
+      _userRating = null;
+      _userRecommendation = null;
+      _selectedSeasonNumber = null;
+      _isWatched = false;
+      _isLoading = true;
+      _load();
+    }
+  }
+
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     final id = int.tryParse(widget.showId);
     if (id == null || id <= 0) {
       setState(() {
@@ -156,79 +190,123 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       });
       return;
     }
-
-    final auth = context.read<AuthProvider>();
-    final user = auth.dbUser;
-    final region = user?.watchProviderRegion ?? 'GB';
-
-    try {
-      final results = await Future.wait([
-        ShowService.getShowById(id, userId: user?.id),
-        ShowService.getShowWatchProviders(id, region).catchError(
-          (_) => <WatchProvider>[],
-        ),
-        ShowService.getShowCredits(id).catchError(
-          (_) => const TvShowCredits(),
-        ),
-        if (user != null)
-          UserService.getUserWatchProviders(user.id)
-        else
-          Future.value(<WatchProvider>[]),
-        if (user != null)
-          ShowService.getUserShowRating(id, user.id).catchError((_) => null)
-        else
-          Future<Map<String, dynamic>?>.value(null),
-        _fetchReviews(id, user?.id),
-        if (user != null)
-          ShowService.getFriendSummary(id).catchError((_) => null)
-        else
-          Future.value(null),
-      ]);
-
-      if (!mounted) return;
-      final show = results[0] as TvShow;
-      final providersFromEndpoint = results[1] as List<WatchProvider>;
-      final credits = results[2] as TvShowCredits;
-      final userProviders = results[3] as List<WatchProvider>;
-      final ratingData = results[4] as Map<String, dynamic>?;
-      final userRating = (ratingData?['rating'] as num?)?.toInt();
-      final reviews = results[5] as List<Review>;
-      final friendSummary = results[6] as TvShowFriendSummary?;
-      final totalEpisodes = show.resolvedEpisodeCount;
-      final watchedEpisodes = _watchedEpisodeCount(show);
-      setState(() {
-        _show = show;
-        _watchProviders = providersFromEndpoint.isNotEmpty
-            ? providersFromEndpoint
-            : show.watchProviders;
-        _cast = credits.cast.isNotEmpty ? credits.cast : show.cast;
-        _crew = credits.crew.isNotEmpty ? credits.crew : show.crew;
-        _userProviderIds = userProviders.map((provider) => provider.id).toSet();
-        _userProviderMatchKeys =
-            userProviders.map((provider) => provider.matchKey).toSet();
-        _userRating = userRating;
-        _userRecommendation = ratingData?['recommendation'] as String?;
-        _reviews = reviews;
-        _friendSummary = friendSummary ?? show.friendSummary;
-        _selectedSeasonNumber = _resolveSelectedSeasonNumber(show);
-        _inWatchlist = _containsShowId(user?.showWatchlist, id);
-        _isWatched = totalEpisodes > 0 && watchedEpisodes >= totalEpisodes;
-        _isFavorite = _containsShowId(user?.favoriteShows, id);
-        _isLoading = false;
-      });
-      if (user != null) {
-        _loadListsContainingShow(user.id, id);
+    final user = context.read<AuthProvider>().dbUser;
+    bool current() =>
+        mounted &&
+        generation == _loadGeneration &&
+        context.read<AuthProvider>().dbUser?.id == user?.id;
+    setState(() {
+      _error = null;
+      _detailsLoading = true;
+      _detailErrors.clear();
+      _pendingDetails.clear();
+      _reviewsLoading = true;
+      _inWatchlist = _containsShowId(user?.showWatchlist, id);
+      _isFavorite = _containsShowId(user?.favoriteShows, id);
+    });
+    Future<void> section<T>(
+        String name, Future<T> request, void Function(T) apply) async {
+      _pendingDetails.add(name);
+      try {
+        final value = await request;
+        if (current()) {
+          setState(() {
+            apply(value);
+            _loadedDetails.add(name);
+          });
+        }
+      } catch (_) {
+        if (current()) setState(() => _detailErrors.add(name));
+      } finally {
+        if (current()) setState(() => _pendingDetails.remove(name));
       }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
     }
+
+    final summary = ShowService.getShowSummary(id);
+    // Attach handlers immediately: a failing optional call cannot become an
+    // unhandled error while the primary request is still pending.
+    final details = section(
+        'episodes', ShowService.getShowById(id, userId: user?.id), (show) {
+      _show = show;
+      _error = null;
+      _isLoading = false;
+      _detailsLoading = false;
+      _selectedSeasonNumber = _resolveSelectedSeasonNumber(show);
+      _isWatched = show.resolvedEpisodeCount > 0 &&
+          _watchedEpisodeCount(show) >= show.resolvedEpisodeCount;
+    }).whenComplete(() {
+      if (current()) setState(() => _detailsLoading = false);
+    });
+    final optional = <Future<void>>[
+      details,
+      section(
+          'streaming services',
+          ShowService.getShowWatchProviders(
+              id, user?.watchProviderRegion ?? 'GB'),
+          (value) => _watchProviders = value),
+      section('cast', ShowService.getShowCredits(id), (value) {
+        _cast = value.cast;
+        _crew = value.crew;
+      }),
+      section('reviews', ShowService.getShowReviews(id, userId: user?.id),
+          (value) {
+        _reviews = value;
+        _reviewsFailed = false;
+      }).whenComplete(() {
+        if (current()) {
+          setState(() {
+            _reviewsLoading = false;
+            _reviewsFailed = _detailErrors.contains('reviews');
+          });
+        }
+      }),
+      if (user != null) ...[
+        section('your services', UserService.getUserWatchProviders(user.id),
+            (value) {
+          _userProviderIds = value.map((provider) => provider.id).toSet();
+          _userProviderMatchKeys =
+              value.map((provider) => provider.matchKey).toSet();
+        }),
+        section('your rating', ShowService.getUserShowRating(id, user.id),
+            (value) {
+          _userRating = (value?['rating'] as num?)?.toInt();
+          _userRecommendation = value?['recommendation'] as String?;
+        }),
+        section('friend activity', ShowService.getFriendSummary(id),
+            (value) => _friendSummary = value),
+      ],
+    ];
+    try {
+      final show = await summary;
+      if (current() &&
+          _detailsLoading &&
+          !_loadedDetails.contains('episodes')) {
+        setState(() {
+          _show = show;
+          _isLoading = false;
+        });
+      } else if (current() && _show == null) {
+        setState(() {
+          _show = show;
+          _isLoading = false;
+        });
+      }
+    } catch (error) {
+      // A full response may still succeed after the summary has failed.
+      await details;
+      if (current() && _show == null) {
+        setState(() {
+          _error = 'Couldn’t load this show. Please retry.';
+          _isLoading = false;
+        });
+      }
+    }
+    if (current() && user != null) _loadListsContainingShow(user.id, id);
+    await Future.wait(optional);
   }
 
   Future<void> _loadListsContainingShow(String userId, int showId) async {
+    final generation = _loadGeneration;
     setState(() => _listsContainingShowLoading = true);
     try {
       final lists = await UserService.getShowLists(userId);
@@ -239,13 +317,13 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
           containing.add(list);
         }
       }
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _myListsContainingShow = containing;
         _listsContainingShowLoading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() => _listsContainingShowLoading = false);
     }
   }
@@ -905,7 +983,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return Scaffold(
       backgroundColor: context.colors.background,
       body: _isLoading
-          ? const SafeArea(child: MediaDetailScreenSkeleton())
+          ? widget.initialTitle != null
+              ? MediaDetailPreview(
+                  title: widget.initialTitle!, poster: widget.initialPoster)
+              : const SafeArea(child: MediaDetailScreenSkeleton())
           : _error != null
               ? _ErrorState(message: _error!, onRetry: _load)
               : _buildBody(context),
@@ -923,6 +1004,15 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               _buildSliverAppBar(context, show),
+              if (_detailErrors.isNotEmpty)
+                SliverToBoxAdapter(
+                    child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    const Expanded(child: Text('Some details couldn’t load.')),
+                    TextButton(onPressed: _load, child: const Text('Retry')),
+                  ]),
+                )),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1435,7 +1525,22 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     );
   }
 
+  Widget _episodeLoadingState() {
+    if (_detailsLoading) {
+      return const ContentPlaceholder(
+          label: 'Loading episodes and progress', rows: 2);
+    }
+    return Row(children: [
+      const Expanded(child: Text('Episodes and progress couldn’t load.')),
+      TextButton(onPressed: _load, child: const Text('Retry')),
+    ]);
+  }
+
   Widget _buildSeasonsAndEpisodesSection(TvShow show) {
+    if (!_loadedDetails.contains('episodes') &&
+        (_detailsLoading || _detailErrors.contains('episodes'))) {
+      return _episodeLoadingState();
+    }
     if (show.seasons.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -1572,6 +1677,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   }
 
   Widget _buildEpisodeProgressBanner(TvShow show) {
+    if (!_loadedDetails.contains('episodes') &&
+        (_detailsLoading || _detailErrors.contains('episodes'))) {
+      return _episodeLoadingState();
+    }
     final progress = TvShowEpisodeProgress(show);
     final next = progress.nextReleased;
     final episode = next ?? progress.nextScheduled;
@@ -1972,6 +2081,18 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   }
 
   Widget _buildProviderSection(TvShow show) {
+    if (_pendingDetails.contains('streaming services') &&
+        !_loadedDetails.contains('streaming services')) {
+      return const ContentPlaceholder(
+          label: 'Loading watch options',
+          style: ContentPlaceholderStyle.providers);
+    }
+    if (_detailErrors.contains('streaming services')) {
+      return Row(children: [
+        const Expanded(child: Text('Watch options couldn’t load.')),
+        TextButton(onPressed: _load, child: const Text('Retry')),
+      ]);
+    }
     final providers = _providersForTab(_watchProviderTab);
     final hasOptions =
         _ShowProviderTab.values.any((tab) => _providersForTab(tab).isNotEmpty);
@@ -2307,6 +2428,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   }
 
   Widget _buildProgressSection(TvShow show) {
+    if (!_loadedDetails.contains('episodes') &&
+        (_detailsLoading || _detailErrors.contains('episodes'))) {
+      return _episodeLoadingState();
+    }
     final total = show.resolvedEpisodeCount;
     final watched = _watchedEpisodeCount(show).clamp(0, total == 0 ? 0 : total);
     final percent = total == 0 ? 0.0 : watched / total;

@@ -12,14 +12,17 @@ class HomeFeedFixture extends fixtures.FixtureCommunity {
   Completer<CommunityPage>? pending;
   bool empty = false;
   int loads = 0;
+  int? lastLimit;
   @override
   Future<CommunityPage> load(
       {String? cursor,
       String filter = 'all',
       String sort = 'latest',
       String? owner,
-      bool saved = false}) async {
+      bool saved = false,
+      int? limit}) async {
     loads++;
+    lastLimit = limit;
     if (pending != null) return pending!.future;
     if (this.fail) throw Exception('offline');
     return CommunityPage(
@@ -57,6 +60,7 @@ void main() {
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
     expect(find.byType(ActivityTile), findsNWidgets(3));
+    expect(service.lastLimit, 3);
     await tester.tap(find.text(fixtures.fixture('0').mediaTitle!).first);
     await tester.pump();
     await tester.pump();
@@ -76,6 +80,7 @@ void main() {
     await tester.dragFrom(const Offset(1, 250), const Offset(700, 0));
     await tester.pumpAndSettle();
     expect(find.byType(ActivityTile), findsNWidgets(3));
+    expect(service.lastLimit, 3);
     expect(service.loads, 1);
     expect(scroll.offset, originalOffset);
     final offset = scroll.offset;
@@ -107,6 +112,7 @@ void main() {
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
     expect(find.byType(ActivityTile), findsNWidgets(3));
+    expect(service.lastLimit, 3);
     service.pending = Completer<CommunityPage>();
     await tester.pumpWidget(home('second'));
     await tester.pump();

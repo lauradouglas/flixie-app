@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -315,9 +316,9 @@ class _FriendActivityScreenState extends State<FriendActivityScreen> {
                                       onPressed: _more
                                           ? null
                                           : () => _loadComments(more: true),
-                                      child: Text(_more
-                                          ? 'Loading comments…'
-                                          : 'More comments')),
+                                      child: LoadingActionLabel(
+                                          loading: _more,
+                                          text: 'More comments')),
                               ],
                             ]))),
                 if (!_loading && _error == null && _post != null)

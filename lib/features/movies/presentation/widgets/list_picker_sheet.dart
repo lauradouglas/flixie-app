@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -27,106 +28,15 @@ class ListPickerItem {
   final List<MovieListCollaborator> collaborators;
 }
 
-class ListPickerLoadingSplash extends StatefulWidget {
+class ListPickerLoadingSplash extends StatelessWidget {
   const ListPickerLoadingSplash({super.key, required this.message});
-
   final String message;
-
   @override
-  State<ListPickerLoadingSplash> createState() =>
-      _ListPickerLoadingSplashState();
-}
-
-class _ListPickerLoadingSplashState extends State<ListPickerLoadingSplash>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: true,
-      child: Container(
-        height: MediaQuery.sizeOf(context).height * 0.62,
-        decoration: BoxDecoration(
-          color: context.colors.background,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) => SizedBox(
-                  width: 116,
-                  height: 116,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 76,
-                        height: 76,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: FlixieColors.primary.withValues(alpha: 0.13),
-                          border: Border.all(
-                            color: FlixieColors.primary.withValues(alpha: 0.34),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.playlist_add_check_circle_rounded,
-                          color: FlixieColors.primary,
-                          size: 38,
-                        ),
-                      ),
-                      Transform.rotate(
-                        angle: _controller.value * 6.283,
-                        child: Align(
-                          alignment: Alignment.topCenter,
-                          child: Icon(
-                            Icons.auto_awesome_rounded,
-                            color: context.colors.warning,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Getting your lists ready',
-                style: TextStyle(
-                  color: context.colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                widget.message,
-                style: TextStyle(
-                  color: context.colors.medium,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SafeArea(
+          child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .62,
+        child: ContentListSkeleton(label: message),
+      ));
 }
 
 class ListPickerSheet extends StatefulWidget {

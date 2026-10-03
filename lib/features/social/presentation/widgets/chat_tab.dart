@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_read_observer.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -726,8 +727,7 @@ class GroupChatTabState extends State<GroupChatTab> {
   @override
   Widget build(BuildContext context) {
     if (_initLoading) {
-      return const Center(
-          child: CircularProgressIndicator(color: FlixieColors.primary));
+      return const ChatContentSkeleton();
     }
     if (_initError != null) {
       return Center(
@@ -748,9 +748,7 @@ class GroupChatTabState extends State<GroupChatTab> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {
-                  return const Center(
-                      child: CircularProgressIndicator(
-                          color: FlixieColors.primary));
+                  return const ChatContentSkeleton();
                 }
                 final messages = snapshot.data ?? [];
                 if (messages.isEmpty) {

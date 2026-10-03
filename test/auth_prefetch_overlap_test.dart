@@ -12,7 +12,7 @@ import 'package:flixie_app/features/social/presentation/controllers/friend_actio
 
 void main() {
   testWidgets(
-      'prefetch and Home share trending and the same friends feed request',
+      'startup warming does not duplicate Home trending or friends requests',
       (tester) async {
     MovieCacheService().clearCache();
     var trends = 0, feeds = 0;

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import '../widgets/community_follow_button.dart';
@@ -226,7 +227,8 @@ class _CommunityProfileScreenState extends State<CommunityProfileScreen> {
                   if (_cursor != null)
                     TextButton(
                         onPressed: _more ? null : () => _load(more: true),
-                        child: Text(_more ? 'Loading…' : 'More posts')),
+                        child: LoadingActionLabel(
+                            loading: _more, text: 'More posts')),
                 ],
               ])));
 }

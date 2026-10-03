@@ -614,7 +614,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     if (_isLoading) {
       return Scaffold(
         backgroundColor: context.colors.background,
-        body: const Center(child: CircularProgressIndicator()),
+        body: const SafeArea(child: MediaDetailScreenSkeleton()),
       );
     }
 

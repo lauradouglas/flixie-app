@@ -34,9 +34,11 @@ class CommunityService {
       String filter = 'all',
       String sort = 'latest',
       String? owner,
-      bool saved = false}) async {
+      bool saved = false,
+      int? limit}) async {
     final query = <String, String>{
       if (cursor != null) 'cursor': cursor,
+      if (limit != null && !saved) 'limit': '$limit',
       if (!saved) ...{
         'filter': filter,
         'sort': sort,

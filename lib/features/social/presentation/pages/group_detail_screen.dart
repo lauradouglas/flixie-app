@@ -246,8 +246,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
               ),
               titleSpacing: 0,
               title: _loadingGroup
-                  ? Text('Loading...',
-                      style: TextStyle(color: context.colors.medium))
+                  ? const ContentPlaceholder(
+                      label: 'Loading group',
+                      style: ContentPlaceholderStyle.compact)
                   : Row(
                       children: [
                         CircleAvatar(

@@ -69,6 +69,166 @@ Fastlane reports multiple matches. Builds explicitly use `lib/main.dart` and the
 production HTTPS API, preserving the Xcode release guard after Patrol testing.
 This tooling does not retire support for iOS 1.0.0 build 70.
 
+## Store screenshots
+
+The screenshot lanes capture these eight screens, in order: Home, Alex River's
+profile, Watchlist, an Alien Watch Plan with Jamie, the Drama community,
+Interstellar (movie 157336), The Newsroom (show 15621), and the rating sheet.
+They use the production screens, theme and main navigation with fictional
+test-only accounts and isolated API responses. Firebase login and the live
+backend are not started. Public TMDB artwork needs internet access. The fixture
+copy is English (en-GB), dark mode. The capture app uses the same purple
+root backdrop as production so transparent routes do not render black. Shared
+fictional friend ratings populate Home, Watchlist and movie details consistently.
+The Alien plan is scheduled three days ahead at 19:30. Provider offers are
+illustrative UK purchase data, not a live availability check.
+
+A separate macOS composition step adds headlines, the official text wordmark
+and a subtle rounded frame using the bundled Manrope font and AppKit. It
+contains the full screenshot at its original aspect ratio and exports the same
+canvas dimensions as the native PNG; it does not repaint app content. No
+ImageMagick, downloaded device frames or image-generation service is needed.
+Headlines and upload order are configured in `fastlane/ScreenshotPresentation.json`.
+The native originals remain untouched.
+
+To refresh only the two movie images while preserving every other PNG:
+
+```bash
+python3 scripts/store-screenshots.py ios --scenes 06-interstellar 08-rating
+python3 scripts/store-screenshots.py android --scenes 06-interstellar 08-rating
+```
+
+Selective capture requires an existing validated full set.
+
+Capture commands run from **flixie-app/**, using the Ruby setup above:
+
+```bash
+# Capture iPhone and iPad screenshots locally. No store credentials needed.
+bundle exec fastlane ios screenshots
+
+# Capture one dedicated iOS simulator instead (UDID from simctl list devices).
+bundle exec fastlane ios screenshots device:DEDICATED_SIMULATOR_UDID
+
+# Boot the Flixie_Patrol AVD in Android Studio first, then capture Android.
+bundle exec fastlane android screenshots
+
+# Capture real tablet layouts into separate Google Play categories.
+bundle exec fastlane android screenshots type:sevenInchScreenshots
+bundle exec fastlane android screenshots type:tenInchScreenshots
+
+# Or select a booted dedicated emulator explicitly.
+bundle exec fastlane android screenshots device:emulator-5554
+```
+
+Configure devices in `fastlane/ScreenshotConfig.json`. The default iOS devices
+are a dedicated iPhone 17 Pro Max and 13-inch iPad Pro, using the installed iOS
+26.5 runtime. The runner creates and boots those named simulators if necessary.
+Change `device_type`/`runtime` to identifiers from `xcrun simctl list devicetypes`
+and `xcrun simctl list runtimes` when using a different Xcode installation.
+Android uses the existing dedicated **Flixie_Patrol** AVD; change `android.avd`
+to another dedicated AVD if needed. Android requires SDK platform-tools (`adb`
+on PATH), the pinned Patrol CLI, and the JDK/SDK described in `docs/testing.md`.
+The capture lane clears Fastlane’s Bundler environment for the SDK subprocess
+so Flutter can use the separately installed CocoaPods.
+Capture devices must be named **Flixie Screenshots…** / **Flixie Patrol** on iOS,
+or **Flixie_Screenshots…** / **Flixie_Patrol…** on Android: Patrol reinstalls the
+app. The runner serializes concurrent capture commands because Patrol generates
+a shared test bundle. Avoid running other Patrol tests during capture.
+
+Use the dedicated `Flixie_Patrol` AVD with hardware graphics (`-gpu host`).
+The 1080×1920 capture completed successfully. A taller-display retry hit a
+launcher ANR, and an API 35 fallback failed instrumentation startup; both
+failed runs left the successful set untouched. Android temporarily uses the configured `size` (1080×1920) so native
+captures meet [Google Play's screenshot size/aspect-ratio requirements](https://support.google.com/googleplay/android-developer/answer/9866151).
+The phone density is 420 dpi. Tablet configuration lives under `android_tablets`:
+7-inch uses 900×1600 at 240 dpi (600 dp wide), and 10-inch uses 1440×2560
+at 280 dpi (about 823 dp wide). These are native tablet-layout captures, not
+enlarged phone images. Each tablet category has its own capture manifest;
+the presentation validator checks all three sets independently. The previous size and density overrides
+are restored after capture. Native screenshots are
+saved as lossless 24-bit RGB PNGs; removing a fully opaque alpha channel preserves
+every RGB pixel. Transparent captures fail instead of being altered.
+
+The test waits for page content and artwork decoding, then contacts a temporary
+authenticated localhost server. That server saves a native PNG with `simctl`
+or `adb screencap` before allowing navigation to the next screen. Android captures also check native WindowManager focus for system error dialogs.
+A failed run
+does not replace the previous complete device set. iOS status chrome is set to
+9:41/full battery during capture and the override is cleared afterwards.
+
+Inspect the PNGs before uploading:
+
+- iOS: `fastlane/screenshots/en-GB/<device>-01-home.png` through `08-rating.png`.
+- Android: `fastlane/metadata/android/en-GB/images/` contains separate
+  `phoneScreenshots/`, `sevenInchScreenshots/`, and `tenInchScreenshots/` sets.
+- Capture manifests: `fastlane/screenshot-manifests/<platform>/`.
+- Failed native test logs: `build/store-screenshots/`.
+
+Generated images and manifests are ignored by Git. iOS identifies display
+families from the native image dimensions. Each Android screenshot category
+should contain just one eight-image device set; remove an older device's images
+and corresponding manifest if changing devices. For iOS, remove the PNGs and
+matching manifest to retire an old device set.
+
+Generate the eight-image presentation per device after capture:
+
+```bash
+bundle exec fastlane ios prepare_screenshots
+bundle exec fastlane android prepare_screenshots
+```
+
+Inspect `fastlane/store-presentation/review.html` and the full-resolution PNGs in
+`fastlane/store-presentation/en-GB/`. The upload order is Home → friends’ movie
+ratings → Watchlist → Watch Plan → personal rating → TV progress → Community →
+Profile. Android uses the same order with its native captures. Its movie-detail
+headline highlights where to watch, since friends’ ratings sit below the
+fold on that display. Android files are generated
+under `fastlane/store-presentation-android/en-GB/images/phoneScreenshots/`, with
+its own `review.html`. Each output is opaque 24-bit RGB and retains the native dimensions.
+The manifest hashes every input, headline configuration, font and output; stale
+or edited presentations fail validation instead of silently reaching the store.
+After recapturing or changing copy, rerun `prepare_screenshots` and review it.
+
+**Current 2.0 workflow: show the finished iPhone, iPad and Android sets to the user and
+obtain approval before uploading.** Generation never uploads or submits.
+On 2 October 2026, the user approved the Apple set; all eight iPhone and eight
+iPad images were uploaded to editable version 2.0 and their order verified.
+The user subsequently approved the Android phone set and requested both tablet
+sizes be uploaded together before submitting the listing for review. The user
+then took over Play Console selection and submission: prepare the tablet files
+and stage them in the asset library only. Do not commit or submit the listing
+on their behalf under that revised instruction. Both tablet asset uploads completed on 3 October 2026: eight 900×1600
+7-inch PNGs and eight 1440×2560 10-inch PNGs. All 16 Google SHA-256
+checksums match the local files. Both native capture runs passed; the 10-inch
+run required a cold restart of the dedicated emulator after hung virtual CPU
+threads. The final presentation contains 24 images, and all eight approved
+phone PNGs remain byte-identical. The user owns selection and submission. The service account cannot commit listing edits; asset-only staging leaves
+the temporary API edit uncommitted so the user can select images in Console.
+
+Upload is a separate command, using the store credentials in `fastlane/.env`:
+
+```bash
+bundle exec fastlane ios upload_screenshots
+bundle exec fastlane android upload_screenshots
+```
+
+Upload validates complete eight-screen manifests and PNG dimensions first.
+The iOS lane replaces the listing's screenshot collection with the locally
+prepared presentation sets; it skips binary/metadata upload and does not submit for review.
+It targets the editable App Store version, not the TestFlight build. Android
+uploads screenshots only, skipping bundles, descriptions, other artwork and
+changelogs. Existing release lanes still leave all listing screenshots untouched.
+These capture lanes do not prove live login or backend behaviour.
+
+Focused screenshot checks:
+
+```bash
+python3 scripts/test-store-screenshots.py
+python3 scripts/test-prepare-store-screenshots.py
+ruby scripts/test-fastlane.rb
+flutter test test/store_screenshot_fixture_test.dart
+```
+
 No automatic deployment workflow is enabled. These lanes can later be called
 from CI once signing and secrets are configured there.
 

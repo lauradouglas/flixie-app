@@ -1397,7 +1397,7 @@ class _ListHeader extends StatelessWidget {
                                 Flexible(
                                   child: Text(
                                     owner == null
-                                        ? 'Loading creator…'
+                                        ? _visibilityLabel(membership?.visibility)
                                         : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                     style: TextStyle(
                                       color: context.colors.medium,
@@ -1439,7 +1439,7 @@ class _ListHeader extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 owner == null
-                                    ? 'Loading owner…'
+                                    ? _visibilityLabel(membership?.visibility)
                                     : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                 style: TextStyle(
                                   color: context.colors.light,

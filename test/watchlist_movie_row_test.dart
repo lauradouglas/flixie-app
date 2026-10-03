@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -255,7 +256,11 @@ void main() {
       'loading, failed and confirmed no offers are different; retry works',
       (tester) async {
     await tester.pumpWidget(wrap(row(loading: true)));
-    expect(find.text('Checking availability…'), findsOneWidget);
+    expect(
+        find.byWidgetPredicate((widget) =>
+            widget is ContentPlaceholder &&
+            widget.label == 'Loading availability'),
+        findsOneWidget);
     var retry = false;
     await tester.pumpWidget(wrap(row(failed: true, retry: () => retry = true)));
     expect(find.text('No providers found'), findsNothing);

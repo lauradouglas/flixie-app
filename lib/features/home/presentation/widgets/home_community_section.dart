@@ -66,7 +66,7 @@ class HomeCommunitySectionState extends State<HomeCommunitySection> {
       _items = [];
     });
     try {
-      final page = await widget.service.load(sort: 'for-you');
+      final page = await widget.service.load(sort: 'for-you', limit: 3);
       if (mounted && generation == _generation) {
         setState(() => _items = page.items
             .where((item) => !SafetyService.isBlocked(item.userId))

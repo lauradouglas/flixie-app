@@ -38,7 +38,7 @@ void main() {
     expect(submitted, isNull);
     await tester.tap(find.text('Black cat'));
     await tester.pump();
-    expect(find.text('Your avatar · change it anytime'), findsOneWidget);
+    expect(find.text('Black cat'), findsNWidgets(2));
     await tester.tap(find.text('Playful'));
     await tester.pump();
     expect(find.text('Black cat'), findsOneWidget);
@@ -60,8 +60,10 @@ void main() {
       await tester.pumpWidget(MaterialApp(
           theme: AppTheme.darkTheme,
           builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: const TextScaler.linear(1.5)),
+              data: MediaQuery.of(context).copyWith(
+                  padding: const EdgeInsets.only(bottom: 34),
+                  viewPadding: const EdgeInsets.only(bottom: 34),
+                  textScaler: const TextScaler.linear(1.5)),
               child: child!),
           home: SignupAvatarStep(
               avatars: avatars,
@@ -72,6 +74,13 @@ void main() {
               onRetry: () {})));
       expect(tester.getBottomRight(find.text('Continue')).dy,
           lessThan(size.height));
+      final footer =
+          tester.getRect(find.byKey(const ValueKey('avatar-footer-surface')));
+      final button =
+          tester.getRect(find.byKey(const ValueKey('avatar-continue')));
+      expect(footer.bottom, size.height);
+      expect(button.bottom, size.height - 34);
+      expect(find.text('Next: find your kind of films & series'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
