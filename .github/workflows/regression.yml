@@ -1,5 +1,8 @@
 name: Regression tests
 on:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       run_patrol:
@@ -38,7 +41,7 @@ jobs:
           if-no-files-found: ignore
 
   patrol-ios:
-    if: ${{ inputs.run_patrol }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_patrol }}
     runs-on: macos-15
     timeout-minutes: 20
     steps:
