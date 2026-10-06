@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/notification_opt_in.dart';
@@ -552,6 +553,7 @@ class _CommunityDiscussionScreenState extends State<CommunityDiscussionScreen> {
     return Scaffold(
         backgroundColor: context.colors.background,
         appBar: AppBar(
+          leading: const FlixieBackButton(),
           title:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(widget.communityId == -1 ? 'Anime' : 'Community',
@@ -864,7 +866,9 @@ class _CommunityDiscussionComposerState
       canPop: !_sending,
       child: Scaffold(
           backgroundColor: context.colors.background,
-          appBar: AppBar(title: const Text('Start a discussion')),
+          appBar: AppBar(
+              leading: const FlixieBackButton(),
+              title: const Text('Start a discussion')),
           body: SafeArea(
               child: Form(
                   key: _form,

@@ -1092,11 +1092,10 @@ class _ListChoiceGroup extends StatelessWidget {
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final item in items)
-              ChoiceChip(
+              FlixiePill.choice(
                 label: item.child,
                 selected: item.value == value,
                 onSelected: (_) => onChanged(item.value),
-                materialTapTargetSize: MaterialTapTargetSize.padded,
               ),
           ]),
         ],

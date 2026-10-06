@@ -27,7 +27,7 @@ class RatingsSection extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AllRatingsSheet(ratings: ratings),
+      builder: (_) => AllRatingsSheet(ratings: ratings),
     );
   }
 
@@ -133,6 +133,7 @@ class _RatingCard extends StatelessWidget {
                 style: TextStyle(
                   color: context.colors.light,
                   fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -143,15 +144,15 @@ class _RatingCard extends StatelessWidget {
   }
 }
 
-class _AllRatingsSheet extends StatefulWidget {
-  const _AllRatingsSheet({required this.ratings});
+class AllRatingsSheet extends StatefulWidget {
+  const AllRatingsSheet({super.key, required this.ratings});
   final List<MovieRating> ratings;
 
   @override
-  State<_AllRatingsSheet> createState() => _AllRatingsSheetState();
+  State<AllRatingsSheet> createState() => _AllRatingsSheetState();
 }
 
-class _AllRatingsSheetState extends State<_AllRatingsSheet> {
+class _AllRatingsSheetState extends State<AllRatingsSheet> {
   final TextEditingController _searchController = TextEditingController();
   List<MovieRating> _filteredRatings = [];
 
@@ -255,16 +256,42 @@ class _AllRatingsSheetState extends State<_AllRatingsSheet> {
                       ),
                     ),
                   )
-                : ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 8,
-                    ),
-                    itemCount: _filteredRatings.length,
-                    itemBuilder: (_, i) =>
-                        _RatingListTile(rating: _filteredRatings[i]),
-                  ),
+                : LayoutBuilder(builder: (context, constraints) {
+                    const columns = 3;
+                    final width =
+                        (constraints.maxWidth - 40 - (columns - 1) * 12) /
+                            columns;
+                    const titleStyle = TextStyle(
+                        fontSize: 12, height: 1.3, fontWeight: FontWeight.w700);
+                    var titleHeight = 0.0;
+                    for (final rating in _filteredRatings) {
+                      final painter = TextPainter(
+                        text: TextSpan(
+                            text: rating.movie?.title ?? 'Unknown',
+                            style: titleStyle),
+                        textDirection: Directionality.of(context),
+                        textScaler: MediaQuery.textScalerOf(context),
+                      )..layout(maxWidth: width);
+                      if (painter.height > titleHeight) {
+                        titleHeight = painter.height;
+                      }
+                      painter.dispose();
+                    }
+                    return GridView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 16,
+                        mainAxisExtent: width * 1.5 + 8 + titleHeight,
+                      ),
+                      itemCount: _filteredRatings.length,
+                      itemBuilder: (_, i) =>
+                          _RatingGridCard(rating: _filteredRatings[i]),
+                    );
+                  }),
           ),
         ],
       ),
@@ -272,91 +299,53 @@ class _AllRatingsSheetState extends State<_AllRatingsSheet> {
   }
 }
 
-class _RatingListTile extends StatelessWidget {
-  const _RatingListTile({required this.rating});
-
+class _RatingGridCard extends StatelessWidget {
+  const _RatingGridCard({required this.rating});
   final MovieRating rating;
-
-  static const String _imgBase = 'https://image.tmdb.org/t/p/w92';
 
   @override
   Widget build(BuildContext context) {
     final movie = rating.movie;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).pop();
-          context.push(movieDetailPath(rating.movieId));
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.colors.tabBarBorder.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pop();
+        context.push(movieDetailPath(rating.movieId));
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        AspectRatio(
+            aspectRatio: 2 / 3,
+            child: Stack(fit: StackFit.expand, children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: movie?.posterPath != null
-                    ? CachedNetworkImage(
-                        imageUrl: '$_imgBase${movie!.posterPath}',
-                        width: 50,
-                        height: 75,
-                        fit: BoxFit.cover,
-                      )
-                    : Container(
-                        width: 50,
-                        height: 75,
-                        color: context.colors.tabBarBorder,
-                        child: Icon(
-                          Icons.movie,
-                          color: context.colors.medium,
-                          size: 24,
-                        ),
-                      ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      movie?.title ?? 'Unknown',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (movie?.releaseDate != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        movie!.releaseDate!.split('-')[0],
-                        style: TextStyle(
-                          color: context.colors.medium,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              FlixiePill.label(
-                  label: Text(hideMovieRatings(context, rating.movieId,
-                          ownerId: rating.userId)
-                      ? 'Rate to see'
-                      : '${rating.rating}'),
-                  avatar: Icon(Icons.star, color: context.colors.tertiary)),
-            ],
-          ),
-        ),
-      ),
+                  borderRadius: BorderRadius.circular(8),
+                  child: movie?.posterPath != null
+                      ? CachedNetworkImage(
+                          imageUrl:
+                              'https://image.tmdb.org/t/p/w342${movie!.posterPath}',
+                          fit: BoxFit.cover)
+                      : ColoredBox(
+                          color: context.colors.tabBarBorder,
+                          child: Icon(Icons.movie_outlined,
+                              color: context.colors.medium, size: 40))),
+              Positioned(
+                  top: 4,
+                  right: 4,
+                  child: FlixiePill.label(
+                      label: Text(hideMovieRatings(context, rating.movieId,
+                              ownerId: rating.userId)
+                          ? 'Rate to see'
+                          : '${rating.rating}'),
+                      avatar:
+                          Icon(Icons.star, color: context.colors.tertiary))),
+            ])),
+        const SizedBox(height: 8),
+        Text(movie?.title ?? 'Unknown',
+            style: TextStyle(
+                color: context.colors.textPrimary,
+                fontSize: 12,
+                height: 1.3,
+                fontWeight: FontWeight.w700)),
+      ]),
     );
   }
 }

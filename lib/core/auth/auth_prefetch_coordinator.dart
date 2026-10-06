@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/notification.dart';
 import 'dart:async';
 
 import 'package:flixie_app/models/watch_provider.dart';
@@ -82,6 +83,15 @@ class AuthPrefetchCoordinator {
       providersByMovieId: providersByMovieId,
       userProviderIds: userProviders.map((provider) => provider.id).toSet(),
     );
+  }
+
+  Future<List<FlixieNotification>?> fetchNotifications(String userId) async {
+    try {
+      return await NotificationService.getNotifications(userId);
+    } catch (error) {
+      logger.w('[AuthPrefetchCoordinator] inbox refresh failed: $error');
+      return null;
+    }
   }
 
   Future<int?> fetchUnreadCount(String userId) async {

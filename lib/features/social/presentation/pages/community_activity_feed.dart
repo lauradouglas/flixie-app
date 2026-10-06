@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import '../../data/starred_people.dart';
 import 'dart:async';
@@ -392,14 +393,14 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                   spacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    ChoiceChip(
+                    FlixiePill.choice(
                         label: const Text('Discover'),
                         selected: !_following,
                         onSelected: (_) {
                           setState(() => _following = false);
                           _query(saved: false);
                         }),
-                    ChoiceChip(
+                    FlixiePill.choice(
                         label: const Text('Following'),
                         selected: _following,
                         onSelected: (_) {

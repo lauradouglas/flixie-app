@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -8,11 +9,13 @@ class WatchPlanScheduleSheet extends StatefulWidget {
   const WatchPlanScheduleSheet({
     super.key,
     this.initial,
+    this.initialDateOnly = true,
     this.initialLocation,
     this.showLocation = false,
   });
 
   final DateTime? initial;
+  final bool initialDateOnly;
   final String? initialLocation;
   final bool showLocation;
 
@@ -23,15 +26,20 @@ class WatchPlanScheduleSheet extends StatefulWidget {
 class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
   late DateTime _selected;
   late _ScheduleEntryMode _mode;
-  bool _leaveTimeUndecided = false;
   late final TextEditingController _locationController;
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.initial?.toLocal() ??
-        DateTime.now().add(const Duration(hours: 2));
-    _mode = _ScheduleEntryMode.dateAndTime;
+    final initial = widget.initial;
+    _selected = initial == null
+        ? DateTime.now().add(const Duration(hours: 2))
+        : widget.initialDateOnly
+            ? watchPlanCalendarDate(initial, dateOnly: true)
+            : initial.toLocal();
+    _mode = widget.initialDateOnly
+        ? _ScheduleEntryMode.dateOnly
+        : _ScheduleEntryMode.dateAndTime;
     _locationController = TextEditingController(
       text: widget.initialLocation?.trim() ?? '',
     );
@@ -71,7 +79,7 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
               const SizedBox(height: 24),
               Row(children: [
                 Expanded(
-                    child: Text('Date & time',
+                    child: Text('Plan date',
                         style: TextStyle(
                             color: context.colors.textPrimary,
                             fontSize: 26,
@@ -83,16 +91,13 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
               ]),
               const SizedBox(height: 8),
               Text(
-                  'Set when this plan should happen. You can change it again later.',
+                  'Choose a date. Add a time if you know it, or leave it for later.',
                   style: TextStyle(color: context.colors.light, fontSize: 13)),
               const SizedBox(height: 24),
               _ScheduleModeSelector(
                   mode: _mode,
                   onChanged: (mode) => setState(() {
                         _mode = mode;
-                        if (mode == _ScheduleEntryMode.dateOnly) {
-                          _leaveTimeUndecided = true;
-                        }
                       })),
               const SizedBox(height: 24),
               Text('Quick pick',
@@ -103,7 +108,12 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
               const SizedBox(height: 12),
               Row(children: [
                 for (final quickPick in <({String label, DateTime value})>[
-                  (label: 'Tonight', value: _tonight()),
+                  (
+                    label: _mode == _ScheduleEntryMode.dateOnly
+                        ? 'Today'
+                        : 'Tonight',
+                    value: _tonight()
+                  ),
                   (label: 'Tomorrow', value: _tomorrow()),
                   (label: 'Weekend', value: _thisWeekend()),
                 ])
@@ -130,17 +140,6 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
                     label: 'TIME',
                     value: TimeOfDay.fromDateTime(_selected).format(context),
                     onTap: _pickTime),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Switch(
-                      value: _leaveTimeUndecided,
-                      onChanged: (value) =>
-                          setState(() => _leaveTimeUndecided = value)),
-                  const SizedBox(width: 10),
-                  Text('Leave the time undecided',
-                      style:
-                          TextStyle(color: context.colors.light, fontSize: 13)),
-                ]),
               ],
               if (widget.showLocation) ...[
                 const SizedBox(height: 10),
@@ -182,21 +181,24 @@ class _WatchPlanScheduleSheetState extends State<WatchPlanScheduleSheet> {
   }
 
   void _save() {
-    if (!_selected.isAfter(DateTime.now())) {
+    final dateOnly = _mode == _ScheduleEntryMode.dateOnly;
+    final proposedFor = dateOnly ? encodeWatchPlanDate(_selected) : _selected;
+    if (watchPlanScheduleHasPassed(proposedFor, dateOnly: dateOnly)) {
       ScaffoldMessenger.of(context).showFlixieToast(
         FlixieToast(
           type: FlixieToastType.warning,
-          content: const Text('Choose a date and time in the future.'),
+          content: Text(dateOnly
+              ? 'Choose today or a future date.'
+              : 'Choose a date and time in the future.'),
           backgroundColor: context.colors.danger,
         ),
       );
       return;
     }
     Navigator.pop(context, (
-      proposedFor: _selected,
-      message: _leaveTimeUndecided || _mode == _ScheduleEntryMode.dateOnly
-          ? 'Time to be decided'
-          : null,
+      proposedFor: proposedFor,
+      dateOnly: dateOnly,
+      message: null,
       location: widget.showLocation
           ? _locationController.text.trim()
           : widget.initialLocation?.trim(),
@@ -337,9 +339,7 @@ class _QuickScheduleButton extends StatelessWidget {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
         child: Text(label,
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.fade,
+            textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
       );
 }

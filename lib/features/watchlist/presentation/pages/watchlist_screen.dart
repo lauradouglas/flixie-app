@@ -35,6 +35,7 @@ import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/add_to_list_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/features/watchlist/presentation/widgets/filter_sheet.dart';
+import 'package:flixie_app/features/watchlist/presentation/widgets/watchlist_navigation_button.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
@@ -1666,6 +1667,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   Widget build(BuildContext context) {
     return FlixiePageScaffold(
       appBar: AppBar(
+        leading: const WatchlistNavigationButton(),
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         toolbarHeight: (MediaQuery.textScalerOf(context).scale(24) + 12)
@@ -3062,7 +3064,13 @@ class WatchlistMovieRow extends StatelessWidget {
               onRetry: onRetryProviders,
               onEditPreferences: onEditPreferences),
           const SizedBox(height: 12),
-          Divider(height: 1, color: context.colors.tabBarBorder),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Theme.of(context).brightness == Brightness.light
+                ? context.colors.textPrimary.withValues(alpha: .2)
+                : context.colors.tabBarBorder,
+          ),
         ]),
       ),
     );
@@ -3141,8 +3149,12 @@ class _FriendsViewing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const ContentPlaceholder(
-          label: 'Loading friends', style: ContentPlaceholderStyle.compact);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Loading friends…',
+            style: TextStyle(color: context.colors.light, fontSize: 12)),
+        const ContentPlaceholder(
+            label: 'Loading friends', style: ContentPlaceholderStyle.compact),
+      ]);
     }
     if (failed) {
       return TextButton.icon(
@@ -3364,9 +3376,13 @@ class _WatchProvidersInline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const ContentPlaceholder(
-          label: 'Loading availability',
-          style: ContentPlaceholderStyle.providers);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Loading watch options…',
+            style: TextStyle(color: context.colors.light, fontSize: 12)),
+        const ContentPlaceholder(
+            label: 'Loading availability',
+            style: ContentPlaceholderStyle.providers),
+      ]);
     }
     if (failed) {
       return TextButton.icon(

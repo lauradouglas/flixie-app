@@ -2,6 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/core/auth/setup_destination.dart';
 
 void main() {
+  test('Watchlist shortcut survives setup', () {
+    expect(setupDestination('/watchlist'), '/watchlist');
+    expect(
+        setupDestination('/watchlist?next=https://example.com'), '/watchlist');
+    expect(setupDestination('https://example.com/watchlist'), isNull);
+  });
   test('keeps exact supported invitation and thread destinations', () {
     for (final route in [
       '/groups/group-1?tab=requests&requestId=plan-1',
@@ -12,6 +18,13 @@ void main() {
     ]) {
       expect(setupDestination(route), route);
     }
+  });
+  test('Social shortcut survives setup with a canonical internal destination',
+      () {
+    expect(setupDestination('/social'), '/social');
+    expect(setupDestination('/social?next=https://example.com'), '/social');
+    expect(setupDestination('flixie:///social'), isNull);
+    expect(setupDestination('https://example.com/social'), isNull);
   });
   test('rejects external, auth and unrelated destinations', () {
     for (final route in [

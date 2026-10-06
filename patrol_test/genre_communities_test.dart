@@ -72,11 +72,13 @@ void main() {
       await $.pumpWidgetAndSettle(
           MaterialApp.router(theme: AppTheme.darkTheme, routerConfig: router));
       await $('Join').tap();
+      expect(service.joined, false);
+      await $('Join community').tap();
       expect(service.joined, true);
       await $(anime ? 'Anime' : 'Horror').tap();
       await $('Leave community').waitUntilVisible();
       expect(find.text('Hidden spoiler title'), findsNothing);
-      await $(anime ? 'Attack on Titan · Series' : 'Alien · Film')
+      await $(anime ? 'Attack on Titan' : 'Alien')
           .scrollTo()
           .tap();
       await $('Original public review').waitUntilVisible();

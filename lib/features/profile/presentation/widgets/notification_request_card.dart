@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_formatters.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -452,7 +453,9 @@ class NotificationRequestCard extends StatelessWidget {
                       const SizedBox(width: 7),
                       Expanded(
                         child: Text(
-                          _formatScheduleDate(scheduledFor),
+                          _formatScheduleDate(scheduledFor,
+                              dateOnly:
+                                  notification.watchRequestScheduledDateOnly),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -627,7 +630,7 @@ class NotificationRequestCard extends StatelessWidget {
     final scheduledFor = notification.watchRequestScheduledFor ??
         _proposalDateWithStatus('ACCEPTED');
     if (scheduledFor == null) return null;
-    return 'Scheduled for ${_formatScheduleDate(scheduledFor)}';
+    return 'Scheduled for ${_formatScheduleDate(scheduledFor, dateOnly: notification.watchRequestScheduledDateOnly)}';
   }
 
   String? get _pendingScheduleLabel {
@@ -639,7 +642,7 @@ class NotificationRequestCard extends StatelessWidget {
       proposal['proposedFor']?.toString() ?? '',
     );
     if (proposedFor == null) return null;
-    return 'Proposed for ${_formatScheduleDate(proposedFor)}';
+    return 'Proposed for ${_formatScheduleDate(proposedFor, dateOnly: proposal['dateOnly'] == true)}';
   }
 
   String? get _proposalNote {
@@ -654,7 +657,8 @@ class NotificationRequestCard extends StatelessWidget {
     return DateTime.tryParse(proposal['proposedFor']?.toString() ?? '');
   }
 
-  String _formatScheduleDate(DateTime value) {
+  String _formatScheduleDate(DateTime value, {bool dateOnly = false}) {
+    if (dateOnly) return formatWatchPlanDateTime(value, dateOnly: true);
     final local = value.toLocal();
     const months = [
       'Jan',
@@ -906,7 +910,7 @@ class NotificationRequestCard extends StatelessWidget {
                                 _PendingWatchDetail(
                                   icon: Icons.schedule_outlined,
                                   text:
-                                      'Proposed for ${_formatScheduleDate(pendingTime)}',
+                                      'Proposed for ${_formatScheduleDate(pendingTime, dateOnly: _latestProposal?['dateOnly'] == true)}',
                                 ),
                               if (pendingTime != null &&
                                   pendingLocation?.isNotEmpty == true)

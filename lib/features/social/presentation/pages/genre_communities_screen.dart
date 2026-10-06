@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
@@ -259,12 +260,12 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
                               prefixIcon: Icon(Icons.search))),
                       const SizedBox(height: 8),
                       Wrap(spacing: 8, children: [
-                        ChoiceChip(
+                        FlixiePill.choice(
                             label: const Text('Explore all'),
                             showCheckmark: false,
                             selected: !_joinedOnly,
                             onSelected: (_) => _filter(false)),
-                        ChoiceChip(
+                        FlixiePill.choice(
                             label: Text(
                                 'Your communities · ${_items.where((g) => g.joined).length}'),
                             showCheckmark: false,

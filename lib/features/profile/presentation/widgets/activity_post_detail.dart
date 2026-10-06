@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
@@ -285,7 +286,7 @@ class _ActivityPostDetailState extends State<ActivityPostDetail> {
                         label: const Text('React'))),
               for (final reaction in ActivityReaction.values)
                 if ((widget.reactions.counts[reaction.emoji] ?? 0) > 0)
-                  ActionChip(
+                  FlixiePill.action(
                       label: Text(
                           '${reaction.emoji} ${widget.reactions.counts[reaction.emoji]}'),
                       tooltip: reaction.label,

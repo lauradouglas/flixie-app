@@ -242,3 +242,74 @@ bash scripts/test-ios-release-guard.sh
 References: [Fastlane setup](https://docs.fastlane.tools/getting-started/ios/setup/),
 [TestFlight](https://docs.fastlane.tools/actions/upload_to_testflight/),
 [Google Play](https://docs.fastlane.tools/actions/upload_to_play_store/).
+
+## Signed IPA entitlement verification
+
+The iOS build lane runs `python3 scripts/validate-ios-ipa.py <ipa>` before upload.
+It checks the signed application, not just the provisioning profile, for Apple
+sign-in, production APNs, associated domains, app identity and disabled debugging.
+An unsigned archive can export successfully while losing capabilities; do not
+assume export success proves these entitlements survived. Build 89 demonstrated
+this failure and was superseded by explicitly signed build 90.
+
+## TestFlight build 93 — 5 October 2026
+
+Uploaded version 1.0.1 build 93 successfully at 13:09 UTC. Includes the
+Watchlist Home fallback for direct widget launches. All 69 focused navigation,
+foreground notification, inbox and plan-refresh tests passed. The standard lane
+hit stale automatic signing profiles; the archive was rebuilt without signing,
+then explicitly signed and exported using the existing build-92 distribution
+profiles. Both final IPA signatures, build numbers, shared widget App Group,
+production APNs, Apple sign-in and associated-domain entitlements were verified
+through Security.framework. No external review or App Store submission was made.
+The friend-plan notification category fix is in the backend and remains local;
+this app upload does not deploy it.
+
+## TestFlight build 96 — 5 October 2026
+
+Uploaded version 1.0.1 build 96 successfully following the user's TestFlight
+request. Built the current working tree with `lib/main.dart` and the production
+HTTPS API. All 48 focused sign-in, notification navigation, Watchlist navigation
+and widget-sync tests passed, alongside 15 Fastlane tests and the iOS release
+guard checks. The archive was explicitly signed with the existing distribution
+identity and build-92 profiles, then exported. Verified both app and widget
+signatures, build numbers and shared App Group, plus the app's production APNs,
+Apple sign-in and associated-domain entitlements. Upload success does not by
+itself confirm Apple processing. No external review or App Store submission was
+made, and this upload does not deploy backend changes.
+
+## TestFlight and Google Play build 97 — 5 October 2026
+
+Uploaded version 1.0.1 build 97 to TestFlight and committed Android version code
+97 to the production track for Google review at the user's explicit request.
+Includes the person-heart background fix, stale group-invitation membership
+navigation, own-activity reaction controls, searchable three-column ratings grid,
+preference explanations, watchlist loading labels/light separators, watch-history
+menu contrast, Home icon buttons (original Trailer styling retained), and Watch
+Plan movie links. Pick for us details navigation was already fixed locally and
+its 18 focused checks passed. The initial 92 focused release checks, 28 Watch Plan
+checks, 15 Fastlane tests and iOS release guards passed. Focused Dart analysis
+passed for the final Watch Plan changes. Full regression/Patrol was not run.
+
+Built the current working tree with lib/main.dart and the production API.
+The final iOS archive was explicitly signed using the existing distribution
+identity and profiles, then exported. Both app/widget signatures and build
+numbers, production APNs, Apple sign-in, associated domains and App Shortcuts
+were verified before upload. Apple processing and Google review are separate
+from upload success. No Apple App Store review submission, listing asset changes,
+backend deployment or production database changes were performed.
+
+## External TestFlight build 98 — 6 October 2026
+
+At the user's request, uploaded 2.0.1 (98) for assignment to external testers.
+App Store Connect reports the released App Store version as 2.0, so an iOS
+build-name override of 2.0.1 was necessary; 1.0.2 would remain below the released
+version. The tracked pubspec version was not changed. Build 97 was VALID before
+this upload. All 75 focused app checks, 15 Fastlane checks and the iOS release
+guards passed. Built the current working tree with lib/main.dart and production
+API configuration, manually signed with the existing distribution identity and
+profiles, exported and verified both app/widget versions and signatures, required
+production entitlements and App Shortcuts. Apple accepted the upload at 15:13 UTC.
+Processing and external beta review remain separate. No external group assignment,
+beta-review submission, App Store submission, Android upload or backend deployment
+was performed; the user requested a build to assign themselves.

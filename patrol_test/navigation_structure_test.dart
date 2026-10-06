@@ -8,10 +8,10 @@ void main() {
     final router = navigationStructureFixture();
     addTearDown(router.dispose);
     await $.pumpWidgetAndSettle(MaterialApp.router(routerConfig: router));
-    await $('Search').tap();
+    await $('Discover').tap();
     await $(find.byType(TextField)).enterText('Alien');
     await $('Social').tap();
-    await $('Search').tap();
+    await $('Discover').tap();
     expect(find.text('Alien'), findsOneWidget);
     await $('Film 0').tap();
     await $('Return to results').tap();

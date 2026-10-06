@@ -5,6 +5,24 @@ import 'package:flixie_app/features/profile/presentation/widgets/notification_in
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 void main() {
+  test(
+      'community reply digest uses the conversation summary and becomes unread again',
+      () {
+    const notification = FlixieNotification(
+        id: 'digest',
+        userId: 'me',
+        type: FlixieNotification.communityReply,
+        action: 'RECEIVED',
+        message: 'People have replied in “Alien discussion”.',
+        read: false);
+    expect(notificationHeadline(notification),
+        'People have replied in “Alien discussion”.');
+    expect(notificationBelongsInInbox(notification), isTrue);
+    expect(
+        notificationBelongsInInbox(notification.copyWith(read: true)), isFalse);
+    expect(
+        notificationBelongsInInbox(notification.copyWith(read: false)), isTrue);
+  });
   test('marking updates read clears them from the inbox across reloads', () {
     const update = FlixieNotification(
         id: 'accepted',

@@ -94,6 +94,8 @@ void main() {
     await $(find.byKey(const ValueKey('taste-movie:348'))).tap();
     await $('Continue').tap();
     await $('Skip services for now').tap();
+    await $('Continue to favourites').tap();
+    await $('Skip favourites').tap();
     await $('Find my kind of people').tap();
     await $('Horror').waitUntilVisible();
     expect(joins, 0);

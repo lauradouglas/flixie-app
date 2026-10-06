@@ -39,7 +39,9 @@ class DeleteAccountButton extends StatelessWidget {
           final password = await showFlixiePromptSheet<String>(
             context: context,
             isDismissible: false,
-            builder: (_) => const _DeleteAccountDialog(),
+            builder: (_) => _DeleteAccountDialog(
+              needsPassword: context.read<AuthProvider>().deletionNeedsPassword,
+            ),
           );
           if (password == null || !context.mounted) return;
 
@@ -188,7 +190,9 @@ class _AccountDeletionProgressScreen extends StatelessWidget {
 }
 
 class _DeleteAccountDialog extends StatefulWidget {
-  const _DeleteAccountDialog();
+  const _DeleteAccountDialog({required this.needsPassword});
+
+  final bool needsPassword;
 
   @override
   State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
@@ -200,7 +204,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   bool _hidePassword = true;
 
   bool get _canDelete =>
-      _passwordController.text.isNotEmpty &&
+      (!widget.needsPassword || _passwordController.text.isNotEmpty) &&
       _confirmationController.text.trim() == 'DELETE';
 
   @override
@@ -230,26 +234,31 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
                 style: TextStyle(color: context.colors.light, height: 1.4),
               ),
               const SizedBox(height: 18),
-              TextField(
-                controller: _passwordController,
-                obscureText: _hidePassword,
-                autofillHints: const [AutofillHints.password],
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Current password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  suffixIcon: IconButton(
-                    tooltip: _hidePassword ? 'Show password' : 'Hide password',
-                    onPressed: () =>
-                        setState(() => _hidePassword = !_hidePassword),
-                    icon: Icon(
-                      _hidePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+              if (!widget.needsPassword)
+                const Text(
+                    'You’ll confirm with your connected provider before deletion.'),
+              if (widget.needsPassword)
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _hidePassword,
+                  autofillHints: const [AutofillHints.password],
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'Current password',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      tooltip:
+                          _hidePassword ? 'Show password' : 'Hide password',
+                      onPressed: () =>
+                          setState(() => _hidePassword = !_hidePassword),
+                      icon: Icon(
+                        _hidePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(height: 14),
               TextField(
                 controller: _confirmationController,

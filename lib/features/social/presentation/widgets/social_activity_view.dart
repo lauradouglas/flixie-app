@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import '../pages/community_activity_feed.dart';
 import '../pages/friends_activity_feed.dart';
@@ -30,7 +31,7 @@ class _SocialActivityViewState extends State<SocialActivityView> {
             child: Wrap(spacing: 8, children: [
               for (final (index, label)
                   in ['Following', 'Friends', 'Around Flixie'].indexed)
-                ChoiceChip(
+                FlixiePill.choice(
                     label: Text(label),
                     selected: _selected == index,
                     onSelected: (_) => setState(() {

@@ -16,8 +16,7 @@ class ApiException implements Exception {
   });
 
   @override
-  String toString() =>
-      'ApiException($statusCode${code == null ? '' : ', $code'}): $message';
+  String toString() => message;
 }
 
 class ApiClient {
@@ -125,22 +124,21 @@ class ApiClient {
 
   static dynamic _parseResponse(http.Response response) {
     if (response.statusCode >= 400) {
-      String message;
+      String? serverMessage;
       String? code;
       try {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
-          message = decoded['error'] as String? ??
-              decoded['message'] as String? ??
-              response.body;
-          code = decoded['code'] as String?;
-        } else {
-          message = response.body;
+          final value = decoded['error'] ?? decoded['message'];
+          if (value is String) serverMessage = value;
+          if (decoded['code'] is String) code = decoded['code'] as String;
         }
       } catch (_) {
-        message = response.body;
+        // HTML proxy errors and malformed responses are not user messages.
       }
-      apiLogger.e('Error ${response.statusCode}: $message');
+      final message = _responseMessage(response.statusCode, serverMessage);
+      apiLogger.e(
+          'Error ${response.statusCode}${code == null ? '' : ' ($code)'}: ${serverMessage ?? message}');
       throw ApiException(
         statusCode: response.statusCode,
         message: message,
@@ -149,6 +147,50 @@ class ApiClient {
     }
     if (response.body.isEmpty) return null;
     return jsonDecode(response.body);
+  }
+
+  static String _responseMessage(int status, String? message) {
+    if (status == 401) return 'Please sign in again to continue.';
+    if (status == 429) {
+      return 'Too many requests. Wait a moment, then try again.';
+    }
+    if (status >= 500) {
+      return 'Flixie is having trouble responding. Please try again shortly.';
+    }
+    final value = message?.trim() ?? '';
+    final technical = RegExp(
+      r'prisma|sql|stack trace|exception|<[^>]+>|https?://',
+      caseSensitive: false,
+    ).hasMatch(value);
+    if (value.isNotEmpty && value.length <= 300 && !technical) return value;
+    if (status == 403) return 'You don’t have permission to do this.';
+    if (status == 404) {
+      return 'This item is no longer available. Refresh and try again.';
+    }
+    if (status == 409) {
+      return 'This has changed since you opened it. Refresh and try again.';
+    }
+    return 'Please check the details you entered and try again.';
+  }
+
+  static Future<T> _send<T>(Future<T> Function() request) async {
+    try {
+      return await request();
+    } on TimeoutException {
+      throw const ApiException(
+        statusCode: 0,
+        code: 'REQUEST_TIMEOUT',
+        message:
+            'Flixie took too long to respond. If you were saving a change, check whether it saved before trying again.',
+      );
+    } on http.ClientException {
+      throw const ApiException(
+        statusCode: 0,
+        code: 'CONNECTION_ERROR',
+        message:
+            'Couldn’t connect to Flixie. Check your internet connection. If you were saving a change, check whether it saved before trying again.',
+      );
+    }
   }
 
   /// Performs a GET request.
@@ -218,7 +260,7 @@ class ApiClient {
     }
 
     try {
-      final result = await request();
+      final result = await _send(request);
       checkSession();
       return result;
     } on ApiException catch (error) {
@@ -233,7 +275,7 @@ class ApiClient {
       );
       await refreshAuthToken();
       checkSession();
-      final result = await request();
+      final result = await _send(request);
       checkSession();
       return result;
     }

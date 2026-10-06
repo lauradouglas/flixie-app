@@ -66,7 +66,9 @@ String? notificationPlanLabel(FlixieNotification n) {
 
 String notificationHeadline(FlixieNotification n) {
   if (n.type == FlixieNotification.communityReply) {
-    return 'Someone replied to your community post';
+    return n.message.isNotEmpty
+        ? n.message
+        : 'People have replied to your community post';
   }
   if (n.type == FlixieNotification.communityReaction) {
     return 'Someone reacted to your community post';

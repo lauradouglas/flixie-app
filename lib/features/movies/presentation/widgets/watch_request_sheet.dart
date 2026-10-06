@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -10,6 +11,7 @@ import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -77,6 +79,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   TimeOfDay? _selectedTime;
   late final List<MovieShort> _movieChoices;
 
+  late List<Friendship> _friends;
+  bool _loadingFriends = false;
+  bool _friendsLoadFailed = false;
+
   List<Group> _groups = [];
   bool _loadingGroups = false;
   bool _loadingProviders = true;
@@ -107,10 +113,12 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
             ),
           ];
     _selectedMovieId = widget.movieId;
+    _friends = List.of(widget.friends);
+    _fetchFriends();
     _fetchGroups();
     if (widget.initialGroupMode || widget.initialGroupId != null) {
       _isGroupMode = true;
-      _scheduleMode = _ScheduleMode.dateAndTime;
+      _scheduleMode = _ScheduleMode.dateOnly;
     }
     if (widget.initialGroupId != null) {
       _selectedGroupId = widget.initialGroupId;
@@ -122,7 +130,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final initialId = widget.initialFriendId!;
-        if (widget.friends
+        if (_friends
             .any((friendship) => friendship.friendUser?.id == initialId)) {
           _selectFriend(initialId);
         }
@@ -136,6 +144,39 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     if (_providerLoadStarted) return;
     _providerLoadStarted = true;
     _loadProviders();
+  }
+
+  Future<void> _fetchFriends() async {
+    setState(() {
+      _loadingFriends = true;
+      _friendsLoadFailed = false;
+    });
+    try {
+      final data = await FriendService.getFriends(widget.requesterId);
+      if (!mounted) return;
+      setState(() {
+        _friends = data.friendships;
+        _loadingFriends = false;
+        if (!_friends.any((item) => item.friendUser?.id == _selectedFriendId)) {
+          _selectedFriendId = null;
+          _friendProviderIds = {};
+        }
+      });
+      final initialId = widget.initialFriendId;
+      if (_selectedFriendId == null &&
+          initialId != null &&
+          _friends.any((item) => item.friendUser?.id == initialId)) {
+        _selectFriend(initialId);
+      }
+    } catch (error) {
+      logger.w('Unable to load watch-plan friends: $error');
+      if (mounted) {
+        setState(() {
+          _loadingFriends = false;
+          _friendsLoadFailed = true;
+        });
+      }
+    }
   }
 
   Future<void> _loadProviders() async {
@@ -324,6 +365,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           _movieChoices.first.id,
           candidateMovieIds: _movieChoices.map((movie) => movie.id).toList(),
           proposedDate: _proposedDate?.toUtc().toIso8601String(),
+          proposedDateOnly: _scheduleMode == _ScheduleMode.dateOnly,
           location: _locationLabel,
         );
         final conversationId = result?['conversationId'] as String?;
@@ -342,6 +384,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
           'type': 'MOVIE_WATCH_REQUEST',
           if (_proposedDate != null)
             'proposedDate': _proposedDate!.toUtc().toIso8601String(),
+          'proposedDateOnly': _scheduleMode == _ScheduleMode.dateOnly,
           if (_locationLabel != null) 'location': _locationLabel,
         });
         final request = result?['request'] as Map<String, dynamic>?;
@@ -447,7 +490,9 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     if (_scheduleMode == _ScheduleMode.decideLater) return true;
     if (_selectedDate == null) return false;
     final proposed = _proposedDate;
-    return proposed == null || !proposed.isBefore(DateTime.now());
+    return proposed != null &&
+        !watchPlanScheduleHasPassed(proposed,
+            dateOnly: _scheduleMode == _ScheduleMode.dateOnly);
   }
 
   DateTime? get _proposedDate {
@@ -456,9 +501,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
     if (date == null) return null;
     final time = _selectedTime;
     if (_scheduleMode != _ScheduleMode.dateAndTime || time == null) {
-      // Noon UTC is a date-only sentinel: it keeps the intended calendar day
-      // stable in every time zone and is never rendered as a watch time.
-      return DateTime.utc(date.year, date.month, date.day, 12);
+      return encodeWatchPlanDate(date);
     }
     return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
@@ -482,14 +525,22 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
             initialTime?.minute ?? 0,
           );
     final selected = await showModalBottomSheet<
-        ({DateTime proposedFor, String? message, String? location})>(
+        ({
+          DateTime proposedFor,
+          bool dateOnly,
+          String? message,
+          String? location
+        })>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => WatchPlanScheduleSheet(
-        initial: initial,
+        initial: _scheduleMode == _ScheduleMode.dateOnly && initialDate != null
+            ? encodeWatchPlanDate(initialDate)
+            : initial,
+        initialDateOnly: _selectedTime == null,
       ),
     );
     if (selected == null || !mounted) return;
@@ -499,7 +550,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
         selected.proposedFor.month,
         selected.proposedFor.day,
       );
-      _scheduleMode = selected.message == null
+      _scheduleMode = !selected.dateOnly
           ? _ScheduleMode.dateAndTime
           : _ScheduleMode.dateOnly;
       _selectedTime = _scheduleMode == _ScheduleMode.dateAndTime
@@ -512,7 +563,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   Widget build(BuildContext context) {
     final sheetHeight = MediaQuery.sizeOf(context).height * .92;
     final query = _recipientSearch.toLowerCase();
-    final visibleFriends = widget.friends.where((item) {
+    final visibleFriends = _friends.where((item) {
       final friend = item.friendUser;
       if (friend == null) return false;
       return query.isEmpty || friend.displayName.toLowerCase().contains(query);
@@ -523,7 +574,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
             group.name.toLowerCase().contains(query) ||
             (group.abbreviation?.toLowerCase().contains(query) ?? false))
         .toList();
-    final hasFriends = widget.friends.isNotEmpty;
+    final hasFriends = _friends.any((item) => item.friendUser != null);
     final hasGroups = _groups.isNotEmpty;
 
     return Container(
@@ -659,13 +710,28 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  if (!hasFriends)
+                  if (_loadingFriends)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                  if (_friendsLoadFailed)
+                    Row(children: [
+                      Expanded(
+                          child: Text(
+                              'Unable to refresh friends. Please try again.',
+                              style: TextStyle(color: context.colors.medium))),
+                      TextButton(
+                          onPressed: _fetchFriends, child: const Text('Retry')),
+                    ]),
+                  if (!hasFriends && !_loadingFriends && !_friendsLoadFailed)
                     Text(
                       'Add some friends to plan a watch together',
                       style:
                           TextStyle(color: context.colors.medium, fontSize: 13),
-                    )
-                  else
+                    ),
+                  if (hasFriends)
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 180),
                       child: ListView.separated(
@@ -679,6 +745,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                           return _RecipientOptionTile(
                             title: friend.displayName,
                             avatar: friend.avatar,
+                            profileBadges: friend.profileBadges,
                             avatarColor:
                                 avatarColorFromIconColor(friend.iconColor),
                             selected: isSelected,
@@ -946,7 +1013,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
   }
 
   String? get _selectedFriendName {
-    for (final friendship in widget.friends) {
+    for (final friendship in _friends) {
       final friend = friendship.friendUser;
       if (friend?.id == _selectedFriendId) return friend?.displayName;
     }
@@ -1565,6 +1632,7 @@ class _RecipientOptionTile extends StatelessWidget {
     this.avatar,
     this.avatarColor = FlixieColors.primary,
     this.groupModel,
+    this.profileBadges = const [],
   });
 
   final String title;
@@ -1574,6 +1642,7 @@ class _RecipientOptionTile extends StatelessWidget {
   final ProfileAvatar? avatar;
   final Color avatarColor;
   final Group? groupModel;
+  final List<String> profileBadges;
   final VoidCallback onTap;
 
   @override
@@ -1601,10 +1670,11 @@ class _RecipientOptionTile extends StatelessWidget {
             children: [
               if (group && groupModel != null)
                 GroupAvatar(group: groupModel!, radius: 18)
-              else if (avatar != null)
+              else if (!group)
                 ProfileAvatarView(
                   avatar: avatar,
-                  fallbackText: '',
+                  profileBadges: profileBadges,
+                  fallbackText: title.isEmpty ? '?' : title[0].toUpperCase(),
                   fallbackColor: avatarColor,
                   size: 36,
                 )

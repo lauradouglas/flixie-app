@@ -1,7 +1,10 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
@@ -38,6 +41,15 @@ class _GroupInvitationDetailScreenState
 
   Future<void> _load() async {
     try {
+      final userId = context.read<AuthProvider>().dbUser?.id;
+      if (userId != null) {
+        final groups = await GroupService.getUserGroups(userId);
+        if (!mounted) return;
+        if (groups.any((group) => group.id == widget.groupId)) {
+          context.pushReplacement('/groups/${widget.groupId}');
+          return;
+        }
+      }
       // Pending invitees can preview the group, but cannot read its members.
       final group = await GroupService.getGroup(widget.groupId);
       if (!mounted) {
@@ -63,9 +75,9 @@ class _GroupInvitationDetailScreenState
       await RequestService.updateRequest(widget.requestId, status);
       if (!mounted) return;
       if (status == 'ACCEPTED') {
-        context.go('/groups/${widget.groupId}');
+        context.pushReplacement('/groups/${widget.groupId}');
       } else {
-        context.pop();
+        flixieBackOrHome(context);
       }
     } catch (_) {
       if (mounted) {
@@ -85,6 +97,7 @@ class _GroupInvitationDetailScreenState
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
+        leading: const FlixieBackButton(),
         backgroundColor: Colors.transparent,
         title: const Text('Group invitation'),
       ),
@@ -102,7 +115,7 @@ class _GroupInvitationDetailScreenState
                           style: TextStyle(color: context.colors.light)),
                       const SizedBox(height: 12),
                       TextButton(
-                          onPressed: () => context.pop(),
+                          onPressed: () => flixieBackOrHome(context),
                           child: const Text('Go back')),
                     ]),
                   ),

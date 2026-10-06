@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -608,7 +609,7 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
               const Positioned(
                 top: 12,
                 left: 12,
-                child: BackButton(),
+                child: FlixieBackButton(),
               ),
               const Positioned(
                 top: 12,

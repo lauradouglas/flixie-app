@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/chat_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
@@ -117,8 +118,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     setState(() => _respondingPlanIds.add(plan.id));
     try {
       if (_friendPlanIds.contains(plan.id)) {
-        await RequestService.updateRequest(
-            plan.id, decision.apiValue.toLowerCase());
+        await RequestService.respondToDirectWatchPlan(plan.id, decision);
       } else {
         await GroupService.respondToWatchRequest(
             conversationId, plan.id, userId, decision);
@@ -245,6 +245,11 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     if (_loading) {
       return Scaffold(
         backgroundColor: context.colors.background,
+        appBar: AppBar(
+          backgroundColor: context.colors.background,
+          leading: const ChatBackButton(),
+          title: const Text('Chat'),
+        ),
         body: const ChatContentSkeleton(),
       );
     }
@@ -252,7 +257,11 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
     if (_error != null || _conversationId == null) {
       return Scaffold(
         backgroundColor: context.colors.background,
-        appBar: AppBar(backgroundColor: context.colors.background),
+        appBar: AppBar(
+          backgroundColor: context.colors.background,
+          leading: const ChatBackButton(),
+          title: const Text('Chat'),
+        ),
         body: Center(
           child: SingleChildScrollView(
               child: LoadFailureNotice(
@@ -273,6 +282,7 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
       backgroundColor: context.colors.background,
       appBar: AppBar(
         backgroundColor: context.colors.background,
+        leading: const ChatBackButton(),
         titleSpacing: 0,
         title: Semantics(
           button: true,

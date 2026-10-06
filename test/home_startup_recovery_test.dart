@@ -34,7 +34,9 @@ void main() {
     MovieCacheService().clearCache();
     final session = Session();
     final auth = AuthProvider(session, MovieService(),
-        prefetchAfterAuth: false, profileLoader: (id) async => profile(id));
+        prefetchAfterAuth: false,
+        profileLoader: (id) async => profile(id),
+        termsStatusLoader: () async => true);
     final cache = WatchRequestCache();
     final trending = Completer<http.Response>();
     final recommendations = Completer<http.Response>();
@@ -66,9 +68,9 @@ void main() {
               'Completed empty friend activity must not wait for recommendations');
       expect(find.text('Friends watching'), findsNothing);
       expect(find.text('On Your Watchlist'), findsNothing);
-      await tester.scrollUntilVisible(find.text('Community'), 250,
+      await tester.scrollUntilVisible(find.text('Around Flixie'), 250,
           scrollable: find.byType(Scrollable).first);
-      expect(find.text('Community'), findsOneWidget);
+      expect(find.text('Around Flixie'), findsOneWidget);
       expect(find.text('Friends’ activity'), findsNothing);
       recommendations.complete(response({'error': 'offline'}, 500));
       await tester.pump();

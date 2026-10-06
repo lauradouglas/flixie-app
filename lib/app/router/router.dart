@@ -177,6 +177,13 @@ GoRouter buildRouter(
     redirect: (context, state) async {
       final status = authProvider.status;
       final hasCompletedSetup = authProvider.dbUser?.completedSetup ?? false;
+      if (state.uri.path == '/search' && state.uri.queryParameters['focus'] == '1') {
+        pendingSetupDestination = '/search?focus=1';
+      } else if (state.uri.path == '/watchlist') {
+        pendingSetupDestination = '/watchlist';
+      } else if (state.uri.path == '/social') {
+        pendingSetupDestination = '/social';
+      }
       if (!hasCompletedSetup) {
         pendingSetupDestination =
             setupDestination(state.uri.toString()) ?? pendingSetupDestination;
@@ -203,6 +210,10 @@ GoRouter buildRouter(
       // Show splash only while Firebase resolves initial auth state
       if (status == AuthStatus.unknown) {
         return isSplash ? null : '/splash';
+      }
+
+      if (authProvider.needsSocialProfile) {
+        return state.matchedLocation == '/auth/signup' ? null : '/auth/signup';
       }
 
       if (status == AuthStatus.unauthenticated && isReferralInvite) {
@@ -235,7 +246,7 @@ GoRouter buildRouter(
         }
         if (state.matchedLocation == '/terms-required') {
           return hasCompletedSetup
-              ? '/'
+              ? (pendingSetupDestination ?? '/')
               : Uri(
                       path: '/onboarding',
                       queryParameters: pendingSetupDestination == null
@@ -302,8 +313,14 @@ GoRouter buildRouter(
           ], routes: [
             GoRoute(
               path: '/search',
-              pageBuilder: (context, state) =>
-                  _calmPage(state, const SearchScreen()),
+              pageBuilder: (context, state) => _calmPage(
+                state,
+                SearchScreen(
+                  focusSearch: state.uri.queryParameters['focus'] == '1',
+                  // Consume the request so a later tap can focus again.
+                  onFocusHandled: () => context.go('/search'),
+                ),
+              ),
             ),
           ]),
           StatefulShellBranch(observers: [

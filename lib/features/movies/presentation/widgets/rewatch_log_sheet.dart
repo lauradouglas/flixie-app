@@ -316,7 +316,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                                     _saving = false;
                                     _saveError = error is ApiException
                                         ? error.message
-                                        : 'Could not save this watch entry. Try again.';
+                                        : 'Couldn’t confirm this watch entry was saved. Check your watch history before trying again.';
                                   });
                                 }
                               }

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -239,11 +240,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
               surfaceTintColor: Colors.transparent,
               scrolledUnderElevation: 0,
               elevation: 0,
-              leading: IconButton(
-                icon: Icon(Icons.arrow_back_ios_new_rounded,
-                    color: context.colors.light, size: 20),
-                onPressed: _deletingGroup ? null : () => context.pop(),
-              ),
+              leading: FlixieBackButton(enabled: !_deletingGroup),
               titleSpacing: 0,
               title: _loadingGroup
                   ? const ContentPlaceholder(

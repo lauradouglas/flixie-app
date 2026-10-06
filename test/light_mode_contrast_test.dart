@@ -35,6 +35,8 @@ void main() {
       home: Scaffold(
           body: WatchPlanScheduleSheet(initial: DateTime(2030, 1, 1, 19))),
     ));
+    await tester.tap(find.text('Date & time'));
+    await tester.pumpAndSettle();
     final labels = tester.widgetList<Text>(find.text('Date & time'));
     expect(labels.any((label) => label.style?.color == Colors.white), isTrue);
     expect(tester.takeException(), isNull);

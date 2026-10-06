@@ -28,6 +28,7 @@ class FlixieNotification {
   /// describes what happened to the Watch Plan rather than a response state.
   final String? event;
   final String message;
+  final String? title;
   final bool? read;
   final bool? closed;
   final String? relatedId;
@@ -50,6 +51,7 @@ class FlixieNotification {
     this.action,
     this.event,
     required this.message,
+    this.title,
     this.read,
     this.closed,
     this.relatedId,
@@ -273,6 +275,18 @@ class FlixieNotification {
     return request == null ? null : WatchRequest.fromJson(request);
   }
 
+  bool get watchRequestScheduledDateOnly =>
+      (_linkedWatchRequest ??
+          link?['groupRequest']
+              as Map<String, dynamic>?)?['scheduledDateOnly'] ==
+      true;
+
+  bool get watchRequestProposedDateOnly =>
+      (_linkedWatchRequest ??
+          link?['groupRequest']
+              as Map<String, dynamic>?)?['proposedDateOnly'] ==
+      true;
+
   DateTime? get watchRequestScheduledFor {
     final raw = _linkedWatchRequest?['scheduledFor'];
     if (raw is String && raw.isNotEmpty) return DateTime.tryParse(raw);
@@ -464,6 +478,7 @@ class FlixieNotification {
       event: json['event'] as String? ??
           (json['data'] as Map<String, dynamic>?)?['event']?.toString(),
       message: json['message'] as String? ?? '',
+      title: json['title'] as String?,
       read: json['read'] as bool? ?? json['isRead'] as bool?,
       closed: json['closed'] as bool?,
       relatedId: json['relatedId'] as String?,
@@ -487,6 +502,7 @@ class FlixieNotification {
     String? action,
     String? event,
     String? message,
+    String? title,
     bool? read,
     bool? closed,
     String? relatedId,
@@ -505,6 +521,7 @@ class FlixieNotification {
       action: action ?? this.action,
       event: event ?? this.event,
       message: message ?? this.message,
+      title: title ?? this.title,
       read: read ?? this.read,
       closed: closed ?? this.closed,
       relatedId: relatedId ?? this.relatedId,
@@ -525,6 +542,7 @@ class FlixieNotification {
       'type': type,
       'action': action,
       'message': message,
+      'title': title,
       'read': read,
       'closed': closed,
       'relatedId': relatedId,

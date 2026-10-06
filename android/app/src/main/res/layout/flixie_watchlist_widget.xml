@@ -1,0 +1,22 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_background">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+<TextView android:id="@+id/widget_wordmark" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/widget_wordmark" android:textColor="#FFFFFF" android:textSize="24sp" android:fontFamily="sans-serif-black" android:contentDescription="Flixie"/>
+<TextView android:id="@+id/widget_watchlist_label" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="end" android:paddingStart="8dp" android:text="@string/widget_watchlist_action" android:textSize="14sp" android:textStyle="bold" android:textColor="#FFFFFF"/>
+</LinearLayout>
+<TextView android:id="@+id/widget_message" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="bottom" android:paddingTop="8dp" android:text="@string/widget_sign_in" android:textSize="14sp" android:textColor="#DFD5F2"/>
+<LinearLayout android:id="@+id/widget_posters" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal" android:layout_marginTop="10dp" android:visibility="gone">
+<FrameLayout android:id="@+id/widget_slot_0" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="8dp" android:background="@drawable/widget_poster_background" android:clipToOutline="true">
+ <ImageView android:id="@+id/widget_poster_0" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
+ <TextView android:id="@+id/widget_title_0" android:layout_width="match_parent" android:layout_height="match_parent" android:padding="5dp" android:gravity="center" android:textSize="12sp" android:textColor="#FFFFFF" android:importantForAccessibility="no"/>
+</FrameLayout><FrameLayout android:id="@+id/widget_slot_1" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="8dp" android:background="@drawable/widget_poster_background" android:clipToOutline="true">
+ <ImageView android:id="@+id/widget_poster_1" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
+ <TextView android:id="@+id/widget_title_1" android:layout_width="match_parent" android:layout_height="match_parent" android:padding="5dp" android:gravity="center" android:textSize="12sp" android:textColor="#FFFFFF" android:importantForAccessibility="no"/>
+</FrameLayout><FrameLayout android:id="@+id/widget_slot_2" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="8dp" android:background="@drawable/widget_poster_background" android:clipToOutline="true">
+ <ImageView android:id="@+id/widget_poster_2" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
+ <TextView android:id="@+id/widget_title_2" android:layout_width="match_parent" android:layout_height="match_parent" android:padding="5dp" android:gravity="center" android:textSize="12sp" android:textColor="#FFFFFF" android:importantForAccessibility="no"/>
+</FrameLayout><FrameLayout android:id="@+id/widget_slot_3" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginEnd="0dp" android:background="@drawable/widget_poster_background" android:clipToOutline="true">
+ <ImageView android:id="@+id/widget_poster_3" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:importantForAccessibility="no"/>
+ <TextView android:id="@+id/widget_title_3" android:layout_width="match_parent" android:layout_height="match_parent" android:padding="5dp" android:gravity="center" android:textSize="12sp" android:textColor="#FFFFFF" android:importantForAccessibility="no"/>
+</FrameLayout>
+</LinearLayout>
+</LinearLayout>

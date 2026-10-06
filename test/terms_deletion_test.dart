@@ -6,10 +6,13 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/legal/terms_acceptance_screen.dart';
 
 class TermsAuth extends ChangeNotifier implements AuthProvider {
-  TermsAuth(this.check);
+  TermsAuth(this.check, {this.needsPassword = true});
+  final bool needsPassword;
   final Future<bool> Function() check;
   int agreements = 0;
   String? deletedWith;
+  @override
+  bool get deletionNeedsPassword => needsPassword;
   @override
   Future<bool> verifyTerms({bool accept = false}) {
     if (accept) agreements++;
@@ -27,6 +30,33 @@ class TermsAuth extends ChangeNotifier implements AuthProvider {
 }
 
 void main() {
+  testWidgets('social account deletion confirms without requesting a password',
+      (tester) async {
+    final auth = TermsAuth(() async => false, needsPassword: false);
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: auth, child: const MaterialApp(home: TermsAcceptanceScreen())));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Delete account'));
+    await tester.tap(find.text('Delete account'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Current password'), findsNothing);
+    expect(
+        tester
+            .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Delete account'))
+            .onPressed,
+        isNull);
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Type DELETE to confirm'), 'DELETE');
+    await tester.pump();
+    await tester
+        .ensureVisible(find.widgetWithText(FilledButton, 'Delete account'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete account'));
+    await tester.pumpAndSettle();
+    expect(auth.deletedWith, '');
+    expect(auth.agreements, 0);
+  });
   for (final state in ['missing', 'failed', 'loading']) {
     testWidgets('deletion is available when terms are $state without accepting',
         (tester) async {

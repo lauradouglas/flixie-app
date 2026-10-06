@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
@@ -105,6 +106,7 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
       length: 4,
       child: Scaffold(
           appBar: AppBar(
+            leading: const FlixieBackButton(),
             title: const Text('Communities'),
             actions: [
               if (_community != null)

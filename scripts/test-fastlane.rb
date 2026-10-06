@@ -70,7 +70,10 @@ class FastlaneTest < Minitest::Test
   end
   def test_internal_draft_builds_production_entrypoint
     @runner.run(:android, :draft, build_number: '123')
-    command = @runner.calls.find { |type, _| type == :shell }.last
+    command = @runner.calls.find { |type, value| type == :shell && value.include?('flutter build appbundle') }.last
+    guard = @runner.calls.index { |type, value| type == :shell && value.include?('check-google-oauth.py') }
+    build = @runner.calls.index { |type, value| type == :shell && value.include?('flutter build appbundle') }
+    assert_operator guard, :<, build
     assert_includes command, '--target=lib/main.dart'
     assert_includes command, '--build-number=123'
     assert_includes command, '--dart-define=API_BASE_URL=https://flixie-api-'
@@ -118,6 +121,16 @@ class FastlaneTest < Minitest::Test
     assert_equal true, upload[:skip_waiting_for_build_processing]
     assert_equal 'com.flixie.flixieApp', upload[:app_identifier]
   end
+  def test_ios_build_validates_signed_ipa_before_returning
+    original_glob = Dir.method(:[])
+    Dir.define_singleton_method(:[]) { |*_args| ['/tmp/fake.ipa'] }
+    assert_equal '/tmp/fake.ipa', @runner.run(:ios, :build, build_number: '123')
+    assert_equal [:shell, :shell], @runner.calls.map(&:first)
+    assert_includes @runner.calls.last.last, 'scripts/validate-ios-ipa.py /tmp/fake.ipa'
+  ensure
+    Dir.define_singleton_method(:[], original_glob)
+  end
+
   def test_ios_build_command
     @runner.flutter_release('ipa', '123')
     assert_includes @runner.calls.last.last, '--export-method=app-store'

@@ -47,6 +47,11 @@ class RequestService {
     return null;
   }
 
+  static Future<void> respondToDirectWatchPlan(
+      String requestId, WatchResponseDecision decision) {
+    return updateRequest(requestId, decision.apiValue);
+  }
+
   static Future<void> updateRequest(String requestId, String status,
       {String? message, bool acceptProposedTime = true}) async {
     await ApiClient.post('/requests/update', body: {
@@ -60,10 +65,12 @@ class RequestService {
   static Future<WatchRequestState> getWatchRequestState({
     required String watchRequestId,
     required String userId,
+    Object? requestScope,
   }) async {
     final data = await ApiClient.get(
       '/watch-requests/$watchRequestId/state',
       queryParams: {'userId': userId},
+      requestScope: requestScope,
     );
     return WatchRequestState.fromJson(data as Map<String, dynamic>);
   }
@@ -72,6 +79,7 @@ class RequestService {
     required String watchRequestId,
     required String userId,
     required DateTime proposedFor,
+    bool dateOnly = false,
     String? message,
     String? location,
   }) async {
@@ -80,6 +88,7 @@ class RequestService {
       body: {
         'userId': userId,
         'proposedFor': proposedFor.toUtc().toIso8601String(),
+        'dateOnly': dateOnly,
         if (message != null && message.trim().isNotEmpty)
           'message': message.trim(),
         if (location != null && location.trim().isNotEmpty)

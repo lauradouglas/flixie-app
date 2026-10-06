@@ -35,6 +35,8 @@ WatchRequest asHomeGroupWatchPlan(Group group, GroupWatchRequest request) {
     showId: request.mediaType?.toLowerCase() == 'show' ? request.mediaId : null,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
+    proposedDateOnly: request.proposedDateOnly,
+    scheduledDateOnly: request.scheduledDateOnly,
     scheduledFor: DateTime.tryParse(request.scheduledFor ?? ''),
     location: request.location,
     scheduleStatus: request.scheduledFor == null ? 'NONE' : 'AGREED',
@@ -49,6 +51,7 @@ WatchRequest asHomeGroupWatchPlan(Group group, GroupWatchRequest request) {
         .map((proposal) => WatchScheduleProposal(
               id: proposal.id,
               proposerId: proposal.proposerId,
+              dateOnly: proposal.dateOnly,
               proposedFor: DateTime.tryParse(proposal.proposedFor ?? ''),
               location: proposal.location,
               status: proposal.status,

@@ -20,13 +20,15 @@ void main() {
     MilestoneCache.instance.clear();
     ApiClient.useClientForTesting(null);
   });
-  testWidgets(
-      'boot proceeds before milestones finish and page reuses warm result',
+  testWidgets('boot defers milestones and reopening reuses the loaded result',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final pending = Completer<http.Response>();
     var calls = 0;
     ApiClient.useClientForTesting(MockClient((request) {
+      if (!request.url.path.endsWith('/milestones')) {
+        return Future.value(http.Response('{"items":[]}', 200));
+      }
       calls++;
       return pending.future;
     }));
@@ -41,10 +43,15 @@ void main() {
     await tester.pump();
     expect(auth.status, AuthStatus.authenticated);
     expect(auth.isPrefetching, isFalse);
+    expect(calls, 0, reason: 'milestones load on demand, not during boot');
+    await tester.pumpWidget(
+        MaterialApp(home: MilestonesScreen(userId: session.identity.uid)));
+    await tester.pump();
     expect(calls, 1);
     expect(pending.isCompleted, isFalse);
     pending.complete(result());
-    await tester.pump();
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(
         MaterialApp(home: MilestonesScreen(userId: session.identity.uid)));
     await tester.pumpAndSettle();

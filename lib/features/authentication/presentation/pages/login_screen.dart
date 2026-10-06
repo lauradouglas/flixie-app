@@ -8,6 +8,7 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
+import 'social_auth_buttons.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -80,6 +81,10 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SocialAuthButtons(),
+              const SizedBox(height: 20),
+              const Text('Or sign in with email', textAlign: TextAlign.center),
+              const SizedBox(height: 20),
               AppTextField(
                 controller: _emailController,
                 label: 'Email or Username',

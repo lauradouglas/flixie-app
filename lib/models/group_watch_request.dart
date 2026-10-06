@@ -332,6 +332,7 @@ class GroupScheduleProposal {
   const GroupScheduleProposal({
     required this.id,
     required this.proposerId,
+    this.dateOnly = false,
     required this.proposedFor,
     required this.status,
     this.location,
@@ -340,6 +341,7 @@ class GroupScheduleProposal {
   });
   final String id;
   final String proposerId;
+  final bool dateOnly;
   final String? proposedFor;
   final String status;
   final String? location;
@@ -353,6 +355,7 @@ class GroupScheduleProposal {
       proposerId: (json['proposerId'] ?? proposer?['id'] ?? json['userId'])
               ?.toString() ??
           '',
+      dateOnly: json['dateOnly'] == true,
       proposedFor: json['proposedFor']?.toString(),
       status: json['status']?.toString() ?? 'PENDING',
       location: json['location']?.toString(),
@@ -409,6 +412,8 @@ class GroupWatchRequest {
 
   // Lifecycle fields
   final WatchRequestStatus status;
+  final bool proposedDateOnly;
+  final bool scheduledDateOnly;
   final String? proposedDate;
   final String? scheduledFor;
   final String? location;
@@ -451,6 +456,8 @@ class GroupWatchRequest {
     this.selectedCandidateId,
     this.scheduleProposals = const [],
     this.status = WatchRequestStatus.open,
+    this.proposedDateOnly = false,
+    this.scheduledDateOnly = false,
     this.proposedDate,
     this.scheduledFor,
     this.location,
@@ -565,6 +572,8 @@ class GroupWatchRequest {
       selectedCandidateId: selectedCandidateId,
       scheduleProposals: scheduleProposals,
       status: WatchRequestStatus.fromString(json['status'] as String?),
+      proposedDateOnly: json['proposedDateOnly'] == true,
+      scheduledDateOnly: json['scheduledDateOnly'] == true,
       proposedDate: json['proposedDate'] as String?,
       scheduledFor: json['scheduledFor'] as String?,
       location: (json['location'] ?? json['locationLabel']) as String?,
@@ -639,6 +648,7 @@ class GroupWatchRequest {
         final sameSlot = current != null &&
             proposed != null &&
             current.isAtSameMomentAs(proposed) &&
+            scheduledDateOnly == proposal.dateOnly &&
             (proposal.location ?? location ?? '').trim() ==
                 (location ?? '').trim();
         return !sameSlot;

@@ -69,6 +69,7 @@ Widget row(
         availableProviders: providers,
         userWatchProviderIds: const {1},
         isLoadingProviders: loading,
+        isLoadingFriends: loading,
         providersFailed: failed,
         onRetryProviders: retry,
         onTap: open ?? () {},
@@ -256,6 +257,10 @@ void main() {
       'loading, failed and confirmed no offers are different; retry works',
       (tester) async {
     await tester.pumpWidget(wrap(row(loading: true)));
+    expect(find.text('Loading friends…'), findsOneWidget);
+    expect(find.text('Loading watch options…'), findsOneWidget);
+    expect(find.text('No friends watched yet'), findsNothing);
+    expect(find.text('No providers found'), findsNothing);
     expect(
         find.byWidgetPredicate((widget) =>
             widget is ContentPlaceholder &&

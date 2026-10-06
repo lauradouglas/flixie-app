@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -422,6 +423,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
+        leading: const FlixieBackButton(),
         backgroundColor: context.colors.background,
         foregroundColor: context.colors.light,
         actions: [
@@ -1397,7 +1399,8 @@ class _ListHeader extends StatelessWidget {
                                 Flexible(
                                   child: Text(
                                     owner == null
-                                        ? _visibilityLabel(membership?.visibility)
+                                        ? _visibilityLabel(
+                                            membership?.visibility)
                                         : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
                                     style: TextStyle(
                                       color: context.colors.medium,

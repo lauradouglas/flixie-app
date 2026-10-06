@@ -1,0 +1,3 @@
+#include "../Flutter/Generated.xcconfig"
+
+CODE_SIGN_ENTITLEMENTS = FlixieSearchWidget/Widget.entitlements

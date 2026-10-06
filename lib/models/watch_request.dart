@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 
 /// The product-facing stage of a [WatchRequest].
@@ -159,6 +160,7 @@ class WatchRequestParticipant {
 class WatchScheduleProposal {
   final String id;
   final String proposerId;
+  final bool dateOnly;
   final DateTime? proposedFor;
   final String? message;
   final String? location;
@@ -170,6 +172,7 @@ class WatchScheduleProposal {
   const WatchScheduleProposal({
     required this.id,
     required this.proposerId,
+    this.dateOnly = false,
     this.proposedFor,
     this.message,
     this.location,
@@ -183,6 +186,7 @@ class WatchScheduleProposal {
     return WatchScheduleProposal(
       id: json['id']?.toString() ?? '',
       proposerId: (json['proposerId'] ?? json['userId'])?.toString() ?? '',
+      dateOnly: json['dateOnly'] == true,
       proposedFor: _dateTimeValue(json['proposedFor']),
       message: json['message'] as String?,
       location: json['location'] as String?,
@@ -357,6 +361,8 @@ class WatchRequest {
   final String type;
   final String? createdAt;
   final String? updatedAt;
+  final bool proposedDateOnly;
+  final bool scheduledDateOnly;
   final DateTime? proposedDate;
   final DateTime? scheduledFor;
   final String? location;
@@ -409,6 +415,8 @@ class WatchRequest {
     required this.type,
     this.createdAt,
     this.updatedAt,
+    this.proposedDateOnly = false,
+    this.scheduledDateOnly = false,
     this.proposedDate,
     this.scheduledFor,
     this.location,
@@ -479,6 +487,8 @@ class WatchRequest {
       type: json['type'] as String? ?? 'MOVIE_WATCH_REQUEST',
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
+      proposedDateOnly: json['proposedDateOnly'] == true,
+      scheduledDateOnly: json['scheduledDateOnly'] == true,
       proposedDate: _dateTimeValue(json['proposedDate']),
       scheduledFor: _dateTimeValue(json['scheduledFor']),
       location: (json['location'] ?? json['locationLabel'])?.toString(),
@@ -646,6 +656,7 @@ class WatchRequest {
           scheduledFor != null &&
           p.proposedFor != null &&
           scheduledFor!.isAtSameMomentAs(p.proposedFor!) &&
+          scheduledDateOnly == p.dateOnly &&
           (p.location ?? location ?? '').trim() == (location ?? '').trim();
       return !matchesConfirmedSlot;
     }).toList()
@@ -698,7 +709,8 @@ class WatchRequest {
 
     if ((normalizedScheduleStatus == 'AGREED' || isScheduled) &&
         scheduledFor != null) {
-      return scheduledFor!.isAfter(currentTime)
+      return !watchPlanScheduleHasPassed(scheduledFor!,
+              dateOnly: scheduledDateOnly, now: currentTime)
           ? WatchPlanStage.upcoming
           : WatchPlanStage.past;
     }

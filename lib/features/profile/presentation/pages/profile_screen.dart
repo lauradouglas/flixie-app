@@ -688,15 +688,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             useRootNavigator: true,
             useSafeArea: true,
             isScrollControlled: true,
-            builder: (context) => SizedBox(
-              height: MediaQuery.sizeOf(context).height * .75,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: _ratingsLoading
-                    ? const ContentPlaceholder(label: 'Loading ratings')
-                    : RatingsSection(ratings: _ratings),
-              ),
-            ),
+            builder: (context) => _ratingsLoading
+                ? SizedBox(
+                    height: MediaQuery.sizeOf(context).height * .75,
+                    child: const SingleChildScrollView(
+                      padding: EdgeInsets.all(20),
+                      child: ContentPlaceholder(label: 'Loading ratings'),
+                    ),
+                  )
+                : AllRatingsSheet(ratings: _ratings),
           ),
         ),
         const SizedBox(height: 20),

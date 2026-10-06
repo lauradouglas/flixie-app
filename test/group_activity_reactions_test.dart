@@ -213,6 +213,27 @@ void main() {
       expect(tester.takeException(), isNull);
     },
         () => MockClient((request) async {
+              if (request.url.path == '/community/activity-state') {
+                final body = jsonDecode(request.body) as Map;
+                return http.Response(
+                    jsonEncode({
+                      'items': [
+                        for (final target in body['targets'] as List)
+                          {
+                            ...target as Map,
+                            'reactions': {
+                              'counts': summary.counts,
+                              'mine': summary.mine
+                            },
+                            'saved': false
+                          }
+                      ]
+                    }),
+                    200,
+                    headers: {
+                      'content-type': 'application/json; charset=utf-8'
+                    });
+              }
               if (request.method == 'PUT') {
                 if (failNext) {
                   failNext = false;
@@ -240,8 +261,90 @@ void main() {
                   headers: {'content-type': 'application/json; charset=utf-8'});
             }));
   });
+  testWidgets(
+      'own activity hides React and retains received reactions in every card layout',
+      (tester) async {
+    for (final layout in ['compact', 'detail', 'card']) {
+      await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+              body: SingleChildScrollView(
+                  child: GroupActivityCard(
+            item: item,
+            feedStyle: layout == 'compact',
+            onOpen: null,
+            onProfile: null,
+            postDetail: layout == 'detail',
+            reactions: const ActivityReactionSummary(counts: {'❤️': 2}),
+          )))));
+      await tester.pumpAndSettle();
+      expect(find.text('React'), findsNothing);
+      if (layout == 'compact') {
+        expect(find.text('❤️'), findsOneWidget);
+        expect(find.text('2'), findsOneWidget);
+      } else {
+        expect(find.text('❤️ 2'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    }
+  });
+  testWidgets('group own activity offers no reaction action', (tester) async {
+    final auth = _Auth();
+    addTearDown(auth.dispose);
+    final own = ActivityListItem.fromJson({
+      'id': 'own',
+      'userId': 'me',
+      'username': 'Laura',
+      'type': 'watched_movie',
+      'movie': {'id': 1, 'title': 'The Odyssey'}
+    });
+    await http.runWithClient(() async {
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: MaterialApp(
+              theme: AppTheme.darkTheme,
+              home: Scaffold(
+                  body: GroupActivityTab(
+                      group: null,
+                      memberCount: 2,
+                      groupId: 'group',
+                      initialRequests: const [],
+                      initialActivity: [own],
+                      groupLists: const [],
+                      onRefresh: () async {})))));
+      await tester.pumpAndSettle();
+      expect(find.text('React'), findsNothing);
+      expect(find.text('❤️ 2'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+        () => MockClient((request) async => http.Response(
+            jsonEncode({
+              'items': [
+                {
+                  'id': 'own',
+                  'userId': 'me',
+                  'username': 'Laura',
+                  'type': 'watched_movie',
+                  'movie': {'id': 1, 'title': 'The Odyssey'}
+                }
+              ],
+              'reactions': {
+                'watched-movie:own': {
+                  'counts': {'❤️': 2},
+                  'mine': null
+                }
+              },
+              'watched-movie:own': {
+                'counts': {'❤️': 2},
+                'mine': null
+              }
+            }),
+            200,
+            headers: {'content-type': 'application/json'})));
+  });
   testWidgets('activity card fits phones, tablets and large text',
       (tester) async {
+    var replies = 0;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -267,11 +370,14 @@ void main() {
                       onReact: (_) {},
                       onOpen: () {},
                       onProfile: () {},
-                      onReply: () {})))));
+                      onReply: () => replies++)))));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('The Odyssey'), findsOneWidget);
-      expect(find.text('Reply'), findsOneWidget);
+      expect(find.text('Message'), findsOneWidget);
+      await tester.ensureVisible(find.text('Message'));
+      await tester.tap(find.text('Message'));
+      expect(replies, [390.0, 320.0, 800.0].indexOf(size.width) + 1);
     }
   });
 }

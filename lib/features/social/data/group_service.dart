@@ -137,6 +137,7 @@ class GroupService {
     String? moviePosterUrl,
     String? message,
     String? proposedDate,
+    bool proposedDateOnly = false,
     String? locationType,
     String? locationLabel,
   }) async {
@@ -150,6 +151,7 @@ class GroupService {
         if (moviePosterUrl != null) 'moviePosterUrl': moviePosterUrl,
         if (message != null && message.isNotEmpty) 'message': message,
         if (proposedDate != null) 'proposedDate': proposedDate,
+        'proposedDateOnly': proposedDateOnly,
         if (locationType != null && locationType.isNotEmpty)
           'locationType': locationType,
         if (locationLabel != null && locationLabel.isNotEmpty)
@@ -172,6 +174,7 @@ class GroupService {
     int mediaId, {
     List<int>? candidateMovieIds,
     String? proposedDate,
+    bool proposedDateOnly = false,
     String? location,
   }) async {
     final data = await ApiClient.post(
@@ -184,6 +187,7 @@ class GroupService {
         if (candidateMovieIds != null && candidateMovieIds.isNotEmpty)
           'candidateMovieIds': candidateMovieIds,
         if (proposedDate != null) 'proposedDate': proposedDate,
+        'proposedDateOnly': proposedDateOnly,
         if (location != null && location.isNotEmpty) 'location': location,
       },
     );
@@ -210,6 +214,7 @@ class GroupService {
     String requestId,
     String userId, {
     required String proposedFor,
+    bool dateOnly = false,
     String? location,
   }) async {
     final data = await ApiClient.post(
@@ -217,6 +222,7 @@ class GroupService {
       body: {
         'userId': userId,
         'proposedFor': proposedFor,
+        'dateOnly': dateOnly,
         if (location != null && location.isNotEmpty) 'location': location,
       },
     );

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:add_2_calendar/add_2_calendar.dart';
 
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -8,21 +9,20 @@ class WatchCalendarService {
   static Future<bool> addScheduledWatch({
     required String title,
     required DateTime scheduledFor,
+    bool dateOnly = false,
     int? runtimeMinutes,
     String? note,
     String? location,
   }) async {
     try {
       return await Add2Calendar.addEvent2Cal(
-        Event(
-          title: 'Watch $title',
-          description: _description(note),
-          location: location?.trim() ?? '',
-          startDate: scheduledFor.toLocal(),
-          endDate: scheduledFor
-              .toLocal()
-              .add(calendarDurationForRuntime(runtimeMinutes)),
-        ),
+        eventForScheduledWatch(
+            title: title,
+            scheduledFor: scheduledFor,
+            dateOnly: dateOnly,
+            runtimeMinutes: runtimeMinutes,
+            note: note,
+            location: location),
       );
     } catch (error, stackTrace) {
       logger.w(
@@ -33,6 +33,30 @@ class WatchCalendarService {
       return false;
     }
   }
+
+  static Event eventForScheduledWatch({
+    required String title,
+    required DateTime scheduledFor,
+    bool dateOnly = false,
+    int? runtimeMinutes,
+    String? note,
+    String? location,
+  }) =>
+      Event(
+        title: 'Watch $title',
+        description: _description(note),
+        location: location?.trim() ?? '',
+        allDay: dateOnly,
+        startDate: dateOnly
+            ? watchPlanCalendarDate(scheduledFor, dateOnly: true)
+            : scheduledFor.toLocal(),
+        endDate: dateOnly
+            ? watchPlanCalendarDate(scheduledFor, dateOnly: true)
+                .add(const Duration(days: 1))
+            : scheduledFor
+                .toLocal()
+                .add(calendarDurationForRuntime(runtimeMinutes)),
+      );
 
   /// Movies rarely start exactly on time, so calendar entries round their
   /// runtime up to the next half hour. This leaves practical time to settle

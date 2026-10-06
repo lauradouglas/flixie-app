@@ -161,6 +161,10 @@ class UserService {
     apiLogger.d('GET /users/external-id/$externalId');
     try {
       final data = await ApiClient.get('/users/external-id/$externalId');
+      if (data == null) {
+        throw const ApiException(
+            statusCode: 404, message: 'Profile not found.');
+      }
       apiLogger.i(
           'User data received: ${(data as Map<String, dynamic>)['username']}');
       return User.fromJson(data);
@@ -173,7 +177,8 @@ class UserService {
   static Future<bool> usernameExists(String username) async {
     final data = await ApiClient.get(
       usernameAvailabilityPath(username),
-      authenticated: false,
+      // Anonymous signup still works; signed-in owners can claim reservations.
+      authenticated: true,
     );
     return data as bool;
   }

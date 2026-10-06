@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/collections/movie_collection_card.dart';
 import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
@@ -1423,10 +1424,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         backgroundColor: context.colors.background,
         appBar: AppBar(
           backgroundColor: context.colors.background,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: context.colors.light),
-            onPressed: () => context.pop(),
-          ),
+          leading: const FlixieBackButton(),
         ),
         body: Center(
           child: Padding(
@@ -1474,10 +1472,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         backgroundColor: context.colors.background,
         appBar: AppBar(
           backgroundColor: context.colors.background,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: context.colors.light),
-            onPressed: () => context.pop(),
-          ),
+          leading: const FlixieBackButton(),
         ),
         body: Center(
           child: Text(
@@ -1640,7 +1635,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }) {
     return Semantics(
         button: true,
-        label: 'Back',
+        label: icon == Icons.home_outlined ? 'Home' : 'Back',
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -1880,8 +1875,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               top: safeTop + _MovieDetailHeroTokens.heroControlsTopInset,
               left: _MovieDetailHeroTokens.pageHorizontalPadding,
               child: _heroIconButton(
-                icon: Icons.arrow_back_ios_new_rounded,
-                onTap: () => context.pop(),
+                icon: flixieBackIcon(context,
+                    backIcon: Icons.arrow_back_ios_new_rounded),
+                onTap: () => flixieBackOrHome(context),
               ),
             ),
           ],

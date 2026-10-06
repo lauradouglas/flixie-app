@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import '../widgets/community_replies.dart';
 import '../widgets/community_follow_button.dart';
 import '../widgets/community_list_editors.dart';
@@ -151,7 +152,10 @@ class _CommunityPostScreenState extends State<CommunityPostScreen> {
 
   @override
   Widget build(BuildContext context) => FlixiePageScaffold(
-        appBar: const FlixieTitleAppBar(title: Text('Post'), centerTitle: true),
+        appBar: const FlixieTitleAppBar(
+            leading: FlixieBackButton(),
+            title: Text('Post'),
+            centerTitle: true),
         body: RefreshIndicator(
             onRefresh: _load,
             child: ListView(

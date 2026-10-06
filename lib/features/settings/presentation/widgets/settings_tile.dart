@@ -18,10 +18,12 @@ class SettingsTile extends StatelessWidget {
     required this.onTap,
     this.isLast = false,
     this.trailing,
+    this.description,
   });
 
   final IconData icon;
   final String label;
+  final String? description;
   final VoidCallback onTap;
 
   /// When [true] the bottom divider is hidden (last item in a group).
@@ -59,13 +61,26 @@ class SettingsTile extends StatelessWidget {
                   ),
                   const SizedBox(width: _kTileGap),
                   Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: context.colors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (description != null) ...[
+                          const SizedBox(height: 4),
+                          Text(description!,
+                              style: TextStyle(
+                                  color: context.colors.light,
+                                  fontSize: 13,
+                                  height: 1.35)),
+                        ],
+                      ],
                     ),
                   ),
                   trailing ??

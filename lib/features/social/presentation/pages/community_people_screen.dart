@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -102,7 +103,8 @@ class _CommunityPeopleScreenState extends State<CommunityPeopleScreen> {
               fallbackColor: Theme.of(context).colorScheme.primary)));
   @override
   Widget build(BuildContext context) => FlixiePageScaffold(
-      appBar: const FlixieTitleAppBar(title: Text('Find your people')),
+      appBar: const FlixieTitleAppBar(
+          leading: FlixieBackButton(), title: Text('Find your people')),
       body: RefreshIndicator(
           onRefresh: _load,
           child: ListView(

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/models/watch_request.dart';
@@ -123,7 +124,10 @@ List<HomeWatchPlanState> homeWatchPlanStates(
   bool scheduledToday(HomeWatchPlanState state) {
     final scheduled = state.plan.scheduledFor;
     return scheduled != null &&
-        _sameDay(scheduled.toLocal(), currentTime.toLocal()) &&
+        _sameDay(
+            watchPlanCalendarDate(scheduled,
+                dateOnly: state.plan.scheduledDateOnly),
+            currentTime.toLocal()) &&
         state.type != HomeWatchPlanStateType.waitingForLogs &&
         state.type != HomeWatchPlanStateType.recap;
   }
@@ -241,7 +245,8 @@ HomeWatchPlanState? _stateFor(
         HomeWatchPlanStateType.waitingForScheduleApproval,
         5,
         'SCHEDULING',
-        _dateTime(pendingProposal.proposedFor),
+        _dateTime(pendingProposal.proposedFor,
+            dateOnly: pendingProposal.dateOnly),
         group
             ? 'Waiting for $companion to approve the time'
             : 'Waiting for @$other to approve the time',
@@ -255,7 +260,7 @@ HomeWatchPlanState? _stateFor(
         HomeWatchPlanStateType.reviewSchedule,
         5,
         'SCHEDULING',
-        _dateTime(proposal.proposedFor),
+        _dateTime(proposal.proposedFor, dateOnly: proposal.dateOnly),
         '${plan.watchPlanTitle} · Suggested by $other',
         'Review time',
         true);
@@ -315,7 +320,7 @@ HomeWatchPlanState? _stateFor(
           HomeWatchPlanStateType.waitingForScheduleApproval,
           5,
           'TIME SUGGESTED',
-          _dateTime(plan.proposedDate!),
+          _dateTime(plan.proposedDate!, dateOnly: plan.proposedDateOnly),
           'Waiting for $companion to approve the time',
           'View plan',
           false);
@@ -326,7 +331,7 @@ HomeWatchPlanState? _stateFor(
         4,
         'TIME PROPOSED',
         plan.watchPlanTitle,
-        _dateTime(plan.proposedDate),
+        _dateTime(plan.proposedDate, dateOnly: plan.proposedDateOnly),
         'Review time',
         true);
   }
@@ -408,12 +413,14 @@ HomeWatchPlanState? _stateFor(
         6,
         'ONE THING LEFT',
         'Where are you watching?',
-        _dateTime(plan.scheduledFor),
+        _dateTime(plan.scheduledFor, dateOnly: plan.scheduledDateOnly),
         'Choose location',
         true);
   }
   final scheduled = plan.scheduledFor;
-  if (scheduled != null && !scheduled.isAfter(now)) {
+  if (scheduled != null &&
+      watchPlanScheduleHasPassed(scheduled,
+          dateOnly: plan.scheduledDateOnly, now: now)) {
     if (!logged) {
       return _state(
           plan,
@@ -421,19 +428,25 @@ HomeWatchPlanState? _stateFor(
           6,
           'DID YOU WATCH IT?',
           plan.watchPlanTitle,
-          'Planned ${_dateTime(scheduled)} · ${group ? companion : 'With @$other'}',
+          'Planned ${_dateTime(scheduled, dateOnly: plan.scheduledDateOnly)} · ${group ? companion : 'With @$other'}',
           'Log watch',
           true);
     }
   }
-  if (scheduled != null && scheduled.isAfter(now)) {
-    final today = _sameDay(scheduled.toLocal(), now.toLocal());
-    final scheduleDetail = _dateTime(scheduled);
+  if (scheduled != null &&
+      !watchPlanScheduleHasPassed(scheduled,
+          dateOnly: plan.scheduledDateOnly, now: now)) {
+    final today = _sameDay(
+        watchPlanCalendarDate(scheduled, dateOnly: plan.scheduledDateOnly),
+        now.toLocal());
+    final scheduleDetail =
+        _dateTime(scheduled, dateOnly: plan.scheduledDateOnly);
     return _state(
         plan,
         today ? HomeWatchPlanStateType.today : HomeWatchPlanStateType.upcoming,
         today ? 8 : 10,
-        _scheduleCountdown(scheduled, now, today),
+        _scheduleCountdown(scheduled, now, today,
+            dateOnly: plan.scheduledDateOnly),
         plan.watchPlanTitle,
         'Scheduled $scheduleDetail · ${group ? companion : 'With @$other'}${plan.location == null ? '' : ' · ${plan.location}'}',
         'View plan',
@@ -483,7 +496,13 @@ String _time(DateTime? value) {
   return '$hour:${date.minute.toString().padLeft(2, '0')} ${date.hour < 12 ? 'AM' : 'PM'}';
 }
 
-String _scheduleCountdown(DateTime scheduled, DateTime now, bool today) {
+String _scheduleCountdown(DateTime scheduled, DateTime now, bool today,
+    {bool dateOnly = false}) {
+  if (dateOnly) {
+    return today
+        ? 'WATCH TODAY'
+        : _dateTime(scheduled, dateOnly: true).toUpperCase();
+  }
   final remaining = scheduled.difference(now);
   if (remaining.inMinutes < 60) {
     final minutes = remaining.inMinutes.clamp(1, 59);
@@ -498,9 +517,11 @@ String _scheduleCountdown(DateTime scheduled, DateTime now, bool today) {
       : _dateTime(scheduled).toUpperCase();
 }
 
-String _dateTime(DateTime? value) {
-  if (value == null) return 'Choose a time';
-  final date = value.toLocal();
+String _dateTime(DateTime? value, {bool dateOnly = false}) {
+  if (value == null) return 'Choose a date';
+  final date =
+      dateOnly ? watchPlanCalendarDate(value, dateOnly: true) : value.toLocal();
+  if (dateOnly) return '${date.day}/${date.month} · Time optional';
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   return '${days[date.weekday - 1]} · ${_time(date)}';
 }

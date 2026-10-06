@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_formatters.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -89,8 +91,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       r.candidates.firstOrNull?.posterPath;
 
   Widget _movieLink(Widget child, String key) {
-    final candidate = chosen ??
-        (r.candidates.length == 1 ? r.candidates.first : null);
+    final candidate =
+        chosen ?? (r.candidates.length == 1 ? r.candidates.first : null);
     final movieId = candidate?.movieId ?? r.movieId ?? r.movie?.id;
     final showId = candidate?.showId ?? r.showId;
     final route = movieId != null
@@ -110,6 +112,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       ),
     );
   }
+
   bool get complete =>
       r.isCompleted ||
       [r.requesterId, r.recipientId]
@@ -118,7 +121,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       r.watchConfirmations.isNotEmpty ||
       (r.normalizedScheduleStatus == 'AGREED' &&
           r.scheduledFor != null &&
-          !r.scheduledFor!.isAfter(DateTime.now()));
+          watchPlanScheduleHasPassed(r.scheduledFor!,
+              dateOnly: r.scheduledDateOnly));
   bool get needsMovie =>
       r.candidates.length > 1 && r.selectedCandidateId == null;
   String get stage {
@@ -134,12 +138,16 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
           ? (_isCreator ? 'Finalise movie' : 'Waiting for creator')
           : 'Pick movies';
     }
-    if (r.latestPendingProposal != null) return 'Agree on a time';
+    if (r.latestPendingProposal != null) {
+      return r.latestPendingProposal!.dateOnly
+          ? 'Agree on a date'
+          : 'Agree on a time';
+    }
     if (due) return 'After the watch';
     if (r.scheduledFor != null && r.normalizedScheduleStatus == 'AGREED') {
       return 'Scheduled';
     }
-    return 'Agree on a time';
+    return 'Agree on a date';
   }
 
   @override
@@ -275,14 +283,14 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
   Widget _summary() {
     final colour = complete || stage == 'Scheduled'
         ? context.colors.success
-        : stage == 'Agree on a time'
+        : (stage == 'Agree on a time' || stage == 'Agree on a date')
             ? const Color(0xFF00D4D4)
             : context.colors.primaryText;
     final icon = complete
         ? Icons.star_outline
         : stage == 'Scheduled'
             ? Icons.check_circle_outline
-            : stage == 'Agree on a time'
+            : (stage == 'Agree on a time' || stage == 'Agree on a date')
                 ? Icons.schedule
                 : r.isPending
                     ? Icons.mail_outline
@@ -290,7 +298,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                         ? Icons.movie_outlined
                         : Icons.local_movies_outlined;
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _summaryPosters(88),
+      _movieLink(_summaryPosters(88), 'watch-plan-summary-poster'),
       const SizedBox(width: 14),
       Expanded(
           child:
@@ -307,10 +315,12 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                       letterSpacing: .7))),
         ]),
         const SizedBox(height: 8),
-        Text(title,
-            style: _title
-                .copyWith(color: context.colors.textPrimary)
-                .copyWith(fontSize: 25, fontWeight: FontWeight.w900)),
+        _movieLink(
+            Text(title,
+                style: _title
+                    .copyWith(color: context.colors.textPrimary)
+                    .copyWith(fontSize: 25, fontWeight: FontWeight.w900)),
+            'watch-plan-summary-title'),
         const SizedBox(height: 2),
         Text('Watch plan',
             style: _body.copyWith(color: context.colors.light).copyWith(
@@ -345,12 +355,14 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         else
           Text(
               r.proposedDate != null
-                  ? 'Accept to confirm this film and time.'
-                  : 'Join the plan, then find a time together.',
+                  ? r.proposedDateOnly
+                      ? 'Accept to confirm this film and date.'
+                      : 'Accept to confirm this film and time.'
+                  : 'Join the plan, then choose a date together.',
               style: _body.copyWith(color: context.colors.light)),
         if (r.proposedDate != null) ...[
           const SizedBox(height: 12),
-          Text(_date(r.proposedDate!),
+          Text(_date(r.proposedDate!, dateOnly: r.proposedDateOnly),
               style: _title.copyWith(color: context.colors.textPrimary)),
         ],
         const SizedBox(height: 24),
@@ -538,10 +550,11 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 20),
       if (proposal == null) ...[
-        Text('Movie confirmed. Find a time that works for you both.',
+        Text(
+            'Movie confirmed. Choose a date that works for you both. A time is optional.',
             style: _body.copyWith(color: context.colors.light)),
         _button(
-            'Suggest a time', Icons.calendar_month, widget.onSuggestSchedule),
+            'Suggest a date', Icons.calendar_month, widget.onSuggestSchedule),
         _button('Change movie', Icons.movie_outlined, widget.onChangeMovie,
             primary: false),
       ] else ...[
@@ -554,7 +567,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         Text(
             proposal.proposedFor == null
                 ? 'Time to agree'
-                : _date(proposal.proposedFor!),
+                : _date(proposal.proposedFor!, dateOnly: proposal.dateOnly),
             style: _body.copyWith(color: context.colors.light)),
         if (proposal.location?.isNotEmpty == true)
           Text(proposal.location!,
@@ -601,6 +614,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
           final saved = await WatchCalendarService.addScheduledWatch(
               title: title,
               scheduledFor: r.scheduledFor!,
+              dateOnly: r.scheduledDateOnly,
               location: r.location,
               runtimeMinutes: r.movie?.runtimeMinutes);
           if (!saved && mounted) {
@@ -701,11 +715,12 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                                 fontSize: 12)),
                         const SizedBox(height: 8),
                       ],
-                      _movieLink(Text(title,
-                          style: TextStyle(
-                              color: context.colors.textPrimary,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800)),
+                      _movieLink(
+                          Text(title,
+                              style: TextStyle(
+                                  color: context.colors.textPrimary,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800)),
                           'watch-plan-movie-title'),
                       const SizedBox(height: 8),
                       if (r.scheduledFor != null)
@@ -976,8 +991,9 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     return FlixiePill.label(label: Text(label));
   }
 
-  String _date(DateTime value) =>
-      '${MaterialLocalizations.of(context).formatMediumDate(value.toLocal())}, ${TimeOfDay.fromDateTime(value.toLocal()).format(context)}';
+  String _date(DateTime value, {bool dateOnly = false}) => dateOnly
+      ? formatWatchPlanDateTime(value, dateOnly: true)
+      : '${MaterialLocalizations.of(context).formatMediumDate(value.toLocal())}, ${TimeOfDay.fromDateTime(value.toLocal()).format(context)}';
 }
 
 const _title = TextStyle(

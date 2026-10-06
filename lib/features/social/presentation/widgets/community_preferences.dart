@@ -82,7 +82,7 @@ class _CommunityPreferencesState extends State<CommunityPreferences> {
         ),
         'communityReplyNotifications': (
           'Replies and mentions',
-          'Notify me about replies to my public posts or comments, and when someone mentions me in a community.'
+          'Show replies and mentions in my Notifications tab. Replies are grouped by conversation, with no push alerts.'
         ),
         'communityReactionNotifications': (
           'Reaction notifications',

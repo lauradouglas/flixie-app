@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/auth/social_auth_provider.dart';
+import 'package:flixie_app/features/authentication/presentation/pages/social_auth_buttons.dart';
 import '../widgets/around_flixie_sharing_setting.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/movie_rating_privacy_setting.dart';
 import '../widgets/appearance_setting.dart';
@@ -73,6 +75,14 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+          if (!context.watch<AuthProvider>().hasConnectedSocialProvider) ...[
+            _sectionLabel(context, 'Sign-in methods'),
+            Text(
+                'Connect ${SocialAuthProvider.available.map((provider) => provider.label).join(' or ')} to sign in to this same Flixie account.'),
+            const SizedBox(height: 12),
+            const SocialAuthButtons(connect: true),
+            const SizedBox(height: 24),
+          ],
           _sectionLabel(context, 'Account'),
           _SettingsGroup(
             children: [
@@ -119,11 +129,40 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              SettingsTile(
-                icon: Icons.lock_outline,
-                label: 'Change Password',
-                onTap: () => _showChangePasswordSheet(context),
-              ),
+              for (final provider in SocialAuthProvider.values)
+                if (context.watch<AuthProvider>().isProviderConnected(provider))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    child: Row(children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: context.colors.surfaceElevated,
+                          border:
+                              Border.all(color: context.colors.tabBarBorder),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.verified_user_outlined,
+                            color: FlixieColors.primary, size: 18),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                          child: Text('${provider.label} connected',
+                              style: TextStyle(
+                                  color: context.colors.textPrimary,
+                                  fontWeight: FontWeight.w500))),
+                      Icon(Icons.check_circle_outline,
+                          color: context.colors.success, size: 20),
+                    ]),
+                  ),
+              if (context.watch<AuthProvider>().hasPassword)
+                SettingsTile(
+                  icon: Icons.lock_outline,
+                  label: 'Change Password',
+                  onTap: () => _showChangePasswordSheet(context),
+                ),
               SettingsTile(
                 icon: Icons.block_outlined,
                 label: 'Blocked Users',
@@ -168,6 +207,8 @@ class SettingsScreen extends StatelessWidget {
                 builder: (context, analytics, _) => SettingsTile(
                   icon: Icons.analytics_outlined,
                   label: 'Share usage analytics',
+                  description:
+                      'Share app usage data to help us understand which features work well and improve Flixie.',
                   onTap: () => analytics.isEnabled
                       ? analytics.decline()
                       : analytics.allow(),
@@ -1079,6 +1120,8 @@ class _EpisodeSpoilerSettingState extends State<_EpisodeSpoilerSetting> {
         builder: (context, _) => SettingsTile(
           icon: Icons.visibility_off_outlined,
           label: 'Hide episode spoilers',
+          description:
+              'Hide titles, images and descriptions for episodes you haven’t watched.',
           onTap: () {
             if (!preference.saving) _change(!preference.hide);
           },

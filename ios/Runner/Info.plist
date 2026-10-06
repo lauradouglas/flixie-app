@@ -32,9 +32,12 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>flixie</string>
+				<string>com.googleusercontent.apps.1093787683868-0vo57s3c7hud798645h5cjc11i5jt43v</string>
 			</array>
 		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>1093787683868-0vo57s3c7hud798645h5cjc11i5jt43v.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>FIREBASE_ANALYTICS_COLLECTION_ENABLED</key>

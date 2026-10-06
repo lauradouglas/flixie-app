@@ -20,6 +20,7 @@ import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'signup_avatar_step.dart';
+import 'social_auth_buttons.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
@@ -77,6 +78,10 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   void initState() {
     super.initState();
+    final auth = context.read<AuthProvider>();
+    if (auth.needsSocialProfile) {
+      _displayNameController.text = auth.firebaseUser?.displayName ?? '';
+    }
     final referralCode = widget.referralCode?.trim();
     if (referralCode != null && referralCode.isNotEmpty) {
       _referralCodeController.text = referralCode.toUpperCase();
@@ -297,6 +302,26 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  Future<void> _leaveSignup() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.isLoading) return;
+    if (auth.needsSocialProfile) await auth.signOut();
+    if (mounted) context.go('/auth/login');
+  }
+
+  void _socialSignedIn() {
+    final auth = context.read<AuthProvider>();
+    if (auth.isAuthenticated) {
+      context.go('/');
+    } else {
+      setState(() {
+        if (_displayNameController.text.isEmpty) {
+          _displayNameController.text = auth.firebaseUser?.displayName ?? '';
+        }
+      });
+    }
+  }
+
   Future<void> _loadAvatars() async {
     try {
       final avatars = await AvatarService.getAvatars();
@@ -401,10 +426,11 @@ class _SignupScreenState extends State<SignupScreen> {
         onRetry: _loadAvatars,
         onSelected: (avatar) => setState(() => _selectedAvatarId = avatar.id),
         onContinue: _completeAvatarSignup,
-        onBack: () => context.pop(),
+        onBack: _leaveSignup,
       );
     }
 
+    final socialProfile = context.watch<AuthProvider>().needsSocialProfile;
     return AuthScaffold(
       topLabel: 'Create your account',
       title: Text.rich(
@@ -432,7 +458,7 @@ class _SignupScreenState extends State<SignupScreen> {
         textAlign: TextAlign.center,
       ),
       subtitle: 'Your next favourite. Your kind of people.',
-      onBack: () => context.pop(),
+      onBack: _leaveSignup,
       cardPadding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
       cardChild: AutofillGroup(
         child: Form(
@@ -440,6 +466,20 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!socialProfile) ...[
+                SocialAuthButtons(onSignedIn: _socialSignedIn),
+                const SizedBox(height: 20),
+                const Text('Or create an account with email',
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+              ] else ...[
+                const Text('Finish your Flixie profile',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text(context.read<AuthProvider>().firebaseUser?.email ??
+                    'Email unavailable'),
+                const SizedBox(height: 20),
+              ],
               AppTextField(
                 controller: _displayNameController,
                 label: 'Display name',
@@ -489,27 +529,28 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ],
               const SizedBox(height: 14),
-              AppTextField(
-                controller: _emailController,
-                label: 'Email Address',
-                prefixIcon: Icons.mail_outline_rounded,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [
-                  AutofillHints.username,
-                  AutofillHints.email,
-                ],
-                onChanged: (_) => setState(() {}),
-                suffixIcon: _buildEmailSuffix(),
-                validator: (value) {
-                  final raw = value?.trim() ?? '';
-                  if (raw.isEmpty) return 'Please enter your email.';
-                  if (!isValidEmailFormat(raw)) {
-                    return 'Please enter a valid email.';
-                  }
-                  return null;
-                },
-              ),
+              if (!socialProfile)
+                AppTextField(
+                  controller: _emailController,
+                  label: 'Email Address',
+                  prefixIcon: Icons.mail_outline_rounded,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [
+                    AutofillHints.username,
+                    AutofillHints.email,
+                  ],
+                  onChanged: (_) => setState(() {}),
+                  suffixIcon: _buildEmailSuffix(),
+                  validator: (value) {
+                    final raw = value?.trim() ?? '';
+                    if (raw.isEmpty) return 'Please enter your email.';
+                    if (!isValidEmailFormat(raw)) {
+                      return 'Please enter a valid email.';
+                    }
+                    return null;
+                  },
+                ),
               const SizedBox(height: 14),
               AppTextField(
                 controller: _referralCodeController,
@@ -569,33 +610,35 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              PasswordField(
-                controller: _passwordController,
-                label: 'Password',
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.newPassword],
-                onChanged: (_) => setState(() {}),
-                validator: validateFirebasePassword,
-              ),
-              const SizedBox(height: 10),
-              PasswordStrengthBar(password: _passwordController.text),
-              const SizedBox(height: 14),
-              PasswordField(
-                controller: _confirmPasswordController,
-                label: 'Confirm Password',
-                textInputAction: TextInputAction.done,
-                autofillHints: const [AutofillHints.newPassword],
-                onFieldSubmitted: (_) => _submit(),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please confirm your password.';
-                  }
-                  if (value != _passwordController.text) {
-                    return 'Passwords do not match.';
-                  }
-                  return null;
-                },
-              ),
+              if (!socialProfile) ...[
+                PasswordField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.newPassword],
+                  onChanged: (_) => setState(() {}),
+                  validator: validateFirebasePassword,
+                ),
+                const SizedBox(height: 10),
+                PasswordStrengthBar(password: _passwordController.text),
+                const SizedBox(height: 14),
+                PasswordField(
+                  controller: _confirmPasswordController,
+                  label: 'Confirm Password',
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.newPassword],
+                  onFieldSubmitted: (_) => _submit(),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password.';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
               const SizedBox(height: 22),
               TermsAgreementField(onChanged: (value) => _termsAccepted = value),
               const SizedBox(height: 16),
@@ -605,8 +648,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 onPressed: isLoading ? null : _submit,
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     'Already have an account?',
@@ -614,7 +658,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ?.copyWith(color: context.colors.light),
                   ),
                   TextButton(
-                    onPressed: () => context.pop(),
+                    onPressed: isLoading ? null : _leaveSignup,
                     style: TextButton.styleFrom(
                       foregroundColor: context.colors.primaryTint,
                       padding: const EdgeInsets.symmetric(horizontal: 8),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import '../../data/people_cache.dart';
@@ -238,11 +239,11 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
           onChanged: (v) => setState(() => _query = v.trim().toLowerCase())),
       const SizedBox(height: 12),
       Wrap(spacing: 8, children: [
-        ChoiceChip(
+        FlixiePill.choice(
             label: Text('Friends ${widget.friends.length}'),
             selected: !_showFollowing,
             onSelected: (_) => setState(() => _showFollowing = false)),
-        ChoiceChip(
+        FlixiePill.choice(
             label: const Text('Following'),
             selected: _showFollowing,
             onSelected: (_) {

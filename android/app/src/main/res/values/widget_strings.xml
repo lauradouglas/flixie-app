@@ -1,0 +1,14 @@
+<resources>
+    <string name="widget_wordmark"><font color="#FFFFFF">flix</font><font color="#7C4DFF">ie</font></string>
+    <string name="widget_compact_sign_in">Sign in to Flixie</string>
+    <string name="widget_compact_empty">Watchlist is empty</string>
+    <string name="widget_search_name">Search Flixie</string>
+    <string name="widget_search_description">Open Flixie search and find your next watch.</string>
+    <string name="widget_watchlist_name">Flixie Watchlist</string>
+    <string name="widget_watchlist_description">Open your watchlist. Resize wider to see your four most recently saved titles.</string>
+    <string name="widget_search_action">Search Flixie</string>
+    <string name="widget_watchlist_action">Watchlist</string>
+    <string name="widget_sign_in">Sign in to see your saved titles</string>
+    <string name="widget_empty">Save something for later</string>
+    <string name="widget_ready">Your next watches, ready</string>
+</resources>

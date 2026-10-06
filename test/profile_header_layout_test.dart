@@ -31,10 +31,12 @@ void main() {
     expect(
         tester.widget<ProfileBadgePills>(find.byType(ProfileBadgePills)).badges,
         badges);
-    await tester.ensureVisible(find.text('Read more'));
-    await tester.tap(find.text('Read more'));
+    await tester
+        .ensureVisible(find.textContaining('Read more', findRichText: true));
+    await tester.tap(find.textContaining('Read more', findRichText: true));
     await tester.pump();
-    expect(find.text('Read less'), findsOneWidget);
+    expect(
+        find.textContaining('Read less', findRichText: true), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

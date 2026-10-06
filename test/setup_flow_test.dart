@@ -304,12 +304,12 @@ void main() {
     await tester.ensureVisible(find.text('Shows'));
     await tester.tap(find.text('Shows'));
     await tester.pump();
-    expect(find.text('Loading shows…'), findsOneWidget);
+    expect(find.bySemanticsLabel('Loading titles'), findsOneWidget);
     expect(find.byKey(const ValueKey('taste-movie:1')), findsNothing);
     service.showLoad!
         .complete([const SetupTitle(2, 'A show', null, isShow: true)]);
     await tester.pumpAndSettle();
-    expect(find.text('Loading shows…'), findsNothing);
+    expect(find.bySemanticsLabel('Loading titles'), findsNothing);
     expect(find.byKey(const ValueKey('taste-show:2')), findsOneWidget);
   });
 

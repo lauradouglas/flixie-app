@@ -34,7 +34,11 @@ String? _extractYear(String? releaseDate) {
 }
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen(
+      {super.key, this.focusSearch = false, this.onFocusHandled});
+
+  final bool focusSearch;
+  final VoidCallback? onFocusHandled;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -42,6 +46,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
   String _query = '';
   _SearchMode _searchMode = _SearchMode.all;
   Timer? _debounce;
@@ -110,10 +115,28 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     _historyReady = _loadHistory();
     _loadDefaultData();
+    if (widget.focusSearch) _focusSearch();
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.focusSearch && !oldWidget.focusSearch) _focusSearch();
+  }
+
+  void _focusSearch() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.selection =
+          TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+      _searchFocus.requestFocus();
+      widget.onFocusHandled?.call();
+    });
   }
 
   @override
   void dispose() {
+    _searchFocus.dispose();
     _controller.dispose();
     _debounce?.cancel();
     super.dispose();
@@ -298,6 +321,7 @@ class _SearchScreenState extends State<SearchScreen> {
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
       child: TextField(
         controller: _controller,
+        focusNode: _searchFocus,
         onChanged: _onSearchChanged,
         onSubmitted: _submitSearch,
         textInputAction: TextInputAction.search,

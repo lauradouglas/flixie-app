@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -225,7 +226,7 @@ class _CommunityRepliesState extends State<CommunityReplies>
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Text('The author has turned off replies.'))
         else ...[
-          FilterChip(
+          FlixiePill.filter(
               label: const Text('Contains spoilers'),
               selected: _spoilers,
               onSelected: _sending

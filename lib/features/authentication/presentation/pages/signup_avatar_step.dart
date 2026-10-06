@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
@@ -162,7 +163,7 @@ class _SignupAvatarStepState extends State<SignupAvatarStep> {
                                   'People',
                                   'Playful'
                                 ]
-                                    .map((c) => ChoiceChip(
+                                    .map((c) => FlixiePill.choice(
                                         label: Text(c),
                                         selected: category == c,
                                         showCheckmark: false,

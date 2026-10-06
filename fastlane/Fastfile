@@ -105,6 +105,7 @@ platform :ios do
     flutter_release("ipa", number)
     ipas = Dir[File.join(ROOT, "build/ios/ipa/*.ipa")]
     UI.user_error!("Expected exactly one IPA in build/ios/ipa; remove stale IPA files and retry") unless ipas.length == 1
+    Dir.chdir(ROOT) { sh(Shellwords.join(["python3", "scripts/validate-ios-ipa.py", ipas.first])) }
     ipas.first
   end
 
@@ -153,6 +154,7 @@ platform :android do
     number = release_number(options)
     release_file("android/key.properties")
     release_file("android/app/google-services.json")
+    sh(Shellwords.join(["python3", File.join(ROOT, "scripts/check-google-oauth.py")]))
     flutter_release("appbundle", number)
     release_file("build/app/outputs/bundle/release/app-release.aab")
   end

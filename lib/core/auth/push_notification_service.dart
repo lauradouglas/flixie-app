@@ -1,3 +1,8 @@
+import 'package:flixie_app/core/navigation/current_route.dart';
+import 'foreground_inbox_tracker.dart';
+import 'package:flixie_app/models/notification.dart';
+import 'foreground_notification_dispatcher.dart';
+import 'foreground_watch_plan_notice.dart';
 import 'dart:io';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'dart:async';
@@ -74,7 +79,9 @@ class PushNotificationService {
   static Timer? _pendingNavigationTimer;
   static GoRouter? _router;
   static GlobalKey<NavigatorState>? _navigatorKey;
+  static final _watchPlanNotices = WatchPlanNoticePresenter();
   static String? _pendingNavigationPath;
+  static String? _openingNotificationPath;
   static bool _navigationReady = false;
   static bool _nativeTapBridgeInitialized = false;
   static bool _localNotificationsReady = false;
@@ -83,9 +90,10 @@ class PushNotificationService {
   static String? _lastNavigatedPath;
   static DateTime? _lastNavigatedAt;
 
-  /// The userId of the currently logged-in user. Used to suppress
+  /// The database ID (not Firebase UID) of the logged-in user. Used to suppress
   /// notifications intended for a different user (e.g. the sender).
   static String? _currentUserId;
+  static final _inboxTracker = ForegroundInboxTracker();
   static final Map<String, Future<void>> _watchPlanReminderScheduling = {};
 
   /// High-importance notification channel used for Android.
@@ -112,6 +120,7 @@ class PushNotificationService {
   static Future<void> scheduleWatchPlanReminders({
     required String planId,
     required DateTime scheduledFor,
+    bool dateOnly = false,
     required String title,
     required String withName,
     required String deepLink,
@@ -122,6 +131,7 @@ class PushNotificationService {
     final scheduled = previous.then((_) => _scheduleWatchPlanReminders(
           planId: planId,
           scheduledFor: scheduledFor,
+          dateOnly: dateOnly,
           title: title,
           withName: withName,
           deepLink: deepLink,
@@ -138,6 +148,7 @@ class PushNotificationService {
   static Future<void> _scheduleWatchPlanReminders({
     required String planId,
     required DateTime scheduledFor,
+    bool dateOnly = false,
     required String title,
     required String withName,
     required String deepLink,
@@ -201,34 +212,24 @@ class PushNotificationService {
           priority: Priority.high,
         ),
         iOS: const DarwinNotificationDetails(
-          presentAlert: true,
+          presentAlert: false,
+          presentBanner: false,
           presentBadge: true,
-          presentSound: true,
+          presentSound: false,
         ),
       );
       final now = DateTime.now();
-      final localScheduledFor = scheduledFor.toLocal();
-      final beforeWatch = localScheduledFor.subtract(const Duration(hours: 1));
-      final followUp = localScheduledFor.add(const Duration(hours: 2));
-      final morningOfWatch = DateTime(
-        localScheduledFor.year,
-        localScheduledFor.month,
-        localScheduledFor.day,
-        watchPlanMorningReminderHour,
-      );
-      final scheduleMorning = shouldScheduleWatchPlanMorningReminder(
-        localScheduledFor,
-        now: now,
-      );
+      final times =
+          watchPlanReminderTimes(scheduledFor, now: now, dateOnly: dateOnly);
       tz.TZDateTime scheduleAt(DateTime dateTime) => _usingTimeZoneFallback
           ? tz.TZDateTime.from(dateTime.toUtc(), tz.UTC)
           : tz.TZDateTime.from(dateTime, tz.local);
-      if (scheduleMorning) {
+      if (times.morning != null) {
         await _localNotifications.zonedSchedule(
           morningId,
           'Watch plan today',
           'Remember you’re seeing $title with $withName today.',
-          scheduleAt(morningOfWatch),
+          scheduleAt(times.morning!),
           details,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
@@ -236,7 +237,7 @@ class PushNotificationService {
           payload: deepLink,
         );
       }
-      if (beforeWatch.isAfter(now)) {
+      if (times.beforeWatch != null) {
         await _localNotifications.zonedSchedule(
           reminderId,
           'Watch starts soon',
@@ -245,7 +246,7 @@ class PushNotificationService {
             withName: withName,
             scope: scope,
           ),
-          scheduleAt(beforeWatch),
+          scheduleAt(times.beforeWatch!),
           details,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
@@ -253,12 +254,12 @@ class PushNotificationService {
           payload: deepLink,
         );
       }
-      if (followUp.isAfter(now)) {
+      if (times.followUp != null) {
         await _localNotifications.zonedSchedule(
           followUpId,
           'Did you watch $title?',
           'Log your watch and add your rating when you’re ready.',
-          scheduleAt(followUp),
+          scheduleAt(times.followUp!),
           details,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
@@ -269,8 +270,8 @@ class PushNotificationService {
       final pending = await _localNotifications.pendingNotificationRequests();
       logger.i(
         '[Local reminders] Registered $planId '
-        '(morning=$scheduleMorning, oneHour=${beforeWatch.isAfter(now)}, '
-        'followUp=${followUp.isAfter(now)}, pending=${pending.length})',
+        '(morning=${times.morning != null}, oneHour=${times.beforeWatch != null}, '
+        'followUp=${times.followUp != null}, pending=${pending.length})',
       );
     } catch (error) {
       logger.w('[Local reminders] Unable to schedule $planId: $error');
@@ -281,6 +282,13 @@ class PushNotificationService {
     String planId, {
     String scope = 'DIRECT',
   }) async {
+    // Let an in-flight Home refresh finish scheduling before removing this
+    // plan's reminders; otherwise it can recreate them after a decline.
+    final pending = _watchPlanReminderScheduling['$scope:$planId'];
+    if (pending != null) await pending;
+    if (!_localNotificationsReady && _initializationFuture != null) {
+      await _initializationFuture;
+    }
     if (!_localNotificationsReady) return;
     final reminderId = _watchPlanReminderId(planId, scope);
     await _localNotifications.cancel(reminderId);
@@ -350,13 +358,14 @@ class PushNotificationService {
     });
     unawaited(_nativeTapChannel
         .invokeMethod<Object?>('getInitialPushTap')
-        .then(_handleNativeTapPayload)
+        .then((payload) => _handleNativeTapPayload(payload, coldStart: true))
         .catchError((Object error) {
       logger.w('[FCM] Native initial notification lookup failed: $error');
     }));
   }
 
-  static void _handleNativeTapPayload(Object? arguments) {
+  static void _handleNativeTapPayload(Object? arguments,
+      {bool coldStart = false}) {
     if (arguments is! Map || arguments.isEmpty) return;
     final data = <String, dynamic>{
       for (final entry in arguments.entries)
@@ -368,7 +377,19 @@ class PushNotificationService {
       _pendingNavigationPath = path;
       return;
     }
-    _navigateWithRouter(path);
+    _navigateWithRouter(path, coldStart: coldStart);
+  }
+
+  /// Routes a platform notification tap through the same path used by FCM.
+  /// A launch replaces startup navigation; a resumed app retains its page.
+  static void handleNotificationTap(Map<String, dynamic> data,
+      {bool coldStart = false}) {
+    final path = notificationDeepLinkPath(data);
+    if (!_navigationReady || _router == null) {
+      _pendingNavigationPath = path;
+      return;
+    }
+    _navigateWithRouter(path, coldStart: coldStart);
   }
 
   /// Initialises FCM for [userId].
@@ -382,25 +403,31 @@ class PushNotificationService {
   /// permission / channel setup that has already been performed.
   static Future<void> initialize({
     required String userId,
+    required String databaseUserId,
     required GlobalKey<NavigatorState> navigatorKey,
   }) {
+    _currentUserId = databaseUserId;
     if (_initializedUserId == userId && _initializationFuture != null) {
       logger.d('[FCM] Push service already initialized for userId=$userId');
       return _initializationFuture!;
     }
 
     _initializedUserId = userId;
-    final future = _initialize(userId: userId, navigatorKey: navigatorKey);
+    final future = _initialize(
+        userId: userId,
+        databaseUserId: databaseUserId,
+        navigatorKey: navigatorKey);
     _initializationFuture = future;
     return future;
   }
 
   static Future<void> _initialize({
     required String userId,
+    required String databaseUserId,
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
     _navigatorKey = navigatorKey;
-    _currentUserId = userId;
+    _currentUserId = databaseUserId;
     _navigationReady = true;
     _flushPendingNavigation();
     logger.i(
@@ -444,17 +471,17 @@ class PushNotificationService {
     await _messaging.setAutoInitEnabled(true);
     logger.d('[FCM] Auto-init enabled');
 
-    // iOS: allow FCM to show alert/badge/sound when the app is in the
-    // foreground only if the user has permitted notification presentation.
+    // Present foreground alerts ourselves so Watch Plans get one in-app
+    // banner. Background system notification behavior is unchanged.
     if (Platform.isIOS && canPresentNotifications) {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
-        alert: true,
+        alert: false,
         badge: true,
-        sound: true,
+        sound: false,
       );
       logger.d(
-          '[FCM] iOS foreground presentation enabled (alert/badge/sound=true)');
+          '[FCM] Foreground alerts presented by the app; background alerts unchanged');
     }
 
     // Re-register whenever the token is rotated by Firebase.
@@ -468,51 +495,76 @@ class PushNotificationService {
     // delay installing tap listeners or consuming the launch notification.
     unawaited(_registerToken(userId));
 
-    // Foreground messages: FCM does NOT show a system notification by default,
-    // so we display one manually via flutter_local_notifications.
+    // Foreground messages use app banners for actionable updates only.
     // Only show if we still have a logged-in user (guards against post-logout delivery).
-    if (!canPresentNotifications) return;
-
-    _onMessageSubscription = FirebaseMessaging.onMessage.listen((message) {
-      logger.d('[FCM] Foreground message: ${message.notification?.title}');
-      logger.d('[FCM] Foreground payload: data=${message.data}');
-      if (_currentUserId == null) {
-        logger.d('[FCM] Suppressing foreground message - no user logged in');
-        return;
-      }
-      // If the backend puts the recipient userId in data, skip if it
-      // doesn't match (prevents sender seeing their own notification).
-      final recipientId = message.data['recipientId'] as String?;
-      if (recipientId != null && recipientId != _currentUserId) {
-        logger.d('[FCM] Suppressing foreground message - not for current user');
-        return;
-      }
-
-      // Fetch newly agreed times on this device before iOS presentation returns.
-      TabRefreshController.watchPlans.value++;
-
-      // On iOS, if this is a notification message, the OS can present it
-      // directly because foreground presentation options are enabled.
-      if (Platform.isIOS && message.notification != null) {
-        logger.d(
-            '[FCM] iOS foreground notification handled by system presentation');
-        return;
-      }
-
-      unawaited(_showLocalNotification(message));
-    });
+    // Keep in-app updates working when OS alert permission is disabled.
+    _onMessageSubscription =
+        FirebaseMessaging.onMessage.listen(handleForegroundMessage);
 
     // Terminated-state notification taps are captured once during main()
     // before auth redirects begin. Do not call getInitialMessage here too:
     // Firebase exposes it as a one-time launch value.
   }
 
+  /// Fallback for foreground inbox events when remote push is unavailable.
+  static void observeInbox(String userId, List<FlixieNotification> items,
+      {bool announce = true}) {
+    // Startup prefetch may finish before the post-frame Firebase setup.
+    // A quiet baseline is safe to record independently of that transport.
+    if (!announce) {
+      _inboxTracker.observe(userId, items, announce: false);
+      return;
+    }
+    if (_currentUserId != userId) return;
+    for (final message
+        in _inboxTracker.observe(userId, items, announce: announce)) {
+      handleForegroundMessage(message);
+    }
+  }
+
+  /// Handles foreground delivery using the active Flixie database identity.
+  /// Also usable by transport integration tests without sending a real push.
+  static void handleForegroundMessage(RemoteMessage message) {
+    logger.d('[FCM] Foreground message: ${message.notification?.title}');
+    logger.d('[FCM] Foreground payload: data=${message.data}');
+    final context = _navigatorKey?.currentContext;
+    final currentUri = context == null || !context.mounted
+        ? null
+        : currentRouterUri(GoRouter.of(context));
+    dispatchForegroundNotification(message,
+        currentUserId: _currentUserId,
+        currentUri: currentUri,
+        refreshWatchPlans: () => TabRefreshController.watchPlans.value++,
+        refreshSocial: TabRefreshController.requestSocialRefresh,
+        showBanner: (notice) {
+          _watchPlanNotices.show(_navigatorKey?.currentState?.overlay, notice,
+              onOpen: () {
+            final context = _navigatorKey?.currentContext;
+            if (!_navigationReady || context == null || !context.mounted) {
+              return;
+            }
+            final router = GoRouter.of(context);
+            if (currentRouterUri(router).toString() == notice.path) {
+              return;
+            }
+            // Foreground banners continue the user's current session. Keep the
+            // existing page and its state underneath so Back returns there.
+            unawaited(router.push<void>(notice.path));
+          });
+        });
+    // Quiet categories stay in their existing inbox/chat. Never fall back
+    // to a system alert while the user is already in the app.
+  }
+
   /// Removes the stored FCM token from the backend and deregisters the device
   /// from FCM so no further messages are delivered after sign-out.
   static Future<void> removeToken(String userId,
       {bool removeFromBackend = true}) async {
+    _watchPlanNotices.reset();
     _currentUserId = null;
+    _inboxTracker.reset();
     _navigationReady = false;
+    _openingNotificationPath = null;
     _initializedUserId = null;
     _initializationFuture = null;
     await _tokenRefreshSubscription?.cancel();
@@ -560,7 +612,7 @@ class PushNotificationService {
     if (allowed && _navigatorKey != null) {
       await _initLocalNotifications(_navigatorKey!);
       await _messaging.setForegroundNotificationPresentationOptions(
-          alert: true, badge: true, sound: true);
+          alert: false, badge: true, sound: false);
       TabRefreshController.watchPlans.value++;
     }
     return allowed;
@@ -604,7 +656,7 @@ class PushNotificationService {
         launchPayload != null &&
         launchPayload.isNotEmpty) {
       logger.d('[FCM] App launched from local notification → $launchPayload');
-      _navigateToPath(launchPayload, navigatorKey);
+      _navigateToPath(launchPayload, navigatorKey, coldStart: true);
     }
 
     // Create (or update) the Android notification channel.
@@ -665,6 +717,13 @@ class PushNotificationService {
 
   static Future<void> showBackgroundDataNotification(
       RemoteMessage message) async {
+    // Older queued data-only replies must also respect the inbox-only policy.
+    if ((message.data['type'] ?? message.data['notificationType'])
+            ?.toString()
+            .toUpperCase() ==
+        'COMMUNITY_REPLY') {
+      return;
+    }
     const androidSettings = AndroidInitializationSettings('ic_stat_flixie');
     const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: false,
@@ -715,7 +774,8 @@ class PushNotificationService {
           importance: Importance.high,
           priority: Priority.high,
         ),
-        iOS: const DarwinNotificationDetails(),
+        iOS: const DarwinNotificationDetails(
+            presentAlert: true, presentBanner: true, presentSound: true),
       ),
       // Attach the raw data so the local notification tap can also deep-link.
       payload: notificationDeepLinkPath(message.data),
@@ -734,7 +794,7 @@ class PushNotificationService {
             .d('[FCM] Holding notification tap until app navigation is ready');
         return;
       }
-      _navigateWithRouter(path);
+      handleNotificationTap(message.data);
     });
   }
 
@@ -752,6 +812,7 @@ class PushNotificationService {
     String path,
     GlobalKey<NavigatorState> navigatorKey, {
     int attempt = 0,
+    bool coldStart = false,
   }) {
     final now = DateTime.now();
     if (attempt == 0 &&
@@ -769,7 +830,7 @@ class PushNotificationService {
     }
 
     if (_router != null) {
-      _navigateWithRouter(path);
+      _navigateWithRouter(path, coldStart: coldStart);
       return;
     }
 
@@ -783,7 +844,8 @@ class PushNotificationService {
       }
       _pendingNavigationTimer?.cancel();
       _pendingNavigationTimer = Timer(_navigationRetryDelay, () {
-        _navigateToPath(path, navigatorKey, attempt: attempt + 1);
+        _navigateToPath(path, navigatorKey,
+            attempt: attempt + 1, coldStart: coldStart);
       });
       return;
     }
@@ -792,21 +854,38 @@ class PushNotificationService {
     _pendingNavigationTimer = null;
     _lastNavigatedPath = path;
     _lastNavigatedAt = now;
-    GoRouter.of(context).go(path);
+    final router = GoRouter.of(context);
+    if (coldStart) {
+      router.go(path);
+    } else {
+      unawaited(router.push<void>(path));
+    }
   }
 
-  static void _navigateWithRouter(String path) {
+  static void _navigateWithRouter(String path, {bool coldStart = false}) {
     try {
+      // A platform tap opens content rather than leaving an unfinished modal
+      // above it, including when the underlying destination is already open.
+      _navigatorKey?.currentState?.popUntil((route) => route is! PopupRoute);
+      if (_openingNotificationPath == path ||
+          currentRouterUri(_router!).toString() == path) {
+        return;
+      }
+      _openingNotificationPath = path;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_openingNotificationPath == path) _openingNotificationPath = null;
+      });
       _pendingNavigationTimer?.cancel();
       _pendingNavigationTimer = null;
       _lastNavigatedPath = path;
       _lastNavigatedAt = DateTime.now();
-      // A push deep-link is a destination change, not a continuation of an
-      // unfinished sheet. Clear modal routes first so a restored creation
-      // sheet cannot remain on top of the Watch Plan it opens.
-      _navigatorKey?.currentState?.popUntil((route) => route is! PopupRoute);
       logger.i('[FCM] Navigating with GoRouter → $path');
-      _router!.go(path);
+      if (currentRouterUri(_router!).toString() == path) return;
+      if (coldStart) {
+        _router!.go(path);
+      } else {
+        unawaited(_router!.push<void>(path));
+      }
     } catch (error) {
       logger.w('[FCM] Router not ready for $path: $error');
       _pendingNavigationPath = path;
@@ -818,7 +897,7 @@ class PushNotificationService {
     if (!_navigationReady || _router == null || path == null) return;
     _pendingNavigationPath = null;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _navigateWithRouter(path);
+      _navigateWithRouter(path, coldStart: true);
     });
   }
 }

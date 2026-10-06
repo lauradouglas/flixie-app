@@ -1,3 +1,6 @@
+import 'package:flixie_app/core/auth/push_notification_service.dart';
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_formatters.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/app/theme/flixie_typography.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -7,6 +10,7 @@ import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/group_watch_plan_recap.dart';
@@ -62,6 +66,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   bool _past = false;
   bool _loading = true;
   bool _processing = false;
+  bool _watchPlanRefreshPending = false;
+  int _loadGeneration = 0;
   String? _error;
   final Map<String, Set<String>> _drafts = {};
 
@@ -72,13 +78,24 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     super.initState();
     _selectedId = widget.initialRequestId;
     TabRefreshController.social.addListener(_onSocialRefresh);
+    TabRefreshController.watchPlans.addListener(_onWatchPlanRefresh);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
     TabRefreshController.social.removeListener(_onSocialRefresh);
+    TabRefreshController.watchPlans.removeListener(_onWatchPlanRefresh);
     super.dispose();
+  }
+
+  void _onWatchPlanRefresh() {
+    if (!mounted) return;
+    if (_processing) {
+      _watchPlanRefreshPending = true;
+    } else {
+      _load();
+    }
   }
 
   void _onSocialRefresh() {
@@ -96,13 +113,15 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     final groupId = widget.groupId;
     if (_requests.isEmpty) setState(() => _loading = true);
     try {
       final loadedGroups = <_LoadedGroup>[];
       if (groupId != null && groupId.isNotEmpty) {
         final values = await Future.wait<Object>([
-          GroupService.getGroupWatchRequests(groupId),
+          GroupService.getGroupWatchRequests(groupId,
+              requestScope: 'group-detail:$hashCode:$generation'),
           GroupService.getGroupMembers(groupId),
         ]);
         loadedGroups.add(_LoadedGroup(
@@ -117,7 +136,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
             (group) async {
               try {
                 final values = await Future.wait<Object>([
-                  GroupService.getGroupWatchRequests(group.id!),
+                  GroupService.getGroupWatchRequests(group.id!,
+                      requestScope: 'group-detail:$hashCode:$generation'),
                   GroupService.getGroupMembers(group.id!),
                 ]);
                 return _LoadedGroup(
@@ -137,7 +157,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         );
         loadedGroups.addAll(results);
       }
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _membersByRequest.clear();
         _groupNamesByRequest.clear();
@@ -169,19 +189,32 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
           _selectedId = null;
         }
       });
+      for (final request in _requests
+          .where((request) => _declined(request) || request.isArchived)) {
+        await PushNotificationService.cancelWatchPlanReminders(
+            _requestId(request),
+            scope: 'GROUP');
+        if (request.id != _requestId(request)) {
+          await PushNotificationService.cancelWatchPlanReminders(request.id,
+              scope: 'GROUP');
+        }
+      }
       widget.onActiveCountChanged?.call(
-        _requests.where((request) => request.isActive).length,
+        _requests
+            .where((request) => request.isActive && !_declined(request))
+            .length,
       );
       widget.onCountChanged?.call(
         _requests
             .where((request) =>
                 request.canRespond &&
                 request.userId != _userId &&
-                !_accepted(request))
+                !_accepted(request) &&
+                !_declined(request))
             .length,
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _loading = false;
         _error = 'Couldn’t refresh these Watch Plans. Pull down to try again.';
@@ -243,7 +276,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                   scrolledUnderElevation: 0,
                   foregroundColor: context.colors.textPrimary,
                   leading: request == null
-                      ? null
+                      ? const FlixieBackButton()
                       : IconButton(
                           tooltip: 'Back to Watch Plans',
                           onPressed: () => setState(() => _selectedId = null),
@@ -318,7 +351,9 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
 
   Widget _list() {
     final plans = _requests
-        .where((item) => _past ? item.isArchived : item.isActive)
+        .where((item) => _past
+            ? item.isArchived || _declined(item)
+            : item.isActive && !_declined(item))
         .toList()
       ..sort((a, b) => _date(b).compareTo(_date(a)));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -329,8 +364,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
           for (final past in [false, true])
             FlixiePill.choice(
                 label: Text(past
-                    ? 'Past · ${_requests.where((plan) => plan.isArchived).length}'
-                    : 'Active · ${_requests.where((plan) => plan.isActive).length}'),
+                    ? 'Past · ${_requests.where((plan) => plan.isArchived || _declined(plan)).length}'
+                    : 'Active · ${_requests.where((plan) => plan.isActive && !_declined(plan)).length}'),
                 selected: _past == past,
                 onSelected: (_) => setState(() => _past = past),
                 showCheckmark: true),
@@ -419,6 +454,17 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   Widget _detail(GroupWatchRequest request) {
     final members = _activeMembers(request);
     final stage = _state(request).stage;
+    if (stage == _Stage.declined) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _hero(request, members),
+        const SizedBox(height: 20),
+        _message('You left this screening',
+            'You won’t receive further updates or reminders for this Watch Plan.'),
+        if (request.isActive)
+          _outline('Rejoin plan', Icons.person_add_alt_rounded,
+              () => _respond(request, WatchResponseDecision.accepted)),
+      ]);
+    }
     if (stage == _Stage.invite) {
       return _inviteDetail(request, members);
     }
@@ -431,9 +477,28 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       _creationMessage(request),
       Divider(height: 30, color: context.colors.tabBarBorder),
       _actionCard(request),
+      if (request.userId == _userId &&
+          request.selectedCandidateId != null &&
+          request.isActive)
+        _text('Change movie options', Icons.playlist_add_rounded,
+            () => _reopenChoices(request)),
       Divider(height: 30, color: context.colors.tabBarBorder),
       _progress(request, members),
     ]);
+  }
+
+  Widget _movieLink(GroupWatchRequest request, Widget child) {
+    final selected = _selectedCandidate(request);
+    final id = selected?.movieId ?? selected?.showId ?? request.mediaId;
+    if (id == null) return child;
+    final show =
+        selected?.showId != null || request.analyticsContentType == 'show';
+    return Semantics(
+        button: true,
+        label: 'View movie details',
+        child: InkWell(
+            onTap: () => context.push(show ? '/shows/$id' : '/movies/$id'),
+            child: child));
   }
 
   Widget _scheduledDetail(
@@ -449,17 +514,21 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _detailPoster(
-              selected?.posterPath ?? request.moviePosterPath, title, 96),
+          _movieLink(
+              request,
+              _detailPoster(
+                  selected?.posterPath ?? request.moviePosterPath, title, 96)),
           const SizedBox(width: 14),
           Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title,
-                  style: TextStyle(
-                      color: context.colors.textPrimary,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w900)),
+              _movieLink(
+                  request,
+                  Text(title,
+                      style: TextStyle(
+                          color: context.colors.textPrimary,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900))),
               const SizedBox(height: 2),
               Text(_groupName(request),
                   maxLines: 1,
@@ -467,7 +536,9 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                   style: _body.copyWith(color: context.colors.light)),
               const SizedBox(height: 12),
               _scheduleFact(
-                  Icons.calendar_month_outlined, _format(request.scheduledFor)),
+                  Icons.calendar_month_outlined,
+                  _format(request.scheduledFor,
+                      dateOnly: request.scheduledDateOnly)),
               const SizedBox(height: 8),
               _scheduleFact(
                   Icons.location_on_outlined,
@@ -514,15 +585,24 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
               : () => WatchCalendarService.addScheduledWatch(
                     title: request.movieTitle ?? 'Group watch',
                     scheduledFor: date,
+                    dateOnly: request.scheduledDateOnly,
                     location: request.location,
                     note: 'With ${_groupName(request)}',
                   ),
         ),
         if (canUpdate) ...[
           const SizedBox(height: 8),
-          _outline('Update time', Icons.schedule_rounded,
+          _outline('Update date or time', Icons.schedule_rounded,
               () => _propose(request, initialIso: request.scheduledFor)),
         ],
+        if (request.userId == _userId)
+          _text('Change movie options', Icons.playlist_add_rounded,
+              () => _reopenChoices(request)),
+        if (request.userId != _userId &&
+            !request.hasLoggedFor(_userId) &&
+            !request.hasMissedFor(_userId))
+          _text('Leave this screening', Icons.person_remove_outlined,
+              () => _respond(request, WatchResponseDecision.declined)),
         const SizedBox(height: 16),
         if (request.hasMissedFor(_userId))
           _notice('You didn’t make it. No watch entry was added.')
@@ -573,20 +653,24 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (!multiple) ...[
-            _detailPoster(
-                selected?.posterPath ?? request.moviePosterPath, title, 96),
+            _movieLink(
+                request,
+                _detailPoster(selected?.posterPath ?? request.moviePosterPath,
+                    title, 96)),
             const SizedBox(width: 14),
           ],
           Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                title,
-                style: TextStyle(
-                    color: context.colors.textPrimary,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900),
-              ),
+              _movieLink(
+                  request,
+                  Text(
+                    title,
+                    style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w900),
+                  )),
               const SizedBox(height: 7),
               _groupPlanPill(),
               const SizedBox(height: 12),
@@ -715,21 +799,25 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 4, 2, 6),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _detailPoster(
-            selected?.posterPath ?? request.moviePosterPath, title, 88),
+        _movieLink(
+            request,
+            _detailPoster(
+                selected?.posterPath ?? request.moviePosterPath, title, 88)),
         const SizedBox(width: 14),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _status(_state(request)),
             const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                  color: context.colors.textPrimary,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w900),
-            ),
+            _movieLink(
+                request,
+                Text(
+                  title,
+                  style: TextStyle(
+                      color: context.colors.textPrimary,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900),
+                )),
             if (widget.groupId == null) ...[
               const SizedBox(height: 2),
               Text(_groupName(request),
@@ -760,15 +848,17 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         _Stage.finalMovie => _finalChoice(request),
         _Stage.waitingMovie => _message('Waiting for the final movie',
             'The plan owner will choose from the group’s saved picks.'),
-        _Stage.chooseTime => _message('Choose a time',
+        _Stage.chooseTime => _message('Choose a date',
             'The movie is set. Propose when and where the group should watch.',
-            action: 'Propose a time',
+            action: 'Propose a date',
             icon: Icons.calendar_month_rounded,
             onTap: () => _propose(request)),
         _Stage.proposal => _proposal(request),
         _Stage.scheduled => _scheduled(request),
         _Stage.postWatch => _postWatch(request),
         _Stage.recap => _recap(request),
+        _Stage.declined => _message('You left this screening',
+            'You won’t receive further updates or reminders for this Watch Plan.'),
         _Stage.closed =>
           _message(request.statusLabel, 'This Watch Plan is no longer active.'),
       };
@@ -844,6 +934,9 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
       Text('The group’s strongest matches are shown first.',
           style: _body.copyWith(color: context.colors.light)),
       const SizedBox(height: 16),
+      if (request.candidates.length < 5)
+        _text('Add another option', Icons.add_circle_outline_rounded,
+            () => _addCandidate(request)),
       ...candidates.map((candidate) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _candidate(candidate, count,
@@ -868,14 +961,20 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     final approved = response?.status.toUpperCase() == 'ACCEPTED';
     return _detailSection(
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Does this time work?',
+      Text(
+          proposal?.dateOnly == true ||
+                  (proposal == null && request.proposedDateOnly)
+              ? 'Does this date work?'
+              : 'Does this time work?',
           style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
       const SizedBox(height: 10),
       Row(children: [
         Icon(Icons.calendar_month_rounded, color: context.colors.secondary),
         const SizedBox(width: 9),
         Expanded(
-          child: Text(_format(iso),
+          child: Text(
+              _format(iso,
+                  dateOnly: proposal?.dateOnly ?? request.proposedDateOnly),
               style: TextStyle(
                   color: context.colors.secondary,
                   fontSize: 18,
@@ -920,6 +1019,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         _timeComparison(
           label: 'Current time',
           date: request.scheduledFor,
+          dateOnly: request.scheduledDateOnly,
           location: request.location,
           icon: Icons.event_available_outlined,
         ),
@@ -927,6 +1027,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         _timeComparison(
           label: 'Requested time',
           date: proposal.proposedFor,
+          dateOnly: proposal.dateOnly,
           location: proposal.location ?? request.location,
           icon: Icons.update_rounded,
           highlighted: true,
@@ -968,6 +1069,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   Widget _timeComparison({
     required String label,
     required String? date,
+    bool dateOnly = false,
     required String? location,
     required IconData icon,
     bool highlighted = false,
@@ -999,7 +1101,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                       fontSize: 12,
                       fontWeight: FontWeight.w800)),
               const SizedBox(height: 3),
-              Text(_format(date),
+              Text(_format(date, dateOnly: dateOnly),
                   style: TextStyle(
                       color: context.colors.textPrimary,
                       fontSize: 16,
@@ -1022,7 +1124,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
           style: _sectionTitle.copyWith(color: context.colors.textPrimary)),
       const SizedBox(height: 6),
       Text(
-          '${request.movieTitle ?? 'Your movie'} is set for ${_format(request.scheduledFor)}.',
+          '${request.movieTitle ?? 'Your movie'} is set for ${_format(request.scheduledFor, dateOnly: request.scheduledDateOnly)}.',
           style: _body.copyWith(color: context.colors.light)),
       const SizedBox(height: 18),
       _primary(
@@ -1033,13 +1135,14 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
             : () => WatchCalendarService.addScheduledWatch(
                   title: request.movieTitle ?? 'Group watch',
                   scheduledFor: date,
+                  dateOnly: request.scheduledDateOnly,
                   location: request.location,
                   note: 'With ${_groupName(request)}',
                 ),
       ),
       if (request.userId == _userId || request.canScheduleFor(_userId)) ...[
         const SizedBox(height: 8),
-        _outline('Update time', Icons.edit_calendar_outlined,
+        _outline('Update date or time', Icons.edit_calendar_outlined,
             () => _propose(request, initialIso: request.scheduledFor)),
       ],
     ]));
@@ -1163,6 +1266,15 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     }, success: 'Your movie picks are saved.');
   }
 
+  Future<void> _reopenChoices(GroupWatchRequest request) async {
+    await _run(() async {
+      await GroupService.reopenWatchPlanMovieSelection(
+          _requestId(request), _userId);
+      _drafts.remove(request.id);
+      await _load();
+    });
+  }
+
   Future<void> _addCandidate(GroupWatchRequest request) async {
     final movie = await showModalBottomSheet<MovieShort>(
       context: context,
@@ -1213,14 +1325,24 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
 
   Future<void> _propose(GroupWatchRequest request, {String? initialIso}) async {
     final result = await showModalBottomSheet<
-        ({DateTime proposedFor, String? message, String? location})>(
+        ({
+          DateTime proposedFor,
+          bool dateOnly,
+          String? message,
+          String? location
+        })>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => WatchPlanScheduleSheet(
-        initial: DateTime.tryParse(initialIso ?? '')?.toLocal(),
+        initial: DateTime.tryParse(initialIso ?? ''),
+        initialDateOnly: initialIso == null ||
+            (initialIso == request.scheduledFor
+                ? request.scheduledDateOnly
+                : request.activeScheduleProposal?.dateOnly ??
+                    request.proposedDateOnly),
         initialLocation: request.location,
         showLocation: true,
       ),
@@ -1231,17 +1353,20 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
         _requestId(request),
         _userId,
         proposedFor: result.proposedFor.toUtc().toIso8601String(),
+        dateOnly: result.dateOnly,
         location: result.location,
       );
       await _load();
-    }, success: 'The new time was sent to the group.');
+    }, success: 'The new schedule was sent to the group.');
   }
 
   Future<void> _approveTime(GroupWatchRequest request) async {
     final proposal = request.activeScheduleProposal;
     final iso = proposal?.proposedFor ?? request.proposedDate;
     final time = DateTime.tryParse(iso ?? '')?.toLocal();
-    if (time == null || !time.isAfter(DateTime.now())) {
+    if (time == null ||
+        watchPlanScheduleHasPassed(time,
+            dateOnly: proposal?.dateOnly ?? request.proposedDateOnly)) {
       _showError('That proposed time has passed. Suggest a new time.');
       return;
     }
@@ -1254,7 +1379,9 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
             _requestId(request), proposal.id, _userId, 'accepted');
       }
       await _load();
-    }, success: 'You approved ${_format(iso)}.');
+    },
+        success:
+            'You approved ${_format(iso, dateOnly: proposal?.dateOnly ?? request.proposedDateOnly)}.');
   }
 
   Future<void> _declineTime(GroupWatchRequest request) async {
@@ -1344,17 +1471,37 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     } catch (error) {
       if (mounted) _showError(_friendlyError(error));
     } finally {
-      if (mounted) setState(() => _processing = false);
+      if (mounted) {
+        setState(() => _processing = false);
+        if (_watchPlanRefreshPending) {
+          _watchPlanRefreshPending = false;
+          await _load();
+        }
+      }
     }
   }
 
   _PlanState _state(GroupWatchRequest request) {
+    if (_declined(request)) {
+      return _PlanState(_Stage.declined, 'You declined', context.colors.medium,
+          Icons.person_remove_outlined);
+    }
     if (request.isArchived) {
       return request.status == WatchRequestStatus.completed
           ? _PlanState(_Stage.recap, 'Watched', context.colors.success,
               Icons.check_circle_rounded)
           : _PlanState(_Stage.closed, request.statusLabel,
               context.colors.medium, Icons.block_rounded);
+    }
+    if (_accepted(request) &&
+        request.selectedCandidateId == null &&
+        request.candidates.isNotEmpty) {
+      if (request.userId == _userId && _everyonePicked(request)) {
+        return _PlanState(_Stage.finalMovie, 'Choose final movie',
+            context.colors.primaryText, Icons.movie_filter_rounded);
+      }
+      return _PlanState(_Stage.picking, 'Picking movies',
+          context.colors.primaryText, Icons.how_to_vote_outlined);
     }
     if (request.selectedCandidateId != null &&
         request.activeScheduleProposal != null) {
@@ -1363,7 +1510,8 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     }
     final scheduled = DateTime.tryParse(request.scheduledFor ?? '')?.toLocal();
     if (scheduled != null) {
-      return scheduled.isAfter(DateTime.now())
+      return !watchPlanScheduleHasPassed(scheduled,
+              dateOnly: request.scheduledDateOnly)
           ? _PlanState(_Stage.scheduled, 'Scheduled', context.colors.success,
               Icons.event_available_rounded)
           : _PlanState(_Stage.postWatch, 'Ready to log', context.colors.warning,
@@ -1372,14 +1520,6 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     if (!_accepted(request) && request.userId != _userId) {
       return _PlanState(_Stage.invite, 'Needs a reply', context.colors.warning,
           Icons.mark_email_unread_outlined);
-    }
-    if (request.selectedCandidateId == null && request.candidates.isNotEmpty) {
-      if (request.userId == _userId && _everyonePicked(request)) {
-        return _PlanState(_Stage.finalMovie, 'Choose final movie',
-            context.colors.primaryText, Icons.movie_filter_rounded);
-      }
-      return _PlanState(_Stage.picking, 'Picking movies',
-          context.colors.primaryText, Icons.how_to_vote_outlined);
     }
     if (request.selectedCandidateId != null &&
         request.proposedDate?.isNotEmpty == true) {
@@ -1393,6 +1533,12 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     return _PlanState(_Stage.waitingMovie, 'Waiting for creator',
         context.colors.medium, Icons.hourglass_top_rounded);
   }
+
+  bool _declined(GroupWatchRequest request) =>
+      request.userId != _userId &&
+      (request.currentUserResponse == WatchResponseDecision.declined ||
+          request.memberStatuses.any(
+              (item) => item.memberId == _userId && item.status == 'DECLINED'));
 
   bool _accepted(GroupWatchRequest request) =>
       request.userId == _userId ||
@@ -1747,7 +1893,13 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     final iso = request.scheduledFor ??
         request.activeScheduleProposal?.proposedFor ??
         request.proposedDate;
-    return iso == null || iso.isEmpty ? 'Time not set' : _format(iso);
+    return iso == null || iso.isEmpty
+        ? 'Time not set'
+        : _format(iso,
+            dateOnly: request.scheduledFor != null
+                ? request.scheduledDateOnly
+                : request.activeScheduleProposal?.dateOnly ??
+                    request.proposedDateOnly);
   }
 
   String _replyLabel(GroupWatchRequest request) {
@@ -1766,7 +1918,11 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
     return '$replied of ${members.length} replied';
   }
 
-  String _format(String? iso) {
+  String _format(String? iso, {bool dateOnly = false}) {
+    if (dateOnly) {
+      return formatWatchPlanDateTime(DateTime.tryParse(iso ?? ''),
+          dateOnly: true);
+    }
     final date = DateTime.tryParse(iso ?? '')?.toLocal();
     if (date == null) return 'Time not set';
     const months = [
@@ -1837,6 +1993,7 @@ class _LoadedGroup {
 }
 
 enum _Stage {
+  declined,
   invite,
   picking,
   finalMovie,

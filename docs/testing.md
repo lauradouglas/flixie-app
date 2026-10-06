@@ -187,3 +187,135 @@ The dedicated Patrol community journey now runs for Horror and Anime series.
 Anime verification completed: seven Flutter tests, clean focused analyzer, two
 API tests, rollback database checks, 12 build-70 checks and both dedicated iOS
 Patrol journeys pass. Production was not modified.
+
+## Watch-plan native journeys
+
+Run the focused suite on the dedicated simulator:
+
+```sh
+scripts/test-patrol.sh -d D4255A47-A9F1-4BFB-A770-557608119574 -t patrol_test/watch_plans_test.dart
+```
+
+`watch_plans_test.dart` exercises production creation sheets, the friend detail
+screen, and the group V2 screen through the real API serializers. Its strict,
+stateful `support/watch_plan_fixture.dart` uses fictional accounts and no live
+network or database writes. Unexpected API paths fail the test.
+
+The eleven journeys cover:
+
+- Single-film invitation creation in date-only and timed modes, including a
+  failed save, retry, and closing the sheet only after success.
+- Exact calendar-date storage for date-only plans and exact local-to-UTC
+  conversion for the chosen 19:30 time.
+- Friend and group invitation responses with failed-save recovery.
+- Date-only and timed schedule proposals, preserving the flag after native
+  background/foreground transitions.
+- Date-only agreement with a 9am-only reminder policy and all-day calendar data.
+- Timed rescheduling: the original schedule remains until agreement, then the
+  replacement survives a fresh detail load. Reminder and calendar data retain
+  the exact agreed time.
+- Multiple-film group picks followed by the creator's final-film selection,
+  retaining the original options and other members' choices.
+- The invited person adds Obsession to Alien/The Odyssey, existing films are
+  filtered out of search results, their picks save without changing the creator's
+  picks, and all three options survive a fresh detail load.
+- A watch with a rating and review that still succeeds when secondary aggregate
+  rating sync fails, without duplicate watch submissions on app resume.
+
+These are native UI-to-API integration journeys, not live-server tests. They
+validate reminder policy and calendar event data; they do not prove OS push
+notification delivery, calendar permission handling, or PostgreSQL constraints.
+The focused watch-plan model, lifecycle, calendar, reminder and backend service
+regressions remain complementary checks. Patrol must not use production login
+credentials or the everyday development simulator.
+
+### Real local HTTP and PostgreSQL watch-plan journeys
+
+From `../FlixieBE`, with the local database enabled and migrated:
+
+```sh
+npm run test:watch-plans:e2e:local
+```
+
+`scripts/test-watch-plans-e2e.ts` mounts the production Express routers on a
+temporary loopback server and uses real authorization, services, transactions
+and Prisma persistence. It refuses non-local database targets, creates fresh
+fictional users and a private group, then removes their rows in `finally`.
+Local metadata must include Alien, The Odyssey and Obsession.
+
+It checks date-only creation/acceptance and fresh API state, exact timezone
+conversion for timed plans (including older requests without the optional flag),
+accepted and declined reschedules, agreed transitions between date-only and timed
+plans, an invited person adding Obsession without
+overwriting the creator's picks, creator-only final selection, outsiders and
+identity spoofing, duplicate options, and invalid ratings before any diary write.
+Direct and group ratings, notes and linked diary entries are read back from SQL;
+repeated saves must retain one entry. A missed participant must have no diary
+entry. Group date-only agreement, final completion and multiple-film creation,
+member additions and creator selection are also checked.
+
+Only Firebase identity verification and external chat transport are isolated.
+Chat/Firestore delivery deliberately fails while real SQL writes and stored
+notifications run, verifying that creation still reports success. This complements
+the native fixture suite; neither suite verifies live Firebase authentication,
+OS reminder delivery, calendar permissions or production deployment.
+
+Verified locally on 4 October 2026: all 11 native journeys passed on Flixie
+Patrol (iOS 26.5), and all six real HTTP/SQL journey groups passed. The final
+native bundle was rerun without rebuilding after recovering a simulator launch
+failure. Build-70 compatibility passed all 17 checks; focused error/policy tests
+passed all 12, and Dart analysis plus backend/runner TypeScript checks passed.
+
+### Four-member group Watch Plans
+
+See [the complete scenario inventory](group-watch-plan-test-scenarios.md) for all
+25 real HTTP/PostgreSQL scenarios, 13 shared native/widget journeys, run commands,
+persistent four-member local fixtures, product fixes and verification boundaries.
+The coverage includes partial declines and recipient filtering, date-only and timed
+schedules, replacement proposals, individual votes, later film additions,
+permissions, closed plans and idempotent independent watch logging.
+
+### Foreground notification policy
+
+`flutter test test/foreground_social_notice_test.dart test/foreground_watch_plan_notice_test.dart test/watch_plan_notice_preview_test.dart`
+
+20 focused cases passed on 4 October 2026. Direct messages show a banner outside
+their conversation; the open conversation stays quiet. Friend/group invitations
+open the actionable inbox. Routine group chat, reactions, film votes and shortlist
+additions remain quiet. Other Watch Plan lifecycle banners retain current-plan
+navigation and delayed-event protection. Foreground FCM handling never falls back
+to a system notification; background delivery remains unchanged. These tests cover
+payload policy and real widgets, not live APNs/FCM delivery or Android scheduled
+local-reminder presentation. Development app notification initialization was
+hot-restarted after the change.
+
+### Grouped community replies
+
+Backend: `npm run test:community-replies:e2e:local` runs guarded local PostgreSQL
+checks for 100 replies to a post and 100 to a discussion, in concurrent batches.
+It verifies one inbox row per recipient/conversation, zero reply pushes, preserving
+read state on immediate duplicate delivery, unread refresh on new replies, reopening
+a dismissed digest, distinct conversations and preferences. Legacy individual reply
+cards are closed on the next reply to that conversation. Fixtures are isolated and
+cleaned up. Backend route/privacy and mention tests plus build-70 checks also pass.
+
+Flutter: `flutter test test/notification_inbox_test.dart test/foreground_social_notice_test.dart test/notification_destination_test.dart`
+verified 33 cases, including displaying the grouped discussion summary and no
+community-reply banner. No production migration or deployment was performed.
+
+## Focused notification suite
+
+Run `scripts/test-notifications.sh` for notification delivery, banner, inbox,
+permission-offer, reminder and routing regressions across the app and backend.
+Use `scripts/test-notifications.sh --local-db` to also exercise isolated local
+community-reply digests and friend/four-member group plan journeys. The detailed
+scenario list and live-device verification boundaries are in
+[notification-test-scenarios.md](notification-test-scenarios.md).
+
+## Notification return navigation — 5 October 2026
+
+Focused Flutter navigation checks: `flutter test test/notification_inbox_navigation_test.dart test/notification_navigation_matrix_test.dart test/notification_destination_exit_test.dart test/foreground_notification_navigation_test.dart test/chat_back_button_test.dart test/watch_plan_back_navigation_test.dart`. These exercise real inbox cards, the production foreground/tap handlers, actual destination loading/error states, preserved drafts, duplicate callbacks, and Home fallback.
+
+Device checks: `scripts/test-patrol.sh -d <dedicated-device> -t patrol_test/notification_navigation_test.dart`. Fictional fixtures cover banner → inbox → group invitation → Back → original draft, and cold community-post navigation → Home, both across native background/resume. They do not send a real APNs/FCM push or log into a production account.
+
+Validation: 223 focused notification/navigation tests and 54 existing media/profile/community tests passed. The 38-case matrix also passed with modal and immediate-duplicate checks. The two dedicated Patrol journeys passed on both iOS and Android (four device cases, no skips). Final shared-navigation analysis is clean. The earlier repository-wide test failures are not resolved by these focused results.

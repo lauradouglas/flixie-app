@@ -65,35 +65,35 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final page = MediaQuery(
-        data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-        child: Scaffold(
-            body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: FriendWatchPlanFlow(
-            request: request,
-            myUserId: 'me',
-            compact: false,
-            scheduledLabel: '18 Sep, 21:30',
-            onOpen: () {},
-            onAccept: accept ?? () {},
-            onDecline: () {},
-            onSuggestSchedule: () {},
-            onRespondToProposal: (_, __) {},
-            onConfirmWatched: logWatch ?? () {},
-            onNotThisTime: () {},
-            onClosePlan: () {},
-            onNewPlan: () {},
-            onCancelPlan: () {},
-            candidateChoiceDraft: const {'moana'},
-            onToggleCandidateChoice: (_) {},
-            onSaveCandidateChoices: save ?? () async => true,
-            onAddCandidate: () {},
-            onRemoveCandidate: (_) {},
-            onSelectCandidate: select ?? (_) {},
-            onChangeMovie: () {},
-          ),
-        )),
-      );
+      data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+      child: Scaffold(
+          body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: FriendWatchPlanFlow(
+          request: request,
+          myUserId: 'me',
+          compact: false,
+          scheduledLabel: '18 Sep, 21:30',
+          onOpen: () {},
+          onAccept: accept ?? () {},
+          onDecline: () {},
+          onSuggestSchedule: () {},
+          onRespondToProposal: (_, __) {},
+          onConfirmWatched: logWatch ?? () {},
+          onNotThisTime: () {},
+          onClosePlan: () {},
+          onNewPlan: () {},
+          onCancelPlan: () {},
+          candidateChoiceDraft: const {'moana'},
+          onToggleCandidateChoice: (_) {},
+          onSaveCandidateChoices: save ?? () async => true,
+          onAddCandidate: () {},
+          onRemoveCandidate: (_) {},
+          onSelectCandidate: select ?? (_) {},
+          onChangeMovie: () {},
+        ),
+      )),
+    );
     await tester.pumpWidget(router == null
         ? MaterialApp(theme: AppTheme.darkTheme, home: page)
         : MaterialApp.router(
@@ -113,8 +113,10 @@ void main() {
       final router = GoRouter(routes: [
         GoRoute(path: '/', builder: (_, __) => const SizedBox()),
         GoRoute(path: '/plan', builder: (_, state) => state.extra as Widget),
-        GoRoute(path: '/movies/:id', builder: (_, state) =>
-            Scaffold(body: Text('Movie details ${state.pathParameters['id']}'))),
+        GoRoute(
+            path: '/movies/:id',
+            builder: (_, state) => Scaffold(
+                body: Text('Movie details ${state.pathParameters['id']}'))),
       ]);
       addTearDown(router.dispose);
       await show(tester, fixture({'selectedCandidateId': 'moana'}),
@@ -199,7 +201,7 @@ void main() {
         }));
     expect(find.text('Save my picks'), findsNothing);
     expect(find.text('What could you watch?'), findsNothing);
-    expect(find.text('Suggest a time'), findsOneWidget);
+    expect(find.text('Suggest a date'), findsOneWidget);
   });
 
   testWidgets('joining an invite does not select a movie', (tester) async {

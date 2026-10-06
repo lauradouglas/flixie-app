@@ -423,8 +423,8 @@ void main() {
           branches: [
             for (final path in [
               '/',
-              '/watchlist',
               '/search',
+              '/plans',
               '/social',
               '/profile'
             ])
@@ -444,12 +444,12 @@ void main() {
                 .isSelected ==
             ui.Tristate.isTrue,
         isTrue);
-    await tester.tap(find.text('Watchlist'));
+    await tester.tap(find.text('Discover'));
     await tester.pumpAndSettle();
-    expect(find.text('Destination /watchlist'), findsOneWidget);
+    expect(find.text('Destination /search'), findsOneWidget);
     expect(
         tester
-                .getSemantics(find.bySemanticsLabel('Watchlist'))
+                .getSemantics(find.bySemanticsLabel('Discover'))
                 .flagsCollection
                 .isSelected ==
             ui.Tristate.isTrue,

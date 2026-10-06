@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
+import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_formatters.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/watch_plan_movie_options.dart';
@@ -104,13 +106,18 @@ class WatchRequestChatCard extends StatelessWidget {
     final attendees =
         r?.memberStatuses.where((m) => m.status == 'ACCEPTED').toList() ?? [];
     final proposal = r?.activeScheduleProposal;
+    final dateOnly = proposal?.dateOnly ??
+        (r?.scheduledFor != null
+            ? r?.scheduledDateOnly
+            : r?.proposedDateOnly) ??
+        false;
     final date = DateTime.tryParse(
             proposal?.proposedFor ?? r?.scheduledFor ?? r?.proposedDate ?? '')
         ?.toLocal();
     final watchDue = scheduled &&
         proposal == null &&
         date != null &&
-        !date.isAfter(DateTime.now());
+        watchPlanScheduleHasPassed(date, dateOnly: dateOnly);
     final waiting = r?.memberStatuses
             .where((m) => m.status == 'PENDING' || m.status == 'MAYBE')
             .length ??
@@ -230,7 +237,9 @@ class WatchRequestChatCard extends StatelessWidget {
       ] else if (!cancelled && !expired) ...[
         if (date != null)
           Text(
-              '${MaterialLocalizations.of(context).formatMediumDate(date)} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(date))}',
+              dateOnly
+                  ? formatWatchPlanDateTime(date, dateOnly: true)
+                  : '${MaterialLocalizations.of(context).formatMediumDate(date)} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(date))}',
               style: _body.copyWith(color: context.colors.light))
         else if (r != null)
           Text('Date not set yet',

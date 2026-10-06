@@ -313,19 +313,20 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                   spacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                Builder(
-                    builder: (anchor) => TextButton.icon(
-                        onPressed: widget.busy || widget.onReact == null
-                            ? null
-                            : () => widget.onReact!(anchor),
-                        icon: Icon(Icons.add_reaction_outlined,
-                            color: widget.reactions.mine != null
-                                ? context.colors.primaryText
-                                : secondary,
-                            size: 22),
-                        label: const Text('React'),
-                        style:
-                            TextButton.styleFrom(foregroundColor: secondary))),
+                if (widget.onReact != null)
+                  Builder(
+                      builder: (anchor) => TextButton.icon(
+                          onPressed: widget.busy || widget.onReact == null
+                              ? null
+                              : () => widget.onReact!(anchor),
+                          icon: Icon(Icons.add_reaction_outlined,
+                              color: widget.reactions.mine != null
+                                  ? context.colors.primaryText
+                                  : secondary,
+                              size: 22),
+                          label: const Text('React'),
+                          style: TextButton.styleFrom(
+                              foregroundColor: secondary))),
                 for (final entry in widget.reactions.counts.entries)
                   if (entry.value > 0)
                     Semantics(

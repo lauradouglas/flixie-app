@@ -454,7 +454,7 @@ class _PickForUsScreenState extends State<PickForUsScreen> {
         const SizedBox(height: 12),
         Align(
             alignment: Alignment.centerLeft,
-            child: ActionChip(
+            child: FlixiePill.action(
                 label: Text('${_mood.label} · Change'),
                 onPressed: () {
                   setState(() => _step = 0);

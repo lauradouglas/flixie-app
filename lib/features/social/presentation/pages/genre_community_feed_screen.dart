@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/community_watchlist_button.dart';
@@ -187,7 +188,7 @@ class _GenreCommunityFeedScreenState extends State<GenreCommunityFeedScreen> {
                                       'movie',
                                       'show'
                                     ])
-                                      ChoiceChip(
+                                      FlixiePill.choice(
                                           showCheckmark: false,
                                           label: Text(filter == 'all'
                                               ? 'All'

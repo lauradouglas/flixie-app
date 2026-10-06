@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
+
 const List<String> _months = [
   'Jan',
   'Feb',
@@ -19,12 +21,21 @@ String formatWatchPlanDate(String? iso) {
   return '${value.day} ${_months[value.month - 1]} ${value.year}';
 }
 
-String formatWatchPlanDateTime(DateTime? value, {DateTime? now}) {
+String formatWatchPlanDateTime(DateTime? value,
+    {DateTime? now, bool dateOnly = false}) {
   if (value == null) return '';
-  final local = value.toLocal();
+  final local =
+      dateOnly ? watchPlanCalendarDate(value, dateOnly: true) : value.toLocal();
   final reference = (now ?? DateTime.now()).toLocal();
   final today = DateTime(reference.year, reference.month, reference.day);
   final date = DateTime(local.year, local.month, local.day);
+  if (dateOnly) {
+    if (date == today) return 'Today · Time optional';
+    if (date == today.add(const Duration(days: 1))) {
+      return 'Tomorrow · Time optional';
+    }
+    return '${local.day} ${_months[local.month - 1]} · Time optional';
+  }
   final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
   final minute = local.minute.toString().padLeft(2, '0');
   final suffix = local.hour >= 12 ? 'pm' : 'am';

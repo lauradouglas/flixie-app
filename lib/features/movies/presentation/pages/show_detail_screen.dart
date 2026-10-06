@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_detail_action.dart';
@@ -982,6 +983,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.colors.background,
+      appBar: !_isLoading && _error != null
+          ? AppBar(leading: const FlixieBackButton())
+          : null,
       body: _isLoading
           ? widget.initialTitle != null
               ? MediaDetailPreview(
@@ -1159,8 +1163,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _heroIconButton(
-                          icon: Icons.arrow_back_ios_new_rounded,
-                          onTap: () => context.pop()),
+                          icon: flixieBackIcon(context,
+                              backIcon: Icons.arrow_back_ios_new_rounded),
+                          onTap: () => flixieBackOrHome(context)),
                       _heroIconButton(
                           icon: Icons.ios_share_rounded,
                           onTap: () => MediaChatShare(context).show(
@@ -1258,7 +1263,11 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       height: 46,
       child: IconButton(
         onPressed: onTap,
-        tooltip: icon == Icons.ios_share_rounded ? 'Share show' : 'Back',
+        tooltip: icon == Icons.ios_share_rounded
+            ? 'Share show'
+            : icon == Icons.home_outlined
+                ? 'Home'
+                : 'Back',
         style: IconButton.styleFrom(
           backgroundColor: context.colors.surface,
           shape: const CircleBorder(),

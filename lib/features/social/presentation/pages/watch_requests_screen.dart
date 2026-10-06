@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
@@ -21,6 +22,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/widgets/flixie_segmented_control.dart';
 import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/core/reviews/app_review_service.dart';
@@ -94,7 +96,7 @@ class _WatchRequestDetailScreenState extends State<WatchRequestDetailScreen> {
         final requests = await GroupService.getGroupWatchRequests(groupId);
         if (requests.any((request) => request.id == widget.requestId)) {
           if (!mounted) return;
-          context.go(
+          context.pushReplacement(
               '/groups/$groupId?tab=requests&requestId=${widget.requestId}');
           return;
         }
@@ -114,6 +116,10 @@ class _WatchRequestDetailScreenState extends State<WatchRequestDetailScreen> {
   Widget build(BuildContext context) {
     if (_resolvingGroupPlan) {
       return const FlixiePageScaffold(
+        appBar: FlixieTitleAppBar(
+          title: Text('Watch Plan'),
+          leading: FlixieBackButton(),
+        ),
         body: Center(child: CircularProgressIndicator()),
       );
     }
@@ -195,15 +201,23 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     }
   }
 
+  int _focusedLoadGeneration = 0;
+
   Future<void> _loadFocusedRequest(String requestId) async {
+    final generation = ++_focusedLoadGeneration;
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null || userId.isEmpty) return;
     try {
       final state = await RequestService.getWatchRequestState(
         watchRequestId: requestId,
         userId: userId,
+        requestScope: 'friend-detail:$hashCode:$generation',
       );
-      if (!mounted || widget.initialRequestId != requestId) return;
+      if (!mounted ||
+          widget.initialRequestId != requestId ||
+          generation != _focusedLoadGeneration) {
+        return;
+      }
       setState(() {
         _all = [state.request];
         _loading = false;
@@ -223,7 +237,11 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       await _syncFocusedReminder(state.request);
     } catch (error) {
       logger.w('[WatchRequestsScreen] focused state load failed: $error');
-      if (!mounted || widget.initialRequestId != requestId) return;
+      if (!mounted ||
+          widget.initialRequestId != requestId ||
+          generation != _focusedLoadGeneration) {
+        return;
+      }
       // Preserve the normal list fallback for legacy links or transient
       // state-endpoint failures, but do not leave a detail page loading.
       await _load(showSpinner: true);
@@ -235,7 +253,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     if (request.isTerminal ||
         request.normalizedScheduleStatus != 'AGREED' ||
         scheduledFor == null ||
-        !scheduledFor.isAfter(DateTime.now())) {
+        watchPlanScheduleHasPassed(scheduledFor,
+            dateOnly: request.scheduledDateOnly)) {
       return;
     }
     final userId = context.read<AuthProvider>().dbUser?.id;
@@ -243,6 +262,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     await PushNotificationService.scheduleWatchPlanReminders(
       planId: request.id,
       scheduledFor: scheduledFor,
+      dateOnly: request.scheduledDateOnly,
       title: request.watchPlanTitle,
       withName: request.otherUser(userId)?.username ?? 'your friend',
       deepLink: '/watch-requests/${request.id}',
@@ -338,10 +358,13 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       }
       for (final request in hydrated) {
         final scheduledFor = request.scheduledFor;
-        if (scheduledFor != null && scheduledFor.isAfter(DateTime.now())) {
+        if (scheduledFor != null &&
+            !watchPlanScheduleHasPassed(scheduledFor,
+                dateOnly: request.scheduledDateOnly)) {
           PushNotificationService.scheduleWatchPlanReminders(
             planId: request.id,
             scheduledFor: scheduledFor,
+            dateOnly: request.scheduledDateOnly,
             title: request.watchPlanTitle,
             withName: request.participants
                     .map((participant) => participant.user)
@@ -497,8 +520,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
   DateTime _parseDate(String? iso) =>
       DateTime.tryParse(iso ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
 
-  String _formatFriendlyDateTime(DateTime? value) =>
-      formatWatchPlanDateTime(value);
+  String _formatFriendlyDateTime(DateTime? value, {bool dateOnly = false}) =>
+      formatWatchPlanDateTime(value, dateOnly: dateOnly);
 
   void _replaceRequest(WatchRequest updated) {
     setState(() {
@@ -709,6 +732,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       {DateTime? initial}) async {
     final selected = await _showScheduleProposalSheet(
       initial: initial,
+      initialDateOnly: initial == null || request.scheduledDateOnly,
       initialLocation: request.location,
     );
     if (!mounted || selected == null) return;
@@ -721,16 +745,31 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       request,
       FriendAcceptanceScheduleDraft(
         proposedFor: selected.proposedFor,
+        dateOnly: selected.dateOnly,
         message: selected.message,
         location: selected.location,
       ),
     );
   }
 
-  Future<({DateTime proposedFor, String? message, String? location})?>
-      _showScheduleProposalSheet({DateTime? initial, String? initialLocation}) {
+  Future<
+          ({
+            DateTime proposedFor,
+            bool dateOnly,
+            String? message,
+            String? location
+          })?>
+      _showScheduleProposalSheet(
+          {DateTime? initial,
+          String? initialLocation,
+          bool initialDateOnly = true}) {
     return showModalBottomSheet<
-        ({DateTime proposedFor, String? message, String? location})>(
+        ({
+          DateTime proposedFor,
+          bool dateOnly,
+          String? message,
+          String? location
+        })>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
@@ -738,6 +777,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => WatchPlanScheduleSheet(
         initial: initial,
+        initialDateOnly: initialDateOnly,
         initialLocation: initialLocation,
       ),
     );
@@ -757,6 +797,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           watchRequestId: request.id,
           userId: userId,
           proposedFor: selected.proposedFor,
+          dateOnly: selected.dateOnly,
           message: selected.message,
           location: selected.location,
         );
@@ -767,7 +808,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FlixieToast(
             type: FlixieToastType.info,
             content: Text(request.scheduledFor == null
-                ? 'Suggested ${_formatFriendlyDateTime(selected.proposedFor)}'
+                ? 'Suggested ${_formatFriendlyDateTime(selected.proposedFor, dateOnly: selected.dateOnly)}'
                 : 'New time proposed - the current plan stays in place until they agree'),
             backgroundColor: context.colors.surfaceElevated,
           ),
@@ -795,7 +836,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     if (userId == null || userId.isEmpty) return;
     if (decision == 'accepted' &&
         proposal.proposedFor != null &&
-        !proposal.proposedFor!.toLocal().isAfter(DateTime.now())) {
+        watchPlanScheduleHasPassed(proposal.proposedFor!,
+            dateOnly: proposal.dateOnly)) {
       ScaffoldMessenger.of(context).showFlixieToast(
         FlixieToast(
           type: FlixieToastType.warning,
@@ -831,6 +873,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           await PushNotificationService.scheduleWatchPlanReminders(
             planId: state.request.id,
             scheduledFor: agreedTime,
+            dateOnly: state.request.scheduledDateOnly,
             title: state.request.watchPlanTitle,
             withName: state.request.participants
                     .map((participant) => participant.user)
@@ -847,6 +890,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           final addToCalendar = await _showAddToCalendarSheet(
                 title: state.request.movie?.title ?? 'Watch together',
                 scheduledFor: agreedTime,
+                dateOnly: state.request.scheduledDateOnly,
                 posterPath: state.request.movie?.posterPath,
               ) ??
               false;
@@ -854,6 +898,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
             await WatchCalendarService.addScheduledWatch(
               title: state.request.movie?.title ?? 'Watch together',
               scheduledFor: agreedTime,
+              dateOnly: state.request.scheduledDateOnly,
               runtimeMinutes: state.request.movie?.runtimeMinutes,
               note: state.request.message,
               location: state.request.location,
@@ -865,7 +910,9 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
           FlixieToast(
             type: FlixieToastType.success,
             content: Text(decision == 'accepted'
-                ? 'Watch time agreed'
+                ? state.request.scheduledDateOnly
+                    ? 'Watch date agreed'
+                    : 'Watch time agreed'
                 : request.scheduledFor != null
                     ? 'New time declined - your original plan is unchanged'
                     : 'Time declined'),
@@ -889,6 +936,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
   Future<bool?> _showAddToCalendarSheet({
     required String title,
     required DateTime scheduledFor,
+    bool dateOnly = false,
     String? posterPath,
   }) {
     return showModalBottomSheet<bool>(
@@ -984,7 +1032,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _formatFriendlyDateTime(scheduledFor),
+                              _formatFriendlyDateTime(scheduledFor,
+                                  dateOnly: dateOnly),
                               style: TextStyle(
                                 color: context.colors.medium,
                                 fontSize: 16,
@@ -1335,6 +1384,7 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
     final screen = FlixiePageScaffold(
       extendBodyBehindAppBar: backdropBehindHeader,
       appBar: FlixieTitleAppBar(
+        leading: isFocused ? const FlixieBackButton() : null,
         backgroundColor: backdropBehindHeader
             ? Colors.transparent
             : context.colors.background,
@@ -1581,7 +1631,8 @@ class _WatchRequestsScreenState extends State<WatchRequestsScreen>
       myAvatar: context.read<AuthProvider>().dbUser?.avatar,
       myProfileBadges:
           context.read<AuthProvider>().dbUser?.profileBadges ?? const [],
-      scheduledLabel: _formatFriendlyDateTime(request.scheduledFor),
+      scheduledLabel: _formatFriendlyDateTime(request.scheduledFor,
+          dateOnly: request.scheduledDateOnly),
       busy: _busyActions.containsKey(request.id),
       onAccept: () => _respond(request, 'ACCEPTED'),
       onDecline: () => _respond(request, 'DECLINED'),

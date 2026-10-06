@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/notification.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/widgets.dart';
@@ -76,6 +77,9 @@ class Prefetch implements AuthPrefetchCoordinator {
 
   @override
   Future<int?> fetchUnreadCount(String userId) async => 0;
+  @override
+  Future<List<FlixieNotification>?> fetchNotifications(String userId) async =>
+      [];
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }

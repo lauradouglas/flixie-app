@@ -58,6 +58,14 @@
                     android:pathPrefix="/invite" />
             </intent-filter>
         </activity>
+        <receiver android:name=".FlixieSearchWidget" android:exported="false" android:label="@string/widget_search_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/flixie_search_widget_info"/>
+        </receiver>
+        <receiver android:name=".FlixieWatchlistWidget" android:exported="false" android:label="@string/widget_watchlist_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/flixie_watchlist_widget_info"/>
+        </receiver>
         <!-- Firebase Cloud Messaging default notification channel and icon -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/core/storage/library_image_warmup.dart';
 import 'package:flixie_app/features/home/presentation/widgets/home_watchlist_action.dart';
@@ -634,18 +635,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!plan.isWatchRequest ||
           plan.isTerminal ||
           scheduledFor == null ||
-          !scheduledFor.isAfter(DateTime.now())) {
+          watchPlanScheduleHasPassed(scheduledFor,
+              dateOnly: plan.scheduledDateOnly)) {
         continue;
       }
       final hasDeclinedGroupPlan = plan.groupName?.isNotEmpty == true &&
           plan.participantFor(userId)?.response.toUpperCase() == 'DECLINED';
-      if (hasDeclinedGroupPlan) continue;
+      if (hasDeclinedGroupPlan) {
+        await PushNotificationService.cancelWatchPlanReminders(plan.id,
+            scope: 'GROUP');
+        continue;
+      }
       final groupName = plan.groupName?.trim();
       final isGroupPlan = groupName?.isNotEmpty == true;
       final otherUser = plan.otherUser(userId);
       await PushNotificationService.scheduleWatchPlanReminders(
         planId: plan.id,
         scheduledFor: scheduledFor,
+        dateOnly: plan.scheduledDateOnly,
         title: plan.watchPlanTitle,
         withName:
             isGroupPlan ? groupName! : otherUser?.username ?? 'your friend',
@@ -668,6 +675,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     for (final entry in entries) {
       final request = entry.request;
       final canonicalId = request.databaseRequestId;
+      final declined = request.memberStatuses.any((member) =>
+          member.memberId == _loadedForUserId && member.status == 'DECLINED');
+      if (declined || request.isArchived) {
+        await PushNotificationService.cancelWatchPlanReminders(
+            canonicalId ?? request.id,
+            scope: 'GROUP');
+      }
       if (canonicalId != null && canonicalId != request.id) {
         await PushNotificationService.cancelWatchPlanReminders(request.id,
             scope: 'GROUP');
@@ -1196,14 +1210,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 const SizedBox(height: 20),
                 _buildBecauseYouRatedSection(context),
                 _buildContinueWatchingSection(context),
-                if (user != null)
-                  FindTonightsFilmSection(onPick: () async {
-                    await context.push('/pick-for-us');
-                    if (mounted) await _refreshAll();
-                  }),
-                if (user != null)
-                  HomeCommunitySection(key: _communityKey, userId: user.id),
               ],
+              if (user != null)
+                FindTonightsFilmSection(onPick: () async {
+                  await context.push('/pick-for-us');
+                  if (mounted) await _refreshAll();
+                }),
+              if (user != null)
+                HomeCommunitySection(key: _communityKey, userId: user.id),
             ],
           ),
         ),
@@ -1508,7 +1522,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           icon: inWatchlist
                               ? Icons.bookmark_rounded
                               : Icons.bookmark_outline_rounded,
-                          foregroundColor: context.colors.warning,
+                          foregroundColor: inWatchlist
+                              ? context.colors.primaryText
+                              : context.colors.light,
                           isBusy: isUpdating,
                           onPressed: () => _toggleHeroWatchlist(context, movie),
                         ),
@@ -2872,20 +2888,16 @@ class _HeroCompactIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: context.colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: isBusy ? null : onPressed,
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: isBusy
-                ? _SpinningActionIcon(icon: icon, color: foregroundColor)
-                : Icon(icon, color: foregroundColor, size: 22),
-          ),
+      child: IconButton(
+        onPressed: isBusy ? null : onPressed,
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(44),
+          foregroundColor: foregroundColor,
+          backgroundColor: Colors.transparent,
         ),
+        icon: isBusy
+            ? _SpinningActionIcon(icon: icon, color: foregroundColor)
+            : Icon(icon, color: foregroundColor, size: 24),
       ),
     );
   }

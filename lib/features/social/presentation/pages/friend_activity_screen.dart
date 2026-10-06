@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -178,7 +180,8 @@ class _FriendActivityScreenState extends State<FriendActivityScreen> {
 
   @override
   Widget build(BuildContext context) => FlixiePageScaffold(
-      appBar: const FlixieTitleAppBar(title: Text('Post'), centerTitle: true),
+      appBar: const FlixieTitleAppBar(
+          leading: FlixieBackButton(), title: Text('Post'), centerTitle: true),
       body: LayoutBuilder(
           builder: (context, constraints) => Column(children: [
                 Expanded(
@@ -357,7 +360,7 @@ class _FriendActivityScreenState extends State<FriendActivityScreen> {
                           child: Text(_sendError!,
                               style: TextStyle(
                                   color: context.colors.textPrimary)))),
-                FilterChip(
+                FlixiePill.filter(
                     label: const Text('Contains spoilers'),
                     selected: _spoilers,
                     onSelected: _sending

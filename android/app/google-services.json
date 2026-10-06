@@ -22,12 +22,24 @@
           }
         },
         {
+          "client_id": "1093787683868-d70qdv9qhegleicamop5k5i85ju589kf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.flixie.app",
+            "certificate_hash": "49d092224ab10fb1fbd0c167698ba19084b98732"
+          }
+        },
+        {
           "client_id": "1093787683868-dnqcqmqkjbps8pd2h7igqhtvcsf864v1.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.flixie.app",
             "certificate_hash": "7d8c1dc50dbdcd2a6416296916a2fbd14600446e"
           }
+        },
+        {
+          "client_id": "1093787683868-cok4pahqen4qj6qc5mueuf6tsv7v65s4.apps.googleusercontent.com",
+          "client_type": 3
         }
       ],
       "api_key": [
@@ -38,6 +50,10 @@
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
+            {
+              "client_id": "1093787683868-cok4pahqen4qj6qc5mueuf6tsv7v65s4.apps.googleusercontent.com",
+              "client_type": 3
+            },
             {
               "client_id": "1093787683868-0vo57s3c7hud798645h5cjc11i5jt43v.apps.googleusercontent.com",
               "client_type": 2,
@@ -56,7 +72,12 @@
           "package_name": "com.flixie.flixie_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1093787683868-cok4pahqen4qj6qc5mueuf6tsv7v65s4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCoDU1xEPxVJ-hCr41gc1QIGTKjjQeRTgo"
@@ -65,6 +86,10 @@
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
+            {
+              "client_id": "1093787683868-cok4pahqen4qj6qc5mueuf6tsv7v65s4.apps.googleusercontent.com",
+              "client_type": 3
+            },
             {
               "client_id": "1093787683868-0vo57s3c7hud798645h5cjc11i5jt43v.apps.googleusercontent.com",
               "client_type": 2,

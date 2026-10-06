@@ -10,6 +10,7 @@ import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/social_auth_provider.dart';
 import 'package:flixie_app/models/user.dart';
 import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart';
 import 'watchlist_recommendation_batch_test.dart' show TestAuth, response;
@@ -24,6 +25,14 @@ class SettingsAnalytics extends ChangeNotifier implements AnalyticsController {
 }
 
 class CountryAuth extends TestAuth {
+  @override
+  bool get hasConnectedSocialProvider => false;
+  @override
+  bool isProviderConnected(SocialAuthProvider provider) => false;
+  @override
+  bool get hasPassword => true;
+  @override
+  bool get isLoading => false;
   User current = const User(
       id: 'viewer',
       username: 'Viewer',

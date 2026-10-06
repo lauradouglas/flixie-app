@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -57,7 +58,11 @@ class WatchPlanDisplayState {
         !request.isCancelled &&
         !request.isExpired &&
         time != null &&
-        !time.isAfter(now ?? DateTime.now());
+        watchPlanScheduleHasPassed(time,
+            dateOnly: request.scheduledFor != null
+                ? request.scheduledDateOnly
+                : request.proposedDateOnly,
+            now: now);
   }
 
   static bool isActive(WatchRequest request) =>
@@ -104,7 +109,8 @@ class WatchPlanDisplayState {
   static bool isUpcoming(WatchRequest request, {DateTime? now}) =>
       request.normalizedScheduleStatus == 'AGREED' &&
       request.scheduledFor != null &&
-      request.scheduledFor!.isAfter(now ?? DateTime.now());
+      !watchPlanScheduleHasPassed(request.scheduledFor!,
+          dateOnly: request.scheduledDateOnly, now: now);
 
   static bool matchesFilter(
     WatchRequest request,

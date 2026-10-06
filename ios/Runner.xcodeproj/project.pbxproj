@@ -21,6 +21,8 @@
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		983355A32F742ED300E7FBF6 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 983355A22F742ED300E7FBF6 /* GoogleService-Info.plist */; };
 		C7EBE661C1A1484D447E2E7F /* RunnerUITests.m in Sources */ = {isa = PBXBuildFile; fileRef = C1E2D5BCD24A8E55C8C328AE /* RunnerUITests.m */; };
+		F11E5EA00000000000000004 /* FlixieSearchWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11E5EA00000000000000001 /* FlixieSearchWidget.swift */; };
+		F11E5EA00000000000000005 /* FlixieSearchWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F11E5EA00000000000000003 /* FlixieSearchWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,6 +40,13 @@
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
 		};
+		F11E5EA0000000000000000C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F11E5EA0000000000000000B;
+			remoteInfo = FlixieSearchWidget;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -49,6 +58,17 @@
 			files = (
 			);
 			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F11E5EA0000000000000000A /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F11E5EA00000000000000005 /* FlixieSearchWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -86,6 +106,10 @@
 		D7C75B113F9B752C14BE716A /* Pods-Runner-RunnerUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner-RunnerUITests.debug.xcconfig"; path = "Target Support Files/Pods-Runner-RunnerUITests/Pods-Runner-RunnerUITests.debug.xcconfig"; sourceTree = "<group>"; };
 		DECAEB80841EF2EAC94CD1EF /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		E9B89DA6B38BF328318F4E09 /* RunnerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F11E5EA00000000000000001 /* FlixieSearchWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlixieSearchWidget.swift; sourceTree = "<group>"; };
+		F11E5EA00000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F11E5EA00000000000000003 /* FlixieSearchWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FlixieSearchWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F11E5EA00000000000000012 /* Widget.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Widget.xcconfig; sourceTree = "<group>"; };
 		F8BFAD1D5EE9A253C91B8F92 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -112,6 +136,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				2AC323715B24F76F4AEFA26F /* Pods_Runner.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F11E5EA00000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -167,6 +198,7 @@
 		97C146E51CF9000F007C117D = {
 			isa = PBXGroup;
 			children = (
+				F11E5EA00000000000000006 /* FlixieSearchWidget */,
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				97C146EF1CF9000F007C117D /* Products */,
@@ -180,6 +212,7 @@
 		97C146EF1CF9000F007C117D /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				F11E5EA00000000000000003 /* FlixieSearchWidget.appex */,
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 				E9B89DA6B38BF328318F4E09 /* RunnerUITests.xctest */,
@@ -220,6 +253,16 @@
 			);
 			name = RunnerUITests;
 			path = RunnerUITests;
+			sourceTree = "<group>";
+		};
+		F11E5EA00000000000000006 /* FlixieSearchWidget */ = {
+			isa = PBXGroup;
+			children = (
+				F11E5EA00000000000000001 /* FlixieSearchWidget.swift */,
+				F11E5EA00000000000000002 /* Info.plist */,
+				F11E5EA00000000000000012 /* Widget.xcconfig */,
+			);
+			path = FlixieSearchWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -272,6 +315,7 @@
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
 				1D6C8357C560AAC20D6744D9 /* [CP] Check Pods Manifest.lock */,
+				F11E5EA0000000000000000A /* Embed App Extensions */,
 				9740EEB61CF901F6004384FC /* Run Script */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
@@ -284,11 +328,29 @@
 			buildRules = (
 			);
 			dependencies = (
+				F11E5EA0000000000000000D /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F11E5EA0000000000000000B /* FlixieSearchWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F11E5EA0000000000000000E /* Build configuration list for PBXNativeTarget "FlixieSearchWidget" */;
+			buildPhases = (
+				F11E5EA00000000000000007 /* Sources */,
+				F11E5EA00000000000000008 /* Frameworks */,
+				F11E5EA00000000000000009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FlixieSearchWidget;
+			productName = FlixieSearchWidget;
+			productReference = F11E5EA00000000000000003 /* FlixieSearchWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -324,6 +386,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				F11E5EA0000000000000000B /* FlixieSearchWidget */,
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
 				65EA0B06249088A57D1FAD62 /* RunnerUITests */,
@@ -352,6 +415,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B07D6A4DC8638DBF4BDB0CDE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F11E5EA00000000000000009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -591,6 +661,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F11E5EA00000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F11E5EA00000000000000004 /* FlixieSearchWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -604,6 +682,11 @@
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
+		};
+		F11E5EA0000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F11E5EA0000000000000000B /* FlixieSearchWidget */;
+			targetProxy = F11E5EA0000000000000000C /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -984,6 +1067,72 @@
 			};
 			name = Release;
 		};
+		F11E5EA0000000000000000F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F11E5EA00000000000000012 /* Widget.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4T69VPQXW6;
+				INFOPLIST_FILE = FlixieSearchWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.flixie.flixieApp.SearchWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F11E5EA00000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F11E5EA00000000000000012 /* Widget.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4T69VPQXW6;
+				INFOPLIST_FILE = FlixieSearchWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.flixie.flixieApp.SearchWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F11E5EA00000000000000011 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F11E5EA00000000000000012 /* Widget.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4T69VPQXW6;
+				INFOPLIST_FILE = FlixieSearchWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.flixie.flixieApp.SearchWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1023,6 +1172,16 @@
 				05AFF860D226DEE7C16E29CF /* Release */,
 				046EED0F3F4BACA52DBA4BAF /* Debug */,
 				4B38078245F9FCBBDF517E74 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F11E5EA0000000000000000E /* Build configuration list for PBXNativeTarget "FlixieSearchWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F11E5EA0000000000000000F /* Debug */,
+				F11E5EA00000000000000010 /* Release */,
+				F11E5EA00000000000000011 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

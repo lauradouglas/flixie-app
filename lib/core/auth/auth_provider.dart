@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/watchlist_widget_sync.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/social/data/starred_people.dart';
 import 'package:flixie_app/features/social/data/people_cache.dart';
@@ -33,6 +34,7 @@ import 'package:flixie_app/core/auth/auth_prefetch_coordinator.dart';
 import 'package:flixie_app/core/auth/auth_prefetch_snapshot.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/core/auth/auth_service.dart';
+import 'package:flixie_app/core/auth/social_auth_provider.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
@@ -54,6 +56,14 @@ typedef AvatarSelector = Future<ProfileAvatar> Function(int avatarId);
 /// Screens can read [status], [firebaseUser], [dbUser], [isLoading] and [errorMessage] and call
 /// [signIn], [signUp], [signOut] and [sendPasswordResetEmail].
 class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
+  final _watchlistWidget = WatchlistWidgetSync();
+
+  @override
+  void notifyListeners() {
+    _watchlistWidget.sync(_dbUser);
+    super.notifyListeners();
+  }
+
   // Prefetched friends activity for home screen
   List<ActivityListItem>? _cachedFriendsActivity;
   List<ActivityListItem>? get cachedFriendsActivity => _cachedFriendsActivity;
@@ -322,6 +332,20 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   // Flag set during sign-up to prevent _onAuthStateChanged from running
   // getUserByExternalId before the DB user has been created.
   bool _isSigningUp = false;
+  bool _needsSocialProfile = false;
+  bool get needsSocialProfile => _needsSocialProfile;
+  bool isProviderConnected(SocialAuthProvider provider) =>
+      _firebaseUser?.providerData
+          .any((info) => info.providerId == provider.id) ??
+      false;
+  bool get hasConnectedSocialProvider =>
+      SocialAuthProvider.values.any(isProviderConnected);
+  bool get hasPassword =>
+      _firebaseUser?.providerData
+          .any((info) => info.providerId == 'password') ??
+      false;
+  bool get deletionNeedsPassword =>
+      hasPassword && !isProviderConnected(SocialAuthProvider.apple);
   Map<String, dynamic>? _pendingSignupProfile;
   String? _pendingSignupEmail;
   int? _pendingAvatarId;
@@ -345,6 +369,13 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _onAuthStateChanged(firebase_auth.User? user,
       {bool retry = false}) async {
     if (_isSigningUp || _disposed) return;
+    // Returning from a native provider dialog must not skip avatar selection.
+    if (user != null &&
+        _needsSocialProfile &&
+        _pendingSignupProfile != null &&
+        _dbUser != null) {
+      return;
+    }
     _authBootstrapTimer?.cancel();
     final sameUser = _firebaseUser?.uid == user?.uid;
     if (sameUser && _authStateChangeFuture != null) {
@@ -479,10 +510,30 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
           throw StateError('No authentication token available');
         }
         if (tokenRevision == ApiClient.tokenRevision) ApiClient.setToken(token);
-        final profile = await StartupTrace.run('profile',
-            () => _profileLoader(user.uid).timeout(_initialProfileTimeout));
+        models.User? profile;
+        try {
+          profile = await StartupTrace.run('profile',
+              () => _profileLoader(user.uid).timeout(_initialProfileTimeout));
+        } on ApiException catch (error) {
+          if (error.statusCode != 404) rethrow;
+        }
         if (!current()) return;
+        if (profile == null &&
+            user.providerData.any((info) =>
+                info.providerId == 'apple.com' ||
+                info.providerId == 'google.com')) {
+          _needsSocialProfile = true;
+          _status = AuthStatus.unauthenticated;
+          _recoveryError = null;
+          _recoveryTimer?.cancel();
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            if (!_disposed) _authStatusNotifier.notify();
+          });
+          notifyListeners();
+          return;
+        }
         if (profile == null) throw StateError('Profile unavailable');
+        _needsSocialProfile = false;
         _dbUser = profile;
         // Resolve account consent before the router sees an authenticated
         // session. An unknown value must not briefly open the agreement page.
@@ -497,6 +548,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         _recoveryError = null;
         _recoveryAttempts = 0;
         _recoveryTimer?.cancel();
+        MilestoneCache.instance.useOwner(profile.id);
         if (_prefetchAfterAuth) _prefetch(profile.id);
       } catch (error) {
         if (!current()) return;
@@ -524,6 +576,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     } else {
       logger.i('User signed out, clearing database user');
+      _needsSocialProfile = false;
+      _pendingSignupEmail = null;
+      _pendingSignupProfile = null;
+      _pendingAvatarId = null;
       // The session has already ended; only deregister this device locally.
       if (_dbUser?.externalId != null) {
         unawaited(PushNotificationService.removeToken(_dbUser!.externalId!,
@@ -674,10 +730,13 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   void _initializePushNotifications(String userId) {
     final key = _navigatorKey;
-    if (key == null) return;
+    final databaseUserId = _dbUser?.id;
+    if (key == null || databaseUserId == null) return;
     SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || _dbUser?.id != databaseUserId) return;
       unawaited(PushNotificationService.initialize(
         userId: userId,
+        databaseUserId: databaseUserId,
         navigatorKey: key,
       ));
     });
@@ -723,6 +782,11 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
               item.id == null || !_dismissedNotificationIds.contains(item.id))
           .toList(growable: false);
       _cachedNotifications = List.unmodifiable(notifications);
+      final userId = _dbUser?.id;
+      if (userId != null) {
+        PushNotificationService.observeInbox(userId, notifications,
+            announce: false);
+      }
     }
     _cachedWatchRequests = snapshot.watchRequests ?? _cachedWatchRequests;
     _syncUnreadNotificationCount(
@@ -805,17 +869,18 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   /// Fetches the current user's unread notification count and notifies listeners.
-  Future<void> refreshNotificationCount() async {
+  Future<void> refreshNotificationCount({bool announce = true}) async {
     final userId = _dbUser?.id;
     if (userId == null) return;
     final session = _sessionGeneration;
-    final count = await _prefetchCoordinator.fetchUnreadCount(userId);
+    final notifications = await _prefetchCoordinator.fetchNotifications(userId);
     if (!_disposed &&
         session == _sessionGeneration &&
         _dbUser?.id == userId &&
-        count != null) {
-      _syncUnreadNotificationCount(count);
-      notifyListeners();
+        notifications != null) {
+      PushNotificationService.observeInbox(userId, notifications,
+          announce: announce && _foreground);
+      updateCachedNotifications(notifications);
     }
   }
 
@@ -905,7 +970,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   void _startNotificationPoller() {
     if (_foreground && !_disposed && _dbUser != null) {
       _notificationPoller.start(
-          interval: const Duration(seconds: 30),
+          interval: const Duration(seconds: 5),
           onTick: refreshNotificationCount);
     }
   }
@@ -930,7 +995,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _recoveryAttempts = 0;
       _recoveryTimer?.cancel();
       _startNotificationPoller();
-      unawaited(refreshNotificationCount());
+      unawaited(refreshNotificationCount(announce: false));
       notifyListeners();
     } catch (error) {
       if (!current()) return;
@@ -1050,6 +1115,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<bool> signIn(String emailOrUsername, String password) async {
+    if (_isLoading) return false;
     _setLoading(true);
     _setError(null);
     try {
@@ -1095,6 +1161,55 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _errorMessage = 'An unexpected error occurred. Please try again.';
       _setLoading(false);
       return false;
+    }
+  }
+
+  Future<bool> signInWithSocialProvider(SocialAuthProvider provider) async {
+    if (_isLoading) return false;
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.signInWithSocialProvider(provider);
+      await _onAuthStateChanged(_authService.currentUser);
+      return isAuthenticated || needsSocialProfile;
+    } on firebase_auth.FirebaseAuthException catch (error) {
+      if (!AuthService.isCancellation(error)) {
+        _errorMessage = AuthService.messageFromAuthException(error);
+      }
+      return false;
+    } catch (_) {
+      _errorMessage = 'Unable to sign in. Please try again.';
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> connectSocialProvider(SocialAuthProvider provider) async {
+    if (_isLoading || !isAuthenticated) return false;
+    if (hasConnectedSocialProvider) {
+      _setError('A sign-in provider is already connected to this account.');
+      return false;
+    }
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.linkSocialProvider(provider);
+      _firebaseUser = _authService.currentUser;
+      return true;
+    } on firebase_auth.FirebaseAuthException catch (error) {
+      _errorCode = error.code;
+      if (!AuthService.isCancellation(error)) {
+        _errorMessage = error.code == 'email-already-in-use'
+            ? 'Firebase could not connect ${provider.label} because the email it supplied is already in use. Your current Flixie account has not been changed. Contact support to check the conflicting account.'
+            : AuthService.messageFromAuthException(error);
+      }
+      return false;
+    } catch (_) {
+      _errorMessage = 'Unable to connect your account. Please try again.';
+      return false;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -1165,8 +1280,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
 
       _status = AuthStatus.authenticated;
-      if (_prefetchAfterAuth && _dbUser?.id != null) {
-        _prefetch(_dbUser!.id);
+      if (_dbUser?.id != null) {
+        MilestoneCache.instance.useOwner(_dbUser!.id);
+        if (_prefetchAfterAuth) _prefetch(_dbUser!.id);
       }
       // Defer router notification so GoRouter navigates *after* the current
       // frame builds cleanly (same pattern as _onAuthStateChanged).
@@ -1228,7 +1344,14 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     _setError(null);
     _isSigningUp = true;
     try {
-      final normalizedEmail = email.trim();
+      final normalizedEmail = _needsSocialProfile
+          ? (_authService.currentUser?.email ?? '').trim()
+          : email.trim();
+      if (_needsSocialProfile && normalizedEmail.isEmpty) {
+        _errorMessage =
+            'Your provider did not share an email. Please use another sign-in method.';
+        return false;
+      }
       _pendingSignupProfile = {
         'firstName': firstName.trim(),
         'lastName': lastName.trim(),
@@ -1251,6 +1374,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         );
       }
       _firebaseUser = _authService.currentUser;
+      if (_needsSocialProfile) {
+        ApiClient.setToken(await _authService.refreshIdToken());
+      }
 
       // Do not let the user continue to avatar selection or onboarding until
       // both identity stores agree that the account exists. Firebase account
@@ -1302,7 +1428,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _pendingSignupEmail = null;
       _pendingSignupProfile = null;
       _pendingAvatarId = null;
+      _needsSocialProfile = false;
       _status = AuthStatus.authenticated;
+      MilestoneCache.instance.useOwner(_dbUser!.id);
       if (_prefetchAfterAuth) _prefetch(_dbUser!.id);
       SchedulerBinding.instance.addPostFrameCallback((_) {
         _authStatusNotifier.notify();
@@ -1416,7 +1544,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.reauthenticate(currentPassword);
+      await _authService.prepareAccountDeletion(currentPassword);
+      ApiClient.setToken(await _authService.refreshIdToken());
       await ApiClient.post('/users/$userId/delete-account', body: {});
       await _authService.signOut();
       return null;

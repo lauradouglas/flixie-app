@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import '../widgets/expandable_profile_bio.dart';
 import '../widgets/creator_interview.dart';
@@ -914,11 +915,13 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   Widget build(BuildContext context) {
     final user = _user;
     if (_userLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+          appBar: AppBar(leading: const FlixieBackButton()),
+          body: const Center(child: CircularProgressIndicator()));
     }
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: AppBar(leading: const FlixieBackButton()),
         body: const Center(child: Text('This profile is unavailable.')),
       );
     }
@@ -933,6 +936,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final coverUrl = user.creatorProfile?.coverUrl;
     final hasCover = coverUrl != null;
     final toolbar = AppBar(
+      leading: const FlixieBackButton(),
       backgroundColor: hasCover ? Colors.transparent : null,
       foregroundColor: hasCover ? Colors.white : null,
       surfaceTintColor: hasCover ? Colors.transparent : null,
@@ -1795,10 +1799,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       appBar: AppBar(
         title:
             Text(widget.previewMode ? 'Public profile preview' : profileName),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: const FlixieBackButton(),
         actions: [
           if (!widget.previewMode && _user != null)
             PopupMenuButton<String>(

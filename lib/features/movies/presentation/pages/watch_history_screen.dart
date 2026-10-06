@@ -502,6 +502,7 @@ class _WatchedMovieCard extends StatelessWidget {
                       top: 6,
                       right: 6,
                       child: PopupMenuButton<String>(
+                        tooltip: 'Actions for ${movie.title}',
                         color: context.colors.surfaceElevated,
                         onSelected: (value) {
                           if (value == 'log') onLogAgain();
@@ -524,14 +525,20 @@ class _WatchedMovieCard extends StatelessWidget {
                               child: Text('Write a review'),
                             ),
                         ],
-                        child: Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.68),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.more_horiz,
-                              color: context.colors.white, size: 18),
+                        child: SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: Center(
+                              child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.85),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.more_horiz,
+                                color: Colors.white, size: 24),
+                          )),
                         ),
                       ),
                     ),

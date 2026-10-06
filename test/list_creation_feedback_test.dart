@@ -38,7 +38,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Who can see it?'), findsOneWidget);
       expect(find.text('Who’s making it?'), findsOneWidget);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Public'));
+      await tester.tap(find.text('Public'));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.widgetWithText(TextField, 'List name'), 'Weekend picks');

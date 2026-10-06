@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
@@ -189,7 +190,7 @@ class _CommunityProfileScreenState extends State<CommunityProfileScreen> {
                     const SizedBox(height: 16),
                     Wrap(spacing: 8, runSpacing: 4, children: [
                       for (final genre in profile.genres)
-                        Chip(label: Text(genre))
+                        FlixiePill.label(label: Text(genre))
                     ]),
                   ],
                   if (profile.favourites.isNotEmpty) ...[

@@ -38,6 +38,7 @@ class FlixieTitleAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.bottom,
     this.backgroundColor = Colors.transparent,
     this.centerTitle = false,
+    this.leading,
   });
 
   final Widget title;
@@ -45,6 +46,7 @@ class FlixieTitleAppBar extends StatelessWidget implements PreferredSizeWidget {
   final PreferredSizeWidget? bottom;
   final Color backgroundColor;
   final bool centerTitle;
+  final Widget? leading;
 
   @override
   Size get preferredSize =>
@@ -61,6 +63,7 @@ class FlixieTitleAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       centerTitle: centerTitle,
       title: title,
+      leading: leading,
       actions: actions,
       bottom: bottom,
     );

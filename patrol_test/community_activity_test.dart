@@ -97,6 +97,7 @@ class _CommunityFixture extends CommunityService
           {String? cursor,
           String filter = 'all',
           String sort = 'latest',
+          int? limit,
           String? owner,
           bool saved = false}) async =>
       CommunityPage([

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -623,7 +624,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         backgroundColor: context.colors.background,
         appBar: AppBar(
           backgroundColor: context.colors.background,
-          leading: BackButton(color: context.colors.light),
+          leading: const FlixieBackButton(),
         ),
         body: Center(
           child: Padding(
@@ -675,9 +676,10 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   top: MediaQuery.paddingOf(context).top + 8,
                   left: 12,
                   child: _heroNavigationButton(
-                    icon: Icons.arrow_back_rounded,
-                    label: 'Back',
-                    onPressed: () => Navigator.of(context).pop(),
+                    icon: flixieBackIcon(context,
+                        backIcon: Icons.arrow_back_rounded),
+                    label: flixieBackLabel(context),
+                    onPressed: () => flixieBackOrHome(context),
                   ),
                 ),
                 Positioned(
@@ -688,10 +690,6 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                           width: 44,
                           height: 44,
                           alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: .5),
-                            shape: BoxShape.circle,
-                          ),
                           child: SizedBox(
                             width: 20,
                             height: 20,
@@ -702,6 +700,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                           ),
                         )
                       : _heroNavigationButton(
+                          transparentBackground: true,
                           icon: _isFavorite
                               ? Icons.favorite_rounded
                               : Icons.favorite_border_rounded,
@@ -819,6 +818,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     required String label,
     required VoidCallback onPressed,
     Color color = FlixieColors.light,
+    bool transparentBackground = false,
   }) {
     return Semantics(
       button: true,
@@ -828,9 +828,13 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         onPressed: onPressed,
         style: IconButton.styleFrom(
           fixedSize: const Size.square(44),
-          backgroundColor: Colors.black.withValues(alpha: .5),
+          backgroundColor: transparentBackground
+              ? Colors.transparent
+              : Colors.black.withValues(alpha: .5),
           foregroundColor: color,
-          side: BorderSide(color: Colors.white.withValues(alpha: .1)),
+          side: transparentBackground
+              ? BorderSide.none
+              : BorderSide(color: Colors.white.withValues(alpha: .1)),
         ),
         icon: Icon(icon),
       ),

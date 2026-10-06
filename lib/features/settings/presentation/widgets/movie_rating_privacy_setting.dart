@@ -33,6 +33,8 @@ class MovieRatingPrivacySetting extends StatelessWidget {
         SettingsTile(
           icon: Icons.visibility_off_outlined,
           label: 'Rate movies first',
+          description:
+              'Hide other people’s movie scores until you’ve rated the movie. TV ratings stay visible.',
           onTap: () {
             if (canChange) change(!privacy.enabled);
           },
