@@ -27,7 +27,7 @@ class MovieCollectionCard extends StatelessWidget {
                   color: context.colors.primaryText),
               title: Text(collection['name'] as String? ?? 'Movie collection',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: const Text('View all films and your progress'),
+              subtitle: const Text('View all films · Track progress'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () async {
                 await Navigator.of(context).push(MaterialPageRoute<void>(

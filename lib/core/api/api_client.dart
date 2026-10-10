@@ -254,6 +254,7 @@ class ApiClient {
     required Future<T> Function() request,
   }) async {
     final session = _sessionGeneration;
+    final hadAuthToken = _token?.isNotEmpty ?? false;
     void checkSession() {
       if (authenticated && session != _sessionGeneration) {
         throw StateError('Session changed while request was pending');
@@ -267,6 +268,8 @@ class ApiClient {
     } on ApiException catch (error) {
       checkSession();
       if (!authenticated ||
+          !hadAuthToken ||
+          (_token?.isEmpty ?? true) ||
           error.statusCode != 401 ||
           _authTokenRefresher == null) {
         rethrow;

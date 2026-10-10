@@ -1,3 +1,8 @@
+import 'package:flixie_app/features/collections/collection_screen.dart';
+import 'package:flixie_app/features/authentication/presentation/cinema_auth_page.dart';
+import 'package:flixie_app/features/guest/data/first_open_store.dart';
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
+import 'package:flixie_app/features/guest/presentation/guest_home_screen.dart';
 import 'package:flixie_app/core/navigation/navigation_retap_region.dart';
 import 'package:flixie_app/core/auth/setup_destination.dart';
 import 'package:flixie_app/features/social/presentation/widgets/conversations_hub.dart';
@@ -169,6 +174,10 @@ GoRouter buildRouter(
 ) {
   final recordedInviteCodes = <String>{};
   String? pendingSetupDestination;
+  String? initialGuestPath;
+  var previousAuthStatus = authProvider.status;
+  var initialEntryResolved = false;
+  Future<bool>? firstWelcome;
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     observers: [_FlixieAnalyticsObserver(analytics)],
@@ -176,8 +185,19 @@ GoRouter buildRouter(
     initialLocation: '/',
     redirect: (context, state) async {
       final status = authProvider.status;
+      final signedOut = previousAuthStatus == AuthStatus.authenticated &&
+          status == AuthStatus.unauthenticated;
+      previousAuthStatus = status;
+      if (signedOut) {
+        initialEntryResolved = true;
+        GuestAccess.clear();
+        pendingSetupDestination = null;
+        initialGuestPath = null;
+        return '/';
+      }
       final hasCompletedSetup = authProvider.dbUser?.completedSetup ?? false;
-      if (state.uri.path == '/search' && state.uri.queryParameters['focus'] == '1') {
+      if (state.uri.path == '/search' &&
+          state.uri.queryParameters['focus'] == '1') {
         pendingSetupDestination = '/search?focus=1';
       } else if (state.uri.path == '/watchlist') {
         pendingSetupDestination = '/watchlist';
@@ -209,6 +229,11 @@ GoRouter buildRouter(
 
       // Show splash only while Firebase resolves initial auth state
       if (status == AuthStatus.unknown) {
+        if (!isSplash &&
+            GuestAccess.isPublicPath(state.uri.path) &&
+            state.uri.path != '/') {
+          initialGuestPath = state.uri.toString();
+        }
         return isSplash ? null : '/splash';
       }
 
@@ -223,19 +248,40 @@ GoRouter buildRouter(
         ).toString();
       }
 
-      if (status == AuthStatus.unauthenticated && !isAuthRoute) {
+      if (status == AuthStatus.authenticated && !initialEntryResolved) {
+        initialEntryResolved = true;
         try {
-          final pendingReferral = await referralStore.read();
-          if (pendingReferral != null) {
-            return Uri(
-              path: '/auth/signup',
-              queryParameters: {'code': pendingReferral},
-            ).toString();
+          await (firstWelcome ??= FirstOpenStore().consumeWelcome());
+        } catch (_) {
+          // Local persistence must not interrupt a restored member session.
+        }
+      }
+      if (status == AuthStatus.unauthenticated && !initialEntryResolved) {
+        initialEntryResolved = true;
+        // Direct links retain their destination; the welcome never interrupts them.
+        try {
+          final showWelcome =
+              await (firstWelcome ??= FirstOpenStore().consumeWelcome());
+          if (showWelcome &&
+              (isSplash || state.uri.path == '/') &&
+              initialGuestPath == null) {
+            return '/welcome';
           }
         } catch (_) {
-          // Fall back to the normal login route if local storage is unavailable.
+          // A preference failure must not block catalogue browsing.
         }
-        return '/auth/login';
+      }
+      if (status == AuthStatus.unauthenticated && !isAuthRoute) {
+        if (isSplash) {
+          final target = initialGuestPath ?? '/';
+          initialGuestPath = null;
+          return target;
+        }
+        if (GuestAccess.isPublicPath(state.uri.path)) return null;
+        GuestAccess.destination = state.uri.toString();
+        GuestAccess.action = null;
+        GuestAccess.awaitingAccount = true;
+        return '/auth/signup';
       }
 
       if (status == AuthStatus.authenticated) {
@@ -268,9 +314,20 @@ GoRouter buildRouter(
               .toString();
         }
 
+        if (GuestAccess.awaitingAccount && GuestAccess.destination != null) {
+          final target = GuestAccess.destination!;
+          GuestAccess.awaitingAccount = false;
+          if (GuestAccess.action == null) GuestAccess.clear();
+          return target;
+        }
+
         // Completed users should land in the app shell, not auth/splash/onboarding.
-        if (isAuthRoute || isSplash || isOnboarding) {
-          final destination = pendingSetupDestination ?? '/';
+        if (isAuthRoute ||
+            isSplash ||
+            isOnboarding ||
+            state.uri.path == '/welcome') {
+          final destination =
+              GuestAccess.destination ?? pendingSetupDestination ?? '/';
           pendingSetupDestination = null;
           return destination;
         }
@@ -280,6 +337,7 @@ GoRouter buildRouter(
       return null;
     },
     routes: [
+      GoRoute(path: '/welcome', builder: (_, __) => const GuestWelcomeScreen()),
       GoRoute(
         path: '/splash',
         pageBuilder: (context, state) => _calmPage(state, const SplashScreen()),
@@ -304,8 +362,11 @@ GoRouter buildRouter(
           ], routes: [
             GoRoute(
               path: '/',
-              pageBuilder: (context, state) =>
-                  _calmPage(state, const HomeScreen()),
+              pageBuilder: (context, state) => _calmPage(
+                  state,
+                  authProvider.dbUser == null
+                      ? const GuestHomeScreen()
+                      : const HomeScreen()),
             ),
           ]),
           StatefulShellBranch(observers: [
@@ -362,8 +423,11 @@ GoRouter buildRouter(
           ], routes: [
             GoRoute(
               path: '/profile',
-              pageBuilder: (context, state) =>
-                  _calmPage(state, const ProfileScreen()),
+              pageBuilder: (context, state) => _calmPage(
+                  state,
+                  authProvider.dbUser == null
+                      ? const GuestWelcomeScreen(you: true)
+                      : const ProfileScreen()),
             ),
           ]),
         ],
@@ -474,6 +538,10 @@ GoRouter buildRouter(
           ),
         ),
       ),
+      GoRoute(
+          path: '/collections/:id',
+          builder: (_, state) => CollectionScreen(
+              collectionId: int.parse(state.pathParameters['id']!))),
       GoRoute(
         path: '/movies/:id',
         pageBuilder: (context, state) => _pushPage(
@@ -718,13 +786,17 @@ GoRouter buildRouter(
       // Auth routes (unauthenticated)
       GoRoute(
         path: '/auth/login',
-        pageBuilder: (context, state) => _calmPage(state, const LoginScreen()),
+        pageBuilder: (context, state) => CinemaAuthPage(
+            key: state.pageKey,
+            name: _screenNameFor(state),
+            child: const LoginScreen()),
       ),
       GoRoute(
         path: '/auth/signup',
-        pageBuilder: (context, state) => _calmPage(
-          state,
-          SignupScreen(
+        pageBuilder: (context, state) => CinemaAuthPage(
+          key: state.pageKey,
+          name: _screenNameFor(state),
+          child: SignupScreen(
             referralCode: state.uri.queryParameters['code'] ??
                 state.uri.queryParameters['referralCode'],
             referralStore: referralStore,
@@ -756,6 +828,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget build(BuildContext context) {
     final navigationShell = widget.navigationShell;
     final selectedIndex = navigationShell.currentIndex;
+    final guest = context.watch<AuthProvider>().dbUser == null;
+    final branches = guest ? [0, 1, 4] : [0, 1, 2, 3, 4];
 
     return Container(
       decoration: BoxDecoration(
@@ -779,8 +853,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             child:
                 NavigationRetapRegion(key: _retapKey, child: navigationShell)),
         bottomNavigationBar: _FlixieNavBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
+          guest: guest,
+          selectedIndex: branches.indexOf(selectedIndex),
+          onDestinationSelected: (visibleIndex) {
+            final index = branches[visibleIndex];
             if (index == selectedIndex) {
               unawaited(_retapKey.currentState?.refresh());
               return;
@@ -798,9 +874,11 @@ class _FlixieNavBar extends StatelessWidget {
   const _FlixieNavBar({
     required this.selectedIndex,
     required this.onDestinationSelected,
+    this.guest = false,
   });
 
   final int selectedIndex;
+  final bool guest;
   final ValueChanged<int> onDestinationSelected;
 
   static const _destinations = [
@@ -852,8 +930,13 @@ class _FlixieNavBar extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_destinations.length, (i) {
-              final dest = _destinations[i];
+            children: List.generate(guest ? 3 : _destinations.length, (i) {
+              final dest = guest && i == 2
+                  ? const _NavDest(
+                      icon: Icons.person_outline,
+                      activeIcon: Icons.person,
+                      label: 'You')
+                  : _destinations[i];
               final isSelected = i == selectedIndex;
               return _NavItem(
                 dest: dest,
@@ -955,6 +1038,8 @@ class _NavItem extends StatelessWidget {
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 200),
                   style: TextStyle(
+                    fontFamily:
+                        Theme.of(context).textTheme.labelSmall?.fontFamily,
                     color: isSelected
                         ? FlixieColors.primary
                         : context.colors.medium,

@@ -37,7 +37,7 @@ class MovieCollection {
   List<CollectionFilm> get remaining => films.where((f) => !f.watched).toList();
   List<CollectionFilm> get toAdd =>
       remaining.where((f) => !f.onWatchlist).toList();
-  static Future<MovieCollection> load(int id) async =>
-      MovieCollection(Map<String, dynamic>.from(
-          await ApiClient.get('/movies/collections/$id')));
+  static Future<MovieCollection> load(int id) async => MovieCollection(
+      Map<String, dynamic>.from(await ApiClient.get('/movies/collections/$id',
+          authenticated: ApiClient.getToken()?.isNotEmpty ?? false)));
 }

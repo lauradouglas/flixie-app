@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
@@ -22,9 +23,13 @@ class _LogoutSheetState extends State<LogoutSheet> {
       _loggingOut = true;
       _error = null;
     });
+    final router = GoRouter.of(context);
+    final route = ModalRoute.of(context);
+    final navigator = Navigator.of(context);
     try {
       await widget.onSignOut();
-      if (mounted) Navigator.of(context).pop();
+      if (mounted && route?.isCurrent == true) navigator.pop();
+      router.go('/');
     } catch (_) {
       if (!mounted) return;
       setState(() {

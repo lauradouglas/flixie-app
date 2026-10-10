@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -22,11 +23,20 @@ class _CollectionScreenState extends State<CollectionScreen> {
   @override
   void initState() {
     super.initState();
-    _future = MovieCollection.load(widget.collectionId);
+    _future = _loadCollection();
+  }
+
+  Future<MovieCollection> _loadCollection() {
+    final future = MovieCollection.load(widget.collectionId);
+    // A retry can fail before the next frame subscribes FutureBuilder.
+    // Observe that error immediately while keeping it on the original future
+    // for the page's retry state.
+    future.then<void>((_) {}, onError: (Object error, StackTrace stack) {});
+    return future;
   }
 
   Future<void> _refresh() async {
-    final next = MovieCollection.load(widget.collectionId);
+    final next = _loadCollection();
     setState(() => _future = next);
     await next;
   }
@@ -41,6 +51,12 @@ class _CollectionScreenState extends State<CollectionScreen> {
   }
 
   Future<void> _watchRest(MovieCollection collection) async {
+    if (!await GuestAccess.require(context,
+        title: 'Track your collection progress',
+        path: '/collections/${widget.collectionId}')) {
+      return;
+    }
+    if (!mounted) return;
     await showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
@@ -51,6 +67,12 @@ class _CollectionScreenState extends State<CollectionScreen> {
   }
 
   Future<void> _plan(MovieCollection collection) async {
+    if (!await GuestAccess.require(context,
+        title: 'Plan a collection with friends',
+        path: '/collections/${widget.collectionId}')) {
+      return;
+    }
+    if (!mounted) return;
     final film = await showModalBottomSheet<CollectionFilm>(
         context: context,
         useRootNavigator: true,
@@ -127,6 +149,7 @@ class _CollectionScreenState extends State<CollectionScreen> {
               ]));
             }
             final data = snapshot.data!;
+            final guest = context.watch<AuthProvider?>()?.dbUser == null;
             return RefreshIndicator(
                 onRefresh: _refresh,
                 child: CustomScrollView(slivers: [
@@ -182,38 +205,49 @@ class _CollectionScreenState extends State<CollectionScreen> {
                   SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                       sliver: SliverList.list(children: [
-                        Text('Your progress',
-                            style: Theme.of(context).textTheme.titleLarge),
-                        const SizedBox(height: 8),
-                        Text(
-                            '${data.watchedCount} of ${data.released.length} released films watched'),
-                        const SizedBox(height: 10),
-                        LinearProgressIndicator(
-                            value: data.released.isEmpty
-                                ? 0
-                                : data.watchedCount / data.released.length,
-                            minHeight: 8,
-                            borderRadius: BorderRadius.circular(8)),
-                        const SizedBox(height: 20),
-                        FilledButton.icon(
-                            onPressed: data.toAdd.isEmpty
-                                ? null
-                                : () => _watchRest(data),
-                            icon: Icon(Icons.bookmark,
-                                color: data.toAdd.isEmpty
-                                    ? null
-                                    : const Color(0xffffc52e)),
-                            label: Text(data.remaining.isEmpty
-                                ? 'Collection watched'
-                                : data.toAdd.isEmpty
-                                    ? 'Remaining films on your watchlist'
-                                    : 'Watch this collection')),
-                        const SizedBox(height: 8),
-                        OutlinedButton.icon(
-                            onPressed:
-                                data.films.isEmpty ? null : () => _plan(data),
-                            icon: const Icon(Icons.people_outline),
-                            label: const Text('Plan with friends')),
+                        if (!guest) ...[
+                          Text('Your progress',
+                              style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 8),
+                          Text(
+                              '${data.watchedCount} of ${data.released.length} released films watched'),
+                          const SizedBox(height: 10),
+                          LinearProgressIndicator(
+                              value: data.released.isEmpty
+                                  ? 0
+                                  : data.watchedCount / data.released.length,
+                              minHeight: 8,
+                              borderRadius: BorderRadius.circular(8)),
+                          const SizedBox(height: 20),
+                          FilledButton.icon(
+                              onPressed: data.toAdd.isEmpty
+                                  ? null
+                                  : () => _watchRest(data),
+                              icon: Icon(Icons.bookmark,
+                                  color: data.toAdd.isEmpty
+                                      ? null
+                                      : const Color(0xffffc52e)),
+                              label: Text(data.remaining.isEmpty
+                                  ? 'Collection watched'
+                                  : data.toAdd.isEmpty
+                                      ? 'Remaining films on your watchlist'
+                                      : 'Watch this collection')),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                              onPressed:
+                                  data.films.isEmpty ? null : () => _plan(data),
+                              icon: const Icon(Icons.people_outline),
+                              label: const Text('Plan with friends')),
+                        ] else ...[
+                          FilledButton.icon(
+                              onPressed: () => GuestAccess.require(context,
+                                  title: 'Track your collection progress',
+                                  message:
+                                      'Create an account to keep track of the films you’ve watched in this collection.',
+                                  path: '/collections/${widget.collectionId}'),
+                              icon: const Icon(Icons.check_circle_outline),
+                              label: const Text('Track progress')),
+                        ],
                         if (data.overview.isNotEmpty) ...[
                           const SizedBox(height: 24),
                           Text(data.overview,
@@ -227,14 +261,22 @@ class _CollectionScreenState extends State<CollectionScreen> {
                         if (data.films.isEmpty)
                           const Text('No films listed in this collection yet.'),
                         for (final film in data.films)
-                          _FilmRow(film: film, onTap: () => _openFilm(film)),
+                          _FilmRow(
+                              film: film,
+                              showProgress: !guest,
+                              onTap: () => _openFilm(film)),
                       ])),
                 ]));
           }));
 }
 
 class _FilmRow extends StatelessWidget {
-  const _FilmRow({required this.film, this.onTap, this.trailing});
+  const _FilmRow(
+      {required this.film,
+      this.onTap,
+      this.trailing,
+      this.showProgress = true});
+  final bool showProgress;
   final CollectionFilm film;
   final VoidCallback? onTap;
   final Widget? trailing;
@@ -276,21 +318,22 @@ class _FilmRow extends StatelessWidget {
                                   'Release date TBA',
                               style: TextStyle(color: context.colors.light)),
                           const SizedBox(height: 6),
-                          Wrap(spacing: 10, runSpacing: 4, children: [
-                            if (film.watched)
-                              _badge(Icons.check, 'Watched',
-                                  context.colors.success)
-                            else if (film.onWatchlist)
-                              _badge(Icons.bookmark, 'Watchlist',
-                                  context.colors.warning)
-                            else
-                              Text(film.released ? 'Not watched' : 'Upcoming',
-                                  style:
-                                      TextStyle(color: context.colors.light)),
-                            if (film.rating != null)
-                              _badge(Icons.star, '${film.rating}/10',
-                                  context.colors.warning),
-                          ]),
+                          if (showProgress)
+                            Wrap(spacing: 10, runSpacing: 4, children: [
+                              if (film.watched)
+                                _badge(Icons.check, 'Watched',
+                                    context.colors.success)
+                              else if (film.onWatchlist)
+                                _badge(Icons.bookmark, 'Watchlist',
+                                    context.colors.warning)
+                              else
+                                Text(film.released ? 'Not watched' : 'Upcoming',
+                                    style:
+                                        TextStyle(color: context.colors.light)),
+                              if (film.rating != null)
+                                _badge(Icons.star, '${film.rating}/10',
+                                    context.colors.warning),
+                            ]),
                         ])),
                     if (trailing != null)
                       trailing!

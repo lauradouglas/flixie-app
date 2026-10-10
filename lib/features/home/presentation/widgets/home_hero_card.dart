@@ -26,7 +26,9 @@ class HomeHeroCard extends StatelessWidget {
       required this.onDetails,
       required this.onWatchlist,
       required this.onTrailer,
-      required this.onFriendsRetry});
+      required this.onFriendsRetry,
+      this.showFriendActivity = true});
+  final bool showFriendActivity;
   final MovieShort movie;
   final double posterHeight;
   final bool inWatchlist,
@@ -160,7 +162,7 @@ class HomeHeroCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         movie.overview!,
-                        maxLines: 2,
+                        maxLines: 3,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: context.colors.light,
@@ -170,7 +172,9 @@ class HomeHeroCard extends StatelessWidget {
                       ),
                     ],
                     const Spacer(),
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      runSpacing: 6,
                       children: [
                         if (!ratingsHidden && (movie.voteAverage ?? 0) > 0) ...[
                           Icon(
@@ -248,112 +252,114 @@ class HomeHeroCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 7),
-                    if (watchlistedBy.isNotEmpty || favouritedBy.isNotEmpty)
-                      Row(
-                        children: [
-                          if (watchlistedBy.isNotEmpty)
-                            Expanded(
-                              flex: 2,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.bookmark_rounded,
-                                    color: context.colors.warning,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  _FriendInteractionAvatarStack(
-                                    interactions: watchlistedBy,
-                                  ),
-                                ],
+                    if (showFriendActivity) ...[
+                      const SizedBox(height: 7),
+                      if (watchlistedBy.isNotEmpty || favouritedBy.isNotEmpty)
+                        Row(
+                          children: [
+                            if (watchlistedBy.isNotEmpty)
+                              Expanded(
+                                flex: 2,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.bookmark_rounded,
+                                      color: context.colors.warning,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _FriendInteractionAvatarStack(
+                                      interactions: watchlistedBy,
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              const Spacer(flex: 2),
+                            if (watchlistedBy.isNotEmpty &&
+                                favouritedBy.isNotEmpty) ...[
+                              Container(
+                                width: 1,
+                                height: 30,
+                                color: Colors.white.withValues(alpha: 0.16),
                               ),
-                            )
-                          else
-                            const Spacer(flex: 2),
-                          if (watchlistedBy.isNotEmpty &&
-                              favouritedBy.isNotEmpty) ...[
-                            Container(
-                              width: 1,
-                              height: 30,
-                              color: Colors.white.withValues(alpha: 0.16),
-                            ),
-                            const SizedBox(width: 14),
-                          ],
-                          if (favouritedBy.isNotEmpty) ...[
-                            Expanded(
-                              flex: 1,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  const Icon(
-                                    Icons.favorite_rounded,
-                                    color: Colors.redAccent,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerRight,
-                                      child: _FriendInteractionAvatarStack(
-                                        interactions: favouritedBy,
+                              const SizedBox(width: 14),
+                            ],
+                            if (favouritedBy.isNotEmpty) ...[
+                              Expanded(
+                                flex: 1,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    const Icon(
+                                      Icons.favorite_rounded,
+                                      color: Colors.redAccent,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerRight,
+                                        child: _FriendInteractionAvatarStack(
+                                          interactions: favouritedBy,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      )
-                    else if (friendActivityFailed)
-                      TextButton.icon(
-                        onPressed: onFriendsRetry,
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('Retry friends’ activity'),
-                      )
-                    else if (friendActivityLoading)
-                      const SizedBox(
-                        height: 30,
-                        child: Row(
-                          children: [
-                            SkeletonBox(
-                              width: 26,
-                              height: 26,
-                              borderRadius: 13,
-                            ),
-                            SizedBox(width: 8),
-                            SkeletonBox(width: 132, height: 10),
-                          ],
-                        ),
-                      )
-                    else
-                      SizedBox(
-                        height: 30,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.people_outline_rounded,
-                              color: context.colors.medium,
-                              size: 19,
-                            ),
-                            const SizedBox(width: 7),
-                            Expanded(
-                              child: Text(
-                                'No friends have saved or favourited this yet',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.colors.medium,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                                  ],
                                 ),
                               ),
-                            ),
+                            ],
                           ],
+                        )
+                      else if (friendActivityFailed)
+                        TextButton.icon(
+                          onPressed: onFriendsRetry,
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Retry friends’ activity'),
+                        )
+                      else if (friendActivityLoading)
+                        const SizedBox(
+                          height: 30,
+                          child: Row(
+                            children: [
+                              SkeletonBox(
+                                width: 26,
+                                height: 26,
+                                borderRadius: 13,
+                              ),
+                              SizedBox(width: 8),
+                              SkeletonBox(width: 132, height: 10),
+                            ],
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 30,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.people_outline_rounded,
+                                color: context.colors.medium,
+                                size: 19,
+                              ),
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Text(
+                                  'No friends have saved or favourited this yet',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: context.colors.medium,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                    ],
                   ],
                 ),
               ),

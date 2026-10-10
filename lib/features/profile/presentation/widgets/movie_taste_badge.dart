@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
@@ -226,6 +228,7 @@ class MovieTasteBadge extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 4,
                       children: genreNames
+                          .where((name) => isVisibleGenre(name))
                           .map((name) => _GenreChip(
                                 name: name,
                                 color: _genreColor(context, name),
@@ -285,6 +288,7 @@ class _GenreChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FlixiePill.label(colorKey: name, label: Text(name));
+    return FlixiePill.label(
+        colorKey: name, avatar: GenreIcon(name), label: Text(name));
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -69,7 +70,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
     return AuthScaffold(
-      topLabel: 'Welcome Back',
+      cinema: true,
+      topLabel: 'Welcome back',
+      onBack: () {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
+      },
       title: const FlixieWordmark(
         fontSize: 46,
         textAlign: TextAlign.center,
@@ -158,6 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+              TextButton(onPressed: () { GuestAccess.clear(); context.go('/'); }, child: const Text('Explore without an account')),
               const SizedBox(height: 20),
               PrimaryButton(
                 label: 'Sign In',

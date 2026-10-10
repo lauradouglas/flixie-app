@@ -212,7 +212,7 @@ class MovieDetailController extends ChangeNotifier {
         userId == auth.dbUser?.id &&
         movie != null) {
       optional.addAll([
-        _optional('reviews', () => service.getMovieReviews(id, userId: userId),
+        if (userId != null) _optional('reviews', () => service.getMovieReviews(id, userId: userId),
             (value) => reviews = value),
         _loadMovieImages(id),
       ]);

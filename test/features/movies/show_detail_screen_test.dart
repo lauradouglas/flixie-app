@@ -138,6 +138,21 @@ Future<void> openTvEpisodes(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('guest show offers Watchlist without member action clutter', (tester) async {
+    final fixture = TvDetailFixture()..install();
+    fixture.auth.account = null;
+    addTearDown(fixture.dispose);
+    await tester.pumpWidget(tvDetailApp(fixture));
+    await tester.pumpAndSettle();
+    expect(find.text('Watchlist'), findsOneWidget);
+    for (final label in ['Rate', 'Favourite', 'List']) {
+      expect(find.text(label), findsNothing);
+    }
+    expect(fixture.writes, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
       'episode spoilers, marking and Undo preserve the actual screen journey',
       (tester) async {

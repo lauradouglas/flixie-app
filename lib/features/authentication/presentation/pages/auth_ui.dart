@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/genre_icon.dart';
+import '../widgets/cinema_auth_scaffold.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'dart:ui';
 
@@ -86,8 +88,10 @@ class AuthScaffold extends StatelessWidget {
     required this.cardChild,
     this.cardPadding = const EdgeInsets.all(24),
     this.onBack,
+    this.cinema = false,
   });
 
+  final bool cinema;
   final String topLabel;
   final Widget title;
   final String subtitle;
@@ -97,6 +101,13 @@ class AuthScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (cinema) {
+      return CinemaAuthScaffold(
+          heading: topLabel,
+          subtitle: subtitle,
+          form: cardChild,
+          onBack: onBack);
+    }
     final size = MediaQuery.sizeOf(context);
     final textTheme = Theme.of(context).textTheme;
     final viewInsets = MediaQuery.viewInsetsOf(context);
@@ -697,7 +708,11 @@ class GenreChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AuthChip(label: label, selected: selected, onTap: onTap);
+    return FlixiePill.choice(
+        label: Text(label),
+        avatar: GenreIcon(label),
+        selected: selected,
+        onSelected: (_) => onTap());
   }
 }
 

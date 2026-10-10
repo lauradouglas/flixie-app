@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -149,6 +150,7 @@ class _FavoriteGenresSheetState extends State<FavoriteGenresSheet> {
                       final selected = _selectedIds.contains(genre.id);
                       return FlixiePill.filter(
                           label: Text(genre.name),
+                          avatar: GenreIcon(genre.name),
                           selected: selected,
                           onSelected: (_) => setState(() {
                                 if (selected) {

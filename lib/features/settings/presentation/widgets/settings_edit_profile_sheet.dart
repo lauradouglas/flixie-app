@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +13,8 @@ import '../../data/reference_data_service.dart';
 import 'settings_country_picker_sheet.dart';
 
 Future<void> showSettingsEditDetailsSheet(BuildContext context) async {
+  if (!await GuestAccess.require(context, title: 'Remember your streaming preferences', intent: 'providers')) return;
+    if (!context.mounted) return ;
   final user = context.read<AuthProvider>().dbUser;
   if (user == null) return;
   await showModalBottomSheet<void>(

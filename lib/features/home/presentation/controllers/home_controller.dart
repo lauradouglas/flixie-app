@@ -96,7 +96,6 @@ class HomeController {
       unawaited(load(showFullLoading: false));
     } else if (_restored) {
       unawaited(watchPlans.load(_auth.dbUser, force: false));
-      unawaited(showHeroPage(0));
     } else {
       unawaited(load());
     }
@@ -191,9 +190,6 @@ class HomeController {
       trending.update(
           data: List.unmodifiable(movies), loading: false, clearError: true);
       onTrendingReady?.call(movies, user);
-      if (user != null) {
-        unawaited(showHeroPage(_heroIndex));
-      }
     } catch (error) {
       logger.w('[Home] trending failed: $error');
       if (!_current(generation, id)) {

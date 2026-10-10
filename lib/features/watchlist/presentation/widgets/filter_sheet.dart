@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
@@ -89,9 +91,11 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
     required String label,
     required bool selected,
     required VoidCallback onSelected,
+    bool genre = false,
   }) {
     return FlixiePill.choice(
         label: Text(label),
+        avatar: genre ? GenreIcon(label) : null,
         selected: selected,
         onSelected: (_) => onSelected(),
         showCheckmark: true);
@@ -204,10 +208,11 @@ class _WatchlistFilterSheetState extends State<WatchlistFilterSheet> {
                         selected: _genre == null,
                         onSelected: () => setState(() => _genre = null),
                       ),
-                      ...widget.genres.map((g) {
+                      ...widget.genres.where((g) => isVisibleGenre(g)).map((g) {
                         final selected = _genre == g;
                         return _optionChip(
                           label: g,
+                          genre: true,
                           selected: selected,
                           onSelected: () => setState(() => _genre = g),
                         );

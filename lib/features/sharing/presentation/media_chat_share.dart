@@ -1,3 +1,4 @@
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -28,6 +29,12 @@ class MediaChatShare {
           child: SingleChildScrollView(child: builder(context))));
 
   Future<void> show(ChatShareMedia movie) async {
+    if (context.read<AuthProvider>().dbUser == null) {
+      final box = context.findRenderObject() as RenderBox?;
+      await Share.share('${movie.title} on Flixie\n${mediaDeepLink(movie)}',
+          sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size);
+      return;
+    }
     final session = MediaShareSession(context.read<AuthProvider>());
     try {
       if (!session.isCurrent) return;

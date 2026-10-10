@@ -188,8 +188,7 @@ void main() {
     expect(data.calls, isNot(contains('watchlist:second')));
   });
 
-  test(
-      'initial carousel loads two cards, swipes fetch ahead and revisits reuse empty results',
+  test('explicit friend activity requests fetch ahead and reuse empty results',
       () async {
     data.trendingRequest = (_) async =>
         List.generate(12, (i) => MovieShort(id: i + 1, name: 'Movie ${i + 1}'));
@@ -197,6 +196,9 @@ void main() {
     await flush();
     List<String> reads() =>
         data.calls.where((c) => c.startsWith('friends:')).toList();
+    expect(reads(), isEmpty,
+        reason: 'Home load does not request friend activity');
+    await home.showHeroPage(0);
     expect(reads(), ['friends:first:1', 'friends:first:2']);
     await home.showHeroPage(1);
     expect(reads(), ['friends:first:1', 'friends:first:2', 'friends:first:3']);
@@ -214,6 +216,7 @@ void main() {
     final pending = Completer<List<FriendMediaInteraction>>();
     data.friendRequest = (_, __) => pending.future;
     await home.load();
+    final initial = home.showHeroPage(0);
     final swipe = home.showHeroPage(1);
     expect(data.calls.where((c) => c.startsWith('friends:')), hasLength(2));
     data.friendRequest = (_, __) async => [];
@@ -223,9 +226,13 @@ void main() {
       const FriendMediaInteraction(
           userId: 'old', username: 'Old', onWatchlist: true, favourited: false)
     ]);
+    await initial;
     await swipe;
-    expect(home.friendInteractions[odyssey.id], isEmpty);
-    expect(data.calls.where((c) => c.startsWith('friends:')), hasLength(3));
+    expect(home.friendInteractions[odyssey.id], isNull,
+        reason:
+            'stale results are discarded without starting new Home friend reads');
+    expect(data.calls.where((c) => c.startsWith('friends:')), hasLength(2));
+    await home.showHeroPage(1);
     await home.showHeroPage(0);
     expect(data.calls.where((c) => c.startsWith('friends:')), hasLength(4));
   });
@@ -237,6 +244,7 @@ void main() {
         id == alien.id ? Future.error(StateError('offline')) : Future.value([]);
     await home.load();
     await flush();
+    await home.showHeroPage(0);
     expect(home.friendActivity(alien.id).value.error, isNotNull);
     data.friendRequest = (_, __) async => [];
     await home.retryFriendActivity(alien);
@@ -245,9 +253,7 @@ void main() {
     expect(data.calls.where((c) => c == 'friends:first:14'), hasLength(1));
   });
 
-  test(
-      'remount fetches first cards missing from a refreshed later-page snapshot',
-      () async {
+  test('remount does not resume friend activity requests', () async {
     data.trendingRequest = (_) async =>
         [alien, odyssey, const MovieShort(id: 15, name: 'Obsession')];
     await home.load();
@@ -259,8 +265,8 @@ void main() {
     home = HomeController(auth: auth, watchPlans: Plans(cache), service: data);
     home.start();
     await flush();
-    expect(data.calls, ['friends:first:13', 'friends:first:14']);
-    expect(home.friendActivityLoaded(alien.id), true);
+    expect(data.calls.where((c) => c.startsWith('friends:')), isEmpty);
+    expect(home.friendActivityLoaded(alien.id), false);
   });
 
   test('trending becomes usable while independent recommendations are pending',
@@ -331,6 +337,7 @@ void main() {
         (id, _) => id == 'first' ? pending.future : Future.value([]);
     home.start();
     await flush();
+    unawaited(home.showHeroPage(0));
     auth.select(viewer('second'));
     await flush();
     pending.complete([
@@ -343,7 +350,7 @@ void main() {
     ]);
     await flush();
     expect(home.userId, 'second');
-    expect(home.friendInteractions[alien.id], isEmpty);
+    expect(home.friendInteractions[alien.id] ?? [], isEmpty);
   });
 
   test(
@@ -470,6 +477,7 @@ void main() {
     data.friendRequest =
         (_, id) => id == alien.id ? first.future : second.future;
     await home.load();
+    unawaited(home.showHeroPage(0));
     var alienChanges = 0, odysseyChanges = 0;
     home.friendActivity(alien.id).addListener(() => alienChanges++);
     home.friendActivity(odyssey.id).addListener(() => odysseyChanges++);

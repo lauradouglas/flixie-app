@@ -105,7 +105,24 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.text('Useful movie'), findsWidgets);
-    expect(movies.reviewCalls, 1);
+    expect(find.text('Watchlist'), findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
+    expect(find.text('Log an entry'), findsOneWidget);
+    await tester.ensureVisible(find.text('Log an entry'));
+    await tester.tap(find.text('Log an entry'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(find.text('Log your movie entry'), findsOneWidget);
+    expect(find.text('Create account'), findsOneWidget);
+    await tester.ensureVisible(find.text('Keep exploring'));
+    await tester.tap(find.text('Keep exploring'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    for (final label in ['Favourite', 'List', 'Plan', 'Watched', 'Rate']) {
+      expect(find.text(label), findsNothing);
+    }
+    expect(movies.reviewCalls, 0,
+        reason: 'guest detail must not call authenticated review endpoints');
     expect(movies.imageCalls, 1);
     expect(movies.reviews.isCompleted, false);
     expect(movies.providers.isCompleted, false);
@@ -135,6 +152,11 @@ void main() {
     await tester.drag(find.byType(Scrollable).first, const Offset(0, 3000));
     await tester.pumpAndSettle();
     expect(find.text('Useful movie'), findsWidgets);
+    expect(find.text('Watchlist'), findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
+    for (final label in ['Favourite', 'List', 'Plan', 'Watched', 'Rate']) {
+      expect(find.text(label), findsNothing);
+    }
     expect(tester.takeException(), isNull);
     debugPrint(
         'Virtual fixture: useful content=100ms; optional work settled=5000ms (not frame performance).');

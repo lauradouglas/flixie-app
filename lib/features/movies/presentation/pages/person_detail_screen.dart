@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -62,7 +63,12 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           parentContentId: widget.parentContentId,
           parentContentType: widget.parentContentType);
     }
-    unawaited(_controller.load());
+    unawaited(_controller.load().then((_) async {
+      if (!mounted || _auth.dbUser == null || _controller.person == null) return;
+      if (GuestAccess.takeAction('/people/${widget.personId}') == 'favorite' && !_controller.favorite) {
+        await togglePersonFavorite(context, _controller);
+      }
+    }));
   }
 
   void _syncViewer() => _controller.selectViewer(_auth.dbUser);

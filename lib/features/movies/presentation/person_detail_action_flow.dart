@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,8 @@ import 'widgets/person_detail/person_filmography.dart';
 
 Future<void> togglePersonFavorite(
     BuildContext context, PersonDetailController controller) async {
+  if (!await GuestAccess.require(context, title: 'Save your favourite people', path: '/people/${controller.personId}', intent: 'favorite')) return;
+    if (!context.mounted) return ;
   final auth = context.read<AuthProvider>();
   bool current() =>
       context.mounted &&

@@ -193,7 +193,8 @@ class ShowDetailController extends ChangeNotifier {
     Future<void>? reviewsTask;
     void warmReviews() {
       if (!current()) return;
-      reviewsTask ??= section('reviews', () => service.reviews(id, user?.id),
+      if (user == null) { reviewsLoading = false; return; }
+      reviewsTask ??= section('reviews', () => service.reviews(id, user.id),
           (value) => reviews = List.unmodifiable(value));
     }
 

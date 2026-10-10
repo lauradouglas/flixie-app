@@ -1,5 +1,6 @@
+import '../widgets/in_cinemas_section.dart';
 import '../models/home_image_urls.dart';
-import '../widgets/home_hero_card.dart';
+import '../widgets/trending_carousel.dart';
 import '../controllers/home_controller.dart';
 import '../controllers/home_watch_plans_controller.dart';
 import '../widgets/home_session_updates.dart';
@@ -73,11 +74,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Keep hero carousel concise so primary CTA and dots remain visible above fold.
-  static const int _maxHeroCarouselItems = HomeController.heroLimit;
-  static const double _heroViewportFraction = 0.84;
 
   late final HomeController _home;
   bool _didCreateController = false;
+  final _cinemasKey = GlobalKey<InCinemasSectionState>();
   final _communityKey = GlobalKey<HomeCommunitySectionState>();
   List<MovieShort> get _featuredMovies => _home.trending.value.data;
   List<MovieShort> get _forYouMovies => _home.recommendations.value.data;
@@ -95,9 +95,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? get _error => _home.trending.value.error;
   final WatchlistActionsController _watchlistActions =
       WatchlistActionsController.instance;
-  final PageController _heroPageController = PageController(
-    viewportFraction: _heroViewportFraction,
-  );
   final PageController _forYouPageController = PageController(
     viewportFraction: 0.88,
   );
@@ -105,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final ScrollController _homeScrollController = ScrollController();
   final GlobalKey _forYouSectionKey = GlobalKey();
   bool _recommendationVisibilityCheckScheduled = false;
-  final ValueNotifier<int> _heroPage = ValueNotifier(0);
   final ValueNotifier<int> _forYouPage = ValueNotifier(0);
   final ValueNotifier<int> _watchPlansPage = ValueNotifier(0);
   final ValueNotifier<double?> _watchPlansCardHeight = ValueNotifier(null);
@@ -160,11 +156,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         .removeListener(_scheduleRecommendationVisibilityCheck);
     _home.dispose();
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
-    _heroPageController.dispose();
     _forYouPageController.dispose();
     _watchPlansScrollController.dispose();
     _homeScrollController.dispose();
-    _heroPage.dispose();
     _forYouPage.dispose();
     _watchPlansPage.dispose();
     _watchPlansCardHeight.dispose();
@@ -199,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _refreshAll() async {
     await Future.wait([
+      if (_cinemasKey.currentState != null) _cinemasKey.currentState!.refresh(),
       _loadAll(refreshRecommendations: true, showFullLoading: false),
       if (_communityKey.currentState != null)
         _communityKey.currentState!.refresh(),
@@ -618,6 +613,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               const HomeUnreadUpdates(),
               _buildGreetingAndPlans(),
               _buildTrendingSection(),
+              _buildInCinemasSection(),
               if (userId != null)
                 FindTonightsFilmSection(onPick: () async {
                   await context.push('/pick-for-us');
@@ -631,6 +627,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
   }
+
+  Widget _buildInCinemasSection() => Selector<AuthProvider, String>(
+      selector: (_, auth) => auth.dbUser?.watchProviderRegion ?? 'GB',
+      builder: (context, region, _) => ListenableBuilder(
+          listenable: _home.watchlist,
+          builder: (context, _) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: InCinemasSection(
+                  key: _cinemasKey,
+                  region: region,
+                  savedIds: _watchlistMovieIds,
+                  pendingIds: _watchlistUpdatesInFlight,
+                  onDetails: (movie) => context.push(movieDetailPath(movie.id),
+                      extra: {'title': movie.name, 'poster': movie.poster}),
+                  onSave: (movie) => _toggleHeroWatchlist(context, movie),
+                  onTrailer: (movie) => _openHeroTrailer(context, movie)))));
 
   Widget _buildGreetingAndPlans() => Selector<AuthProvider, models.User?>(
         selector: (_, auth) => auth.dbUser,
@@ -704,8 +716,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   const HomeSectionHeader(title: 'Trending now'),
                   const SizedBox(height: 4),
                   _buildHeroCarousel(context, movies),
-                  const SizedBox(height: 10),
-                  _buildCarouselDots(movies),
                   const SizedBox(height: 20),
                   secondarySections!,
                 ],
@@ -767,105 +777,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   // ── Hero carousel ──────────────────────────────────────────────────────────
 
-  Widget _buildHeroCarousel(BuildContext context, List<MovieShort> movies) {
-    final count = movies.length.clamp(0, _maxHeroCarouselItems);
-    final visibleMovies = movies.take(count).toList(growable: false);
-    final sharedPosterHeight = visibleMovies.fold<double>(
-      0,
-      (largest, movie) => _heroPosterHeight(movie) > largest
-          ? _heroPosterHeight(movie)
-          : largest,
-    );
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    // Every page reserves the height required by the largest card in this
-    // carousel. This keeps card edges and pagination aligned when a title,
-    // date, or social row takes more room than its neighbours.
-    final carouselHeight = sharedPosterHeight + (220 * textScale);
-    return SizedBox(
-      height: carouselHeight,
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 14),
-            child: PageView.builder(
-              controller: _heroPageController,
-              padEnds: false,
-              clipBehavior: Clip.none,
-              onPageChanged: (index) {
-                _heroPage.value = index;
-                unawaited(_home.showHeroPage(index));
-              },
-              itemCount: count,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: ListenableBuilder(
-                    listenable: Listenable.merge([
-                      _home.watchlist,
-                      _home.friendActivity(movies[index].id),
-                    ]),
-                    builder: (context, _) => _buildHeroCard(
-                        context, movies[index],
-                        posterHeight: sharedPosterHeight),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  double _heroPosterHeight(MovieShort movie) => 280.0;
-
-  Widget _buildCarouselDots(List<MovieShort> movies) {
-    final count = movies.length.clamp(0, _maxHeroCarouselItems);
-    if (count <= 1) return const SizedBox.shrink();
-    return ValueListenableBuilder<int>(
-      valueListenable: _heroPage,
-      builder: (context, page, _) => Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(
-          count,
-          (index) => AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            width: index == page ? 20 : 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: index == page
-                  ? FlixieColors.primary
-                  : Colors.white.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeroCard(BuildContext context, MovieShort movie,
-          {required double posterHeight}) =>
-      HomeHeroCard(
-        movie: movie,
-        posterHeight: posterHeight,
-        inWatchlist: _watchlistMovieIds.contains(movie.id),
-        isUpdating: _watchlistUpdatesInFlight.contains(movie.id),
-        interactions: _home.friendActivity(movie.id).value.data,
-        friendActivityLoading: context.read<AuthProvider>().dbUser != null &&
-            !_home.friendActivityLoaded(movie.id),
-        friendActivityFailed:
-            _home.friendActivity(movie.id).value.error != null,
-        onOpen: () => context.push(
-            movieDetailPath(movie.id, source: DetailSource.trending),
-            extra: {'title': movie.name, 'poster': movie.poster}),
-        onDetails: () => context
-            .push(movieDetailPath(movie.id, source: DetailSource.trending)),
-        onWatchlist: () => _toggleHeroWatchlist(context, movie),
-        onTrailer: () => _openHeroTrailer(context, movie),
-        onFriendsRetry: () => _home.retryFriendActivity(movie),
-      );
+  Widget _buildHeroCarousel(BuildContext context, List<MovieShort> movies) =>
+      ListenableBuilder(
+          listenable: _home.watchlist,
+          builder: (context, _) => TrendingCarousel(
+              movies: movies,
+              savedIds: _watchlistMovieIds,
+              pendingIds: _watchlistUpdatesInFlight,
+              onDetails: (movie) => context.push(
+                  movieDetailPath(movie.id, source: DetailSource.trending),
+                  extra: {'title': movie.name, 'poster': movie.poster}),
+              onSave: (movie) => _toggleHeroWatchlist(context, movie),
+              onTrailer: (movie) => _openHeroTrailer(context, movie)));
 
   Widget _buildBecauseYouRatedSection(BuildContext context) {
     if (_isLoadingRecommendations && _forYouMovies.isEmpty) {

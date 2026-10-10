@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/movies/presentation/widgets/media_synopsis.dart';
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import '../controllers/movie_detail_controller.dart';
 import '../movie_detail_action_flow.dart';
 export '../controllers/movie_detail_controller.dart' show ListUpdateType;
@@ -107,7 +109,29 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   }
 
   Future<void> _refresh() => _data.refresh(widget.movieId);
-  Future<void> _load() => _data.load(widget.movieId);
+  Future<void> _load() async {
+    await _data.load(widget.movieId);
+    if (!mounted ||
+        _data.movie == null ||
+        context.read<AuthProvider>().dbUser == null) return;
+    final intent = GuestAccess.takeAction('/movies/${widget.movieId}');
+    switch (intent) {
+      case 'watchlist':
+        if (!_data.inWatchlist) await _actionFlow.toggleWatchlist();
+      case 'favorite':
+        if (!_data.isFavorite) await _actionFlow.toggleFavorite();
+      case 'list':
+        await _actionFlow.showAddToListSheet();
+      case 'log':
+        await _actionFlow.showLogWatchSheet();
+      case 'review':
+        await _actionFlow.showWriteReviewSheet(context);
+      case 'providers':
+        await showSettingsEditDetailsSheet(context);
+      case 'plan':
+        _showWatchRequestSheet();
+    }
+  }
 
   @override
   void didUpdateWidget(covariant MovieDetailScreen oldWidget) {
@@ -421,37 +445,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   Widget _buildSynopsis(BuildContext context, Movie movie) {
     final text = movie.overview;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
-    final sentenceEnd = RegExp(r'[.!?](?:\s|$)').firstMatch(text);
-    final preview =
-        sentenceEnd == null ? text : text.substring(0, sentenceEnd.start + 1);
-    final showToggle = preview.length < text.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(context, 'Story'),
         const SizedBox(height: 8),
-        Text(
-          _showFullSynopsis ? text : preview,
+        MediaSynopsis(
+          text: text,
           style: TextStyle(
-            color: context.colors.light,
-            fontSize: 14,
-            height: 1.48,
-          ),
+              color: context.colors.light, fontSize: 14, height: 1.48),
+          expanded: _showFullSynopsis,
+          onToggle: () =>
+              setState(() => _showFullSynopsis = !_showFullSynopsis),
+          actionColor: FlixieColors.primary,
         ),
-        if (showToggle) ...[
-          const SizedBox(height: 7),
-          GestureDetector(
-            onTap: () => setState(() => _showFullSynopsis = !_showFullSynopsis),
-            child: Text(
-              _showFullSynopsis ? 'Show less' : 'Read more',
-              style: const TextStyle(
-                color: FlixieColors.primary,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
         if (_data.director != null) ...[
           const SizedBox(height: 10),
           GestureDetector(
@@ -490,7 +497,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- Watch request -------------------------------------------------------
 
-  void _showWatchRequestSheet() {
+  void _showWatchRequestSheet() async {
+    if (!await GuestAccess.require(context,
+        title: 'Plan a watch with friends',
+        path: '/movies/${widget.movieId}',
+        intent: 'plan')) return;
+    if (!mounted) return;
     final auth = context.read<AuthProvider>();
     final friends = auth.cachedFriends?.friendships ?? [];
     final userId = auth.dbUser?.id;
@@ -538,10 +550,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   // ---- CTA buttons ---------------------------------------------------------
 
   Widget _buildActionButtons() {
+    final signedIn = context.watch<AuthProvider>().dbUser != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildWatchEntryStatusRow(),
+        if (signedIn)
+          _buildWatchEntryStatusRow()
+        else
+          FilledButton.icon(
+            onPressed: () => _actionFlow.showLogWatchSheet(),
+            icon: const Icon(Icons.edit_note_outlined),
+            label: const Text('Log an entry'),
+          ),
         const SizedBox(height: 8),
         Divider(
           height: 1,
@@ -568,46 +588,50 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                       : _actionFlow.toggleWatchlist,
                 ),
               ),
-              Expanded(
-                child: _statusActionItem(
-                  icon: _data.isFavorite
-                      ? Icons.favorite
-                      : Icons.favorite_outline,
-                  label: 'Favourite',
-                  color: context.colors.danger,
-                  isActive: _data.isFavorite,
-                  isLoading: _data.currentlyUpdating == ListUpdateType.favorite,
-                  onTap: _data.currentlyUpdating != null
-                      ? null
-                      : _actionFlow.toggleFavorite,
+              if (signedIn)
+                Expanded(
+                  child: _statusActionItem(
+                    icon: _data.isFavorite
+                        ? Icons.favorite
+                        : Icons.favorite_outline,
+                    label: 'Favourite',
+                    color: context.colors.danger,
+                    isActive: _data.isFavorite,
+                    isLoading:
+                        _data.currentlyUpdating == ListUpdateType.favorite,
+                    onTap: _data.currentlyUpdating != null
+                        ? null
+                        : _actionFlow.toggleFavorite,
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _statusActionItem(
-                  icon: _data.myListsContainingMovie.isNotEmpty
-                      ? Icons.playlist_add_check_rounded
-                      : Icons.playlist_add_rounded,
-                  label: 'List',
-                  color: context.colors.secondary,
-                  isActive: _data.myListsContainingMovie.isNotEmpty,
-                  isLoading: _data.listsContainingMovieLoading,
-                  onTap: _data.currentlyUpdating != null
-                      ? null
-                      : _actionFlow.showAddToListSheet,
+              if (signedIn)
+                Expanded(
+                  child: _statusActionItem(
+                    icon: _data.myListsContainingMovie.isNotEmpty
+                        ? Icons.playlist_add_check_rounded
+                        : Icons.playlist_add_rounded,
+                    label: 'List',
+                    color: context.colors.secondary,
+                    isActive: _data.myListsContainingMovie.isNotEmpty,
+                    isLoading: _data.listsContainingMovieLoading,
+                    onTap: _data.currentlyUpdating != null
+                        ? null
+                        : _actionFlow.showAddToListSheet,
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _statusActionItem(
-                  icon: Icons.group_add_outlined,
-                  label: 'Plan',
-                  color: FlixieColors.primary,
-                  isActive: false,
-                  isLoading: false,
-                  onTap: _data.currentlyUpdating != null
-                      ? null
-                      : _showWatchRequestSheet,
+              if (signedIn)
+                Expanded(
+                  child: _statusActionItem(
+                    icon: Icons.group_add_outlined,
+                    label: 'Plan',
+                    color: FlixieColors.primary,
+                    isActive: false,
+                    isLoading: false,
+                    onTap: _data.currentlyUpdating != null
+                        ? null
+                        : _showWatchRequestSheet,
+                  ),
                 ),
-              ),
               Expanded(
                 child: _statusActionItem(
                   icon: Icons.ios_share_rounded,

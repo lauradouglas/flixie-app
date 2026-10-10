@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -74,8 +75,10 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  void _openEntity(SearchEntityResult item) {
+  void _openEntity(SearchEntityResult item) async {
     if (item.type == SearchEntityType.collection) {
+      if (!await GuestAccess.require(context, title: 'Explore your collections', path: '/search')) return;
+      if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CollectionScreen(collectionId: item.id),

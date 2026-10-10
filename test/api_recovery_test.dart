@@ -5,6 +5,21 @@ import 'package:http/testing.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 void main() {
+  testWidgets('a guest 401 never tries an installed token refresher',
+      (tester) async {
+    ApiClient.setToken(null);
+    var refreshes = 0;
+    ApiClient.setAuthTokenRefresher(() async {
+      refreshes++;
+      throw StateError('no current user');
+    });
+    await http.runWithClient(() async {
+      await expectLater(ApiClient.get('/movies/collections/531241'),
+          throwsA(isA<ApiException>()));
+      expect(refreshes, 0);
+    }, () => MockClient((_) async => http.Response('expired', 401)));
+  });
+
   tearDown(() {
     ApiClient.setAuthTokenRefresher(null);
     ApiClient.setToken(null);

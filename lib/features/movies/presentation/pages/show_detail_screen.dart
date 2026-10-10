@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/movies/presentation/widgets/media_synopsis.dart';
+import 'package:flixie_app/features/settings/presentation/widgets/settings_edit_profile_sheet.dart';
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import '../widgets/show_detail_metadata.dart';
 import '../show_detail_action_flow.dart';
 import '../controllers/show_detail_controller.dart';
@@ -132,7 +135,27 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     }
   }
 
-  Future<void> _load() => _data.load(widget.showId);
+  Future<void> _load() async {
+    await _data.load(widget.showId);
+    if (!mounted ||
+        _data.show == null ||
+        context.read<AuthProvider>().dbUser == null) return;
+    final intent = GuestAccess.takeAction('/shows/${widget.showId}');
+    switch (intent) {
+      case 'watchlist':
+        if (!_data.inWatchlist) await _flow.toggleWatchlist();
+      case 'favorite':
+        if (!_data.isFavorite) await _flow.toggleFavorite();
+      case 'list':
+        await _flow.showAddToListSheet();
+      case 'rate':
+        _flow.showRatingSheet();
+      case 'review':
+        await _flow.showWriteReviewSheet();
+      case 'providers':
+        await showSettingsEditDetailsSheet(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -264,26 +287,17 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   Widget _buildSynopsis(BuildContext context, TvShow show) {
     final text = show.overview;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
-    final sentenceEnd = RegExp(r'[.!?](?:\s|$)').firstMatch(text);
-    final preview =
-        sentenceEnd == null ? text : text.substring(0, sentenceEnd.start + 1);
-    final showToggle = preview.length < text.length;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _buildSectionHeader(context, 'About the show'),
       const SizedBox(height: 10),
-      Text(_showFullOverview ? text : preview,
-          style: TextStyle(
-              color: context.colors.light, fontSize: 14, height: 1.7)),
-      if (showToggle)
-        TextButton(
-          onPressed: () =>
-              setState(() => _showFullOverview = !_showFullOverview),
-          style: TextButton.styleFrom(
-              foregroundColor: context.colors.primaryText,
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(48, 44)),
-          child: Text(_showFullOverview ? 'Read less' : 'Read more'),
-        ),
+      MediaSynopsis(
+        text: text,
+        style:
+            TextStyle(color: context.colors.light, fontSize: 14, height: 1.7),
+        expanded: _showFullOverview,
+        onToggle: () => setState(() => _showFullOverview = !_showFullOverview),
+        actionColor: context.colors.primaryText,
+      ),
     ]);
   }
 
@@ -600,6 +614,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       onRegionChanged: _load);
 
   Widget _buildActions() {
+    final signedIn = context.watch<AuthProvider>().dbUser != null;
     return Column(
       children: [
         Divider(
@@ -609,22 +624,23 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         ),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(
-            child: _statusActionItem(
-              icon: _data.userRating != null
-                  ? Icons.star_rounded
-                  : Icons.star_outline_rounded,
-              label: 'Rate',
-              badge:
-                  _data.userRating != null ? '${_data.userRating!}/10' : null,
-              color: context.colors.tertiary,
-              isActive: _data.userRating != null,
-              isLoading: _data.isRatingLoading,
-              onTap: _data.updatingAction != null || _data.isRatingLoading
-                  ? null
-                  : _flow.showRatingSheet,
+          if (signedIn)
+            Expanded(
+              child: _statusActionItem(
+                icon: _data.userRating != null
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                label: 'Rate',
+                badge:
+                    _data.userRating != null ? '${_data.userRating!}/10' : null,
+                color: context.colors.tertiary,
+                isActive: _data.userRating != null,
+                isLoading: _data.isRatingLoading,
+                onTap: _data.updatingAction != null || _data.isRatingLoading
+                    ? null
+                    : _flow.showRatingSheet,
+              ),
             ),
-          ),
           Expanded(
             child: _statusActionItem(
               icon: _data.inWatchlist ? Icons.bookmark : Icons.bookmark_outline,
@@ -636,30 +652,34 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                   _data.updatingAction != null ? null : _flow.toggleWatchlist,
             ),
           ),
-          Expanded(
-            child: _statusActionItem(
-              icon: _data.isFavorite ? Icons.favorite : Icons.favorite_outline,
-              label: 'Favourite',
-              color: context.colors.danger,
-              isActive: _data.isFavorite,
-              isLoading: _data.updatingAction == ShowDetailAction.favorite,
-              onTap: _data.updatingAction != null ? null : _flow.toggleFavorite,
+          if (signedIn)
+            Expanded(
+              child: _statusActionItem(
+                icon:
+                    _data.isFavorite ? Icons.favorite : Icons.favorite_outline,
+                label: 'Favourite',
+                color: context.colors.danger,
+                isActive: _data.isFavorite,
+                isLoading: _data.updatingAction == ShowDetailAction.favorite,
+                onTap:
+                    _data.updatingAction != null ? null : _flow.toggleFavorite,
+              ),
             ),
-          ),
-          Expanded(
-            child: _statusActionItem(
-              icon: _data.myListsContainingShow.isNotEmpty
-                  ? Icons.playlist_add_check_rounded
-                  : Icons.playlist_add_rounded,
-              label: 'List',
-              color: context.colors.secondary,
-              isActive: _data.myListsContainingShow.isNotEmpty,
-              isLoading: _data.listsContainingShowLoading,
-              onTap: _data.updatingAction != null
-                  ? null
-                  : _flow.showAddToListSheet,
+          if (signedIn)
+            Expanded(
+              child: _statusActionItem(
+                icon: _data.myListsContainingShow.isNotEmpty
+                    ? Icons.playlist_add_check_rounded
+                    : Icons.playlist_add_rounded,
+                label: 'List',
+                color: context.colors.secondary,
+                isActive: _data.myListsContainingShow.isNotEmpty,
+                isLoading: _data.listsContainingShowLoading,
+                onTap: _data.updatingAction != null
+                    ? null
+                    : _flow.showAddToListSheet,
+              ),
             ),
-          ),
         ]),
       ],
     );

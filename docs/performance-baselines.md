@@ -482,7 +482,7 @@ detail opening remain nine reads each; Past/Active/Back add none.
 Useful-content medians cold 183.258 → 168.957 ms, warm 181.294 → 166.394 ms;
 stage/frame timings are mixed, so no release-speed gain claimed. Median peak debug
 RSS rises cold 319.406 → 549.500 MiB and warm 271.750 → 519.578 MiB; first cold peaks
-are similar at ~723/~725 MiB and decoded images remain 5.52 MiB. The cause remains
+are similar at ~723/~725 MiB an d decoded images remain 5.52 MiB. The cause remains
 unresolved: these pre-GC readings prove neither a retained leak nor a memory gain.
 The Person Detail controlled-memory result cannot establish group-plan behaviour.
 

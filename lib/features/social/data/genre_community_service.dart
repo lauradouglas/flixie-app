@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 
@@ -62,6 +63,7 @@ class GenreCommunityService {
     final data = await ApiClient.get('/community/genres') as Map;
     return (data['items'] as List)
         .map((v) => GenreCommunity.fromJson(v as Map))
+        .where((genre) => isVisibleGenre(genre.name, id: genre.id))
         .toList();
   }
 

@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/safety/safety_actions.dart';
@@ -189,8 +191,10 @@ class _CommunityProfileScreenState extends State<CommunityProfileScreen> {
                   if (profile.genres.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     Wrap(spacing: 8, runSpacing: 4, children: [
-                      for (final genre in profile.genres)
-                        FlixiePill.label(label: Text(genre))
+                      for (final genre
+                          in profile.genres.where((g) => isVisibleGenre(g)))
+                        FlixiePill.label(
+                            label: Text(genre), avatar: GenreIcon(genre))
                     ]),
                   ],
                   if (profile.favourites.isNotEmpty) ...[

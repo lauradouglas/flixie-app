@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/features/authentication/data/setup_service.dart';
 import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/core/legal/terms_agreement_field.dart';
@@ -306,7 +307,12 @@ class _SignupScreenState extends State<SignupScreen> {
     final auth = context.read<AuthProvider>();
     if (auth.isLoading) return;
     if (auth.needsSocialProfile) await auth.signOut();
-    if (mounted) context.go('/auth/login');
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/auth/login');
+    }
   }
 
   void _socialSignedIn() {
@@ -432,6 +438,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     final socialProfile = context.watch<AuthProvider>().needsSocialProfile;
     return AuthScaffold(
+      cinema: true,
       topLabel: 'Create your account',
       title: Text.rich(
         TextSpan(
@@ -642,6 +649,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 22),
               TermsAgreementField(onChanged: (value) => _termsAccepted = value),
               const SizedBox(height: 16),
+              if (!context.read<AuthProvider>().needsSocialProfile) TextButton(onPressed: () { GuestAccess.clear(); context.go('/'); }, child: const Text('Keep exploring')),
               PrimaryButton(
                 label: 'Continue',
                 isLoading: isLoading,

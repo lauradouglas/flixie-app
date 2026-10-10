@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
@@ -47,6 +48,13 @@ class MovieDetailActionFlow {
       data.auth.dbUser?.id == _viewer;
 
   Future<void> toggleWatchlist({bool offerUndo = true}) async {
+    if (!await GuestAccess.require(context,
+        title: 'Save this film for later',
+        message:
+            'Create an account to keep your watchlist and come back to this film whenever you’re ready.',
+        path: '/movies/${data.movieId}',
+        intent: 'watchlist')) return;
+    if (!context.mounted) return;
     if (!context.mounted || !isCurrent || data.currentlyUpdating != null) {
       return;
     }
@@ -201,6 +209,11 @@ class MovieDetailActionFlow {
   }
 
   Future<void> toggleFavorite({bool offerUndo = true}) async {
+    if (!await GuestAccess.require(context,
+        title: 'Save your favourites',
+        path: '/movies/${data.movieId}',
+        intent: 'favorite')) return;
+    if (!context.mounted) return;
     if (!context.mounted || !isCurrent || data.currentlyUpdating != null) {
       return;
     }
@@ -319,6 +332,11 @@ class MovieDetailActionFlow {
   }
 
   Future<void> showAddToListSheet() async {
+    if (!await GuestAccess.require(context,
+        title: 'Build your film lists',
+        path: '/movies/${data.movieId}',
+        intent: 'list')) return;
+    if (!context.mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     final movieId = data.movieId;
     if (movieId == null) return;
@@ -346,6 +364,13 @@ class MovieDetailActionFlow {
   }
 
   Future<bool> showLogWatchSheet({MovieWatchEntry? entry}) async {
+    if (!await GuestAccess.require(context,
+        title: 'Log your movie entry',
+        message:
+            'Create an account to log when you watched this film, add a rating and keep your movie diary.',
+        path: '/movies/${data.movieId}',
+        intent: 'log')) return false;
+    if (!context.mounted) return false;
     final movieId = data.movieId;
     final authProvider = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
@@ -613,6 +638,13 @@ class MovieDetailActionFlow {
     double? initialRating,
     bool? initialRecommended,
   }) async {
+    if (!await GuestAccess.require(context,
+        title: 'Share your thoughts',
+        message:
+            'Create an account to write your review and discuss it with other film fans.',
+        path: '/movies/${data.movieId}',
+        intent: 'review')) return;
+    if (!context.mounted) return;
     final user = context.read<AuthProvider>().dbUser;
     if (user == null) return;
     final movieId = data.movieId;

@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -115,10 +117,14 @@ class TonightFiltersPanel extends StatelessWidget {
                 title: 'Choose a genre',
                 note: 'Filter the titles in your watchlist.',
                 children: [
-                  for (final value in <String?>[null, ...genres])
+                  for (final value in <String?>[
+                    null,
+                    ...genres.where((g) => isVisibleGenre(g))
+                  ])
                     Builder(
                         builder: (sheetContext) => FlixiePill.choice(
                             label: Text(value ?? 'All genres'),
+                            avatar: value == null ? null : GenreIcon(value),
                             selected: genre == value,
                             onSelected: (_) {
                               onGenre?.call(value);

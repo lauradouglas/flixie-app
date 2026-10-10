@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -177,9 +179,11 @@ class WrappedGenreChips extends StatelessWidget {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: genres.map((g) {
+      children: genres.where((g) => isVisibleGenre(g.name)).map((g) {
         return FlixiePill.label(
-            colorKey: g.name, label: Text('${g.name}  ${g.count}'));
+            colorKey: g.name,
+            avatar: GenreIcon(g.name),
+            label: Text('${g.name}  ${g.count}'));
       }).toList(),
     );
   }

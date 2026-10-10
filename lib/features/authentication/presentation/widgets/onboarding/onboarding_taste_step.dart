@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import '../../../data/setup_service.dart';
@@ -67,6 +68,7 @@ class OnboardingTasteStep extends StatelessWidget {
                     children: controller.allGenres
                         .map((g) => FlixiePill.filter(
                             label: Text(g.name),
+                            avatar: GenreIcon(g.name),
                             selected: controller.genres.contains(g.id),
                             onSelected: (v) => controller.selectGenre(g.id, v)))
                         .toList())

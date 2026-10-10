@@ -39,7 +39,9 @@ class MediaReviewsSection extends StatelessWidget {
                     label: const Text('Write review')),
               ]),
           const SizedBox(height: 12),
-          if (loading && reviews.isEmpty)
+          if (currentUserId == null)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Sign in to read and share reviews.'))
+          else if (loading && reviews.isEmpty)
             const ContentPlaceholder(
                 label: 'Loading reviews', style: ContentPlaceholderStyle.review)
           else if (failed)

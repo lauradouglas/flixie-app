@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'controllers/show_detail_controller.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -33,6 +34,8 @@ class ShowDetailActionFlow {
   final String? _viewer;
   bool get mounted => context.mounted && _data.owns(_generation, _viewer);
   Future<void> toggleWatchlist({bool offerUndo = true}) async {
+    if (!await GuestAccess.require(context, title: 'Save this show for later', message: 'Create an account to keep your watchlist and come back to this show whenever you’re ready.', path: '/shows/${_data.showId}', intent: 'watchlist')) return ;
+    if (!context.mounted) return ;
     if (_data.updatingAction != null || !context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
@@ -105,6 +108,8 @@ class ShowDetailActionFlow {
   }
 
   Future<void> toggleFavorite({bool offerUndo = true}) async {
+    if (!await GuestAccess.require(context, title: 'Save your favourites', path: '/shows/${_data.showId}', intent: 'favorite')) return ;
+    if (!context.mounted) return ;
     if (_data.updatingAction != null || !context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
@@ -204,6 +209,8 @@ class ShowDetailActionFlow {
   }
 
   Future<void> showAddToListSheet() async {
+    if (!await GuestAccess.require(context, title: 'Build your lists', path: '/shows/${_data.showId}', intent: 'list')) return ;
+    if (!context.mounted) return ;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     final show = _data.show;
@@ -231,6 +238,8 @@ class ShowDetailActionFlow {
   }
 
   Future<void> setSeasonWatched(TvSeason season, bool watched) async {
+    if (!await GuestAccess.require(context, title: 'Keep track of what you watch', path: '/shows/${_data.showId}')) return;
+    if (!context.mounted) return ;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     final show = _data.show;
@@ -335,6 +344,8 @@ class ShowDetailActionFlow {
 
   Future<void> setEpisodeWatched(TvEpisode episode, bool watched,
       {bool undo = false}) async {
+    if (!await GuestAccess.require(context, title: 'Keep track of what you watch', path: '/shows/${_data.showId}')) return;
+    if (!context.mounted) return ;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     final showId = _data.show?.id;
@@ -521,7 +532,9 @@ class ShowDetailActionFlow {
     }
   }
 
-  void showRatingSheet() {
+  void showRatingSheet() async {
+    if (!await GuestAccess.require(context, title: 'Rate this show', path: '/shows/${_data.showId}', intent: 'rate')) return ;
+    if (!context.mounted) return ;
     if (!context.mounted || !mounted) return;
     var selectedRating = _data.userRating;
     var selectedRecommendation = _data.userRecommendation;
@@ -610,6 +623,8 @@ class ShowDetailActionFlow {
   }
 
   Future<void> showWriteReviewSheet() async {
+    if (!await GuestAccess.require(context, title: 'Share your thoughts', message: 'Create an account to write your review and discuss it with other film fans.', path: '/shows/${_data.showId}', intent: 'review')) return ;
+    if (!context.mounted) return ;
     if (!context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
     final show = _data.show;

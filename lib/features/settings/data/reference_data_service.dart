@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 
@@ -29,6 +30,7 @@ class ReferenceDataService {
     final data = await ApiClient.get('/utils/genres');
     return (data as List<dynamic>)
         .map((e) => Genre.fromJson(e as Map<String, dynamic>))
+        .where((genre) => isVisibleGenre(genre.name, id: genre.id))
         .toList();
   }
 
