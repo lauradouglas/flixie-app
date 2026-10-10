@@ -313,3 +313,23 @@ production entitlements and App Shortcuts. Apple accepted the upload at 15:13 UT
 Processing and external beta review remain separate. No external group assignment,
 beta-review submission, App Store submission, Android upload or backend deployment
 was performed; the user requested a build to assign themselves.
+
+## Production review submission
+
+Explicitly authorised production submissions can use the following lanes. Use a new build number above all store uploads and set RELEASE_VERSION to the intended marketing version. Android submission sends a completed production rollout for review; it does not fall back silently to an unsubmitted edit. Apple submits for review and retains manual release after approval. Existing screenshots are preserved.
+
+```bash
+RELEASE_VERSION=2.0.1 bundle exec fastlane android submit build_number:99
+RELEASE_VERSION=2.0.1 bundle exec fastlane ios submit build_number:99
+```
+
+Play credentials must be exported or configured in fastlane/.env. Android notes live in fastlane/release-metadata/android/en-GB/changelogs/<build>.txt. Apple notes are supplied by the submission lane. Do not retry a successful upload with the same build number; inspect store state first.
+
+For the same signed IPA in TestFlight and App Review, upload once, wait for processing, then select the uploaded build without uploading again:
+
+```bash
+RELEASE_VERSION=2.0.1 bundle exec fastlane ios beta build_number:99 ipa:build/ios/ipa/flixie_app.ipa wait:true
+RELEASE_VERSION=2.0.1 bundle exec fastlane ios submit build_number:99 ipa:build/ios/ipa/flixie_app.ipa uploaded:true
+```
+
+Release 2.0.1 (99) was submitted to Google Play production and Apple review on 10 October 2026 and made available to internal TestFlight testers.

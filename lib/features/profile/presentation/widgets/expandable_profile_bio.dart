@@ -13,7 +13,8 @@ class _ExpandableProfileBioState extends State<ExpandableProfileBio> {
   @override
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
-        final style = TextStyle(color: context.colors.light, height: 1.4);
+        final style = DefaultTextStyle.of(context).style.copyWith(
+            color: context.colors.light, fontSize: 14, height: 1.45);
         final painter = TextPainter(
           text: TextSpan(text: widget.text.trim(), style: style),
           textDirection: Directionality.of(context),

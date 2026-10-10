@@ -9,6 +9,9 @@ class HomeNotificationAction extends StatelessWidget {
   const HomeNotificationAction({super.key});
   @override
   Widget build(BuildContext context) {
+    final signedIn =
+        context.select<AuthProvider, bool>((auth) => auth.dbUser != null);
+    if (!signedIn) return const SizedBox.shrink();
     final count = context
         .select<AuthProvider, int>((auth) => auth.unreadNotificationCount);
     return IconButton(

@@ -112,6 +112,9 @@ void main() {
                           .copyWith(textScaler: TextScaler.linear(scale)),
                       child: child!)))));
       await tester.pumpAndSettle();
+      await tester.widget<RefreshIndicator>(find.byType(RefreshIndicator).first).onRefresh();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       expect(find.text('Home'), findsOneWidget);
       expect(find.text('Discover'), findsOneWidget);
       expect(find.text('You'), findsOneWidget);
@@ -142,7 +145,17 @@ void main() {
       expect(find.text('Create your account'), findsOneWidget);
       expect(find.text('Create account'), findsOneWidget);
       expect(find.text('Your streaming services'), findsNothing);
-      expect(find.text('Already a member? Sign in'), findsNothing);
+      expect(find.text('Already a member? Sign in'), findsOneWidget);
+      await tester.tap(find.text('Home'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Join Flixie'));
+      await tester.pumpAndSettle();
+      expect(find.text('Already have an account?'), findsOneWidget);
+      await tester.ensureVisible(find.text('Sign In'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign In'));
+      await tester.pumpAndSettle();
+      expect(find.text('Already have an account?'), findsNothing);
       await tester.pumpWidget(const SizedBox());
       router.dispose();
       auth.dispose();

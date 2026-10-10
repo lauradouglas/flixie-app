@@ -150,6 +150,35 @@ void main() {
     expect(data.show!.episodes.first.watched, false);
     expect(data.show!.episodes.last.watched, false);
   });
+  testWidgets(
+      'catch up preserves watched history and excludes selected episode with Undo',
+      (tester) async {
+    final oldDate = DateTime.utc(2026, 1, 1);
+    final episodes = List.generate(
+        5,
+        (i) => TvEpisode(
+            id: i + 1,
+            seasonNumber: 1,
+            episodeNumber: i + 1,
+            name: 'Episode ${i + 1}',
+            airDate: '2020-01-01',
+            watched: i == 0,
+            watchedAt: i == 0 ? oldDate : null));
+    data.show = TvShow(id: 1, name: 'The OA', episodes: episodes);
+    await mount(tester);
+    await flow.catchUpToEpisode(episodes.last, includeSelected: false);
+    await tester.pump();
+    expect(requests.length, 3);
+    expect(data.show!.episodes.take(4).every((e) => e.watched), true);
+    expect(data.show!.episodes.last.watched, false);
+    expect(data.show!.episodes.first.watchedAt, oldDate);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    expect(data.show!.episodes.where((e) => e.watched).length, 1);
+    expect(data.show!.episodes.first.watchedAt, oldDate);
+  });
+
   testWidgets('duplicate episode saves coalesce by busy state', (tester) async {
     const episode =
         TvEpisode(id: 1, seasonNumber: 1, episodeNumber: 1, name: 'Pilot');

@@ -30,6 +30,7 @@ def flutter_release(kind, number)
   args = ["flutter", "build", kind, "--release", "--target=lib/main.dart",
           "--build-number=#{number}", "--dart-define-from-file=.firebase.json",
           "--dart-define=API_BASE_URL=#{PRODUCTION_API}"]
+  args << "--build-name=#{ENV["RELEASE_VERSION"]}" if ENV["RELEASE_VERSION"].to_s.match?(/\A[0-9]+(?:\.[0-9]+){1,2}\z/)
   args << "--export-method=app-store" if kind == "ipa"
   Dir.chdir(ROOT) { sh(Shellwords.join(args)) }
 end
@@ -113,10 +114,29 @@ platform :ios do
   lane :beta do |options|
     release_number(options)
     key = apple_key
-    ipa = build(options)
+    ipa = options[:ipa] ? release_file(options[:ipa]) : build(options)
     upload_to_testflight(
       api_key: key, app_identifier: "com.flixie.flixieApp", ipa: ipa,
-      skip_waiting_for_build_processing: true, distribute_external: false
+      skip_waiting_for_build_processing: options[:wait] != true, distribute_external: false,
+      changelog: "Explore Flixie without signing in, plus performance improvements."
+    )
+  end
+  desc "Upload a production build and submit for Apple review (manual release after approval)"
+  lane :submit do |options|
+    number = release_number(options)
+    key = apple_key
+    ipa = options[:ipa] ? release_file(options[:ipa]) : build(options)
+    upload_to_app_store(
+      api_key: key, app_identifier: "com.flixie.flixieApp",
+      ipa: options[:uploaded] == true ? nil : ipa,
+      app_version: required_env("RELEASE_VERSION"),
+      build_number: options[:uploaded] == true ? number : nil,
+      skip_binary_upload: options[:uploaded] == true,
+      submit_for_review: true, automatic_release: false,
+      reject_if_possible: options[:replace_review] == true,
+      skip_screenshots: true, skip_metadata: false,
+      release_notes: { "en-GB" => "Explore Flixie without signing in, plus performance improvements." },
+      force: true, run_precheck_before_submit: true, precheck_include_in_app_purchases: false
     )
   end
 end
@@ -179,4 +199,17 @@ platform :android do
       skip_upload_aab: true, skip_upload_apk: true
     ))
   end
+  desc "Build and submit a Google Play production release"
+  lane :submit do |options|
+    release_number(options)
+    config = play_options
+    aab = build(options)
+    upload_to_play_store(**config.merge(
+      aab: aab, track: "production", release_status: "completed",
+      changes_not_sent_for_review: false, rescue_changes_not_sent_for_review: false,
+      metadata_path: File.join(ROOT, "fastlane/release-metadata/android"),
+      skip_upload_changelogs: false
+    ))
+  end
+
 end

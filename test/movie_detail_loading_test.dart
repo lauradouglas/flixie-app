@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/presentation/widgets/movie_detail_loading_sections.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -126,7 +127,7 @@ void main() {
     expect(movies.imageCalls, 1);
     expect(movies.reviews.isCompleted, false);
     expect(movies.providers.isCompleted, false);
-    expect(find.byType(ContentPlaceholder), findsOneWidget);
+    expect(find.byType(MovieProvidersSkeleton), findsOneWidget);
     // The core is useful at virtual t=100ms. Full loading is still pending.
     await tester.pump(const Duration(milliseconds: 4900));
     movies.providers.complete([]);

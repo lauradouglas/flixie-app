@@ -14,6 +14,13 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_
 import 'package:flixie_app/features/profile/presentation/widgets/lists_preview_section.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/friend_profile_header.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
+import 'package:flixie_app/features/profile/presentation/controllers/friend_profile_controller.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/friend_profile_content.dart';
+import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/models/movie_rating.dart';
+import 'package:flixie_app/models/review.dart';
+import 'package:flixie_app/core/safety/safety_service.dart';
+import 'friend_profile_controller_test.dart' show friendUser;
 import 'profile_controller_test.dart' show ProfileAuth;
 
 class FriendScreenFixture {
@@ -158,6 +165,85 @@ Future<void> openFriendTab(WidgetTester tester, String label) async {
 }
 
 void main() {
+  testWidgets('shared favourites displays the numeric count', (tester) async {
+    final fixture = FriendScreenFixture();
+    fixture.install();
+    addTearDown(fixture.dispose);
+    final auth = fixture.auth;
+    final controller = FriendProfileController(auth: auth, subjectId: 'friend')
+      ..user = friendUser('friend')
+      ..friendshipStatus = FriendshipStatus.friends
+      ..compatibilityLoading = false
+      ..sharedFavCount = 3
+      ..sharedRatings = [
+        MovieRating(
+            id: 'rating',
+            userId: 'friend',
+            movieId: 1,
+            rating: 8,
+            createdAt: '',
+            updatedAt: '')
+      ];
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: auth,
+        child: MaterialApp(
+            theme: AppTheme.darkTheme,
+            home: Scaffold(
+                body: Builder(
+                    builder: (context) => SingleChildScrollView(
+                        child: Column(
+                            children: buildFriendProfileContent(context,
+                                controller: controller))))))));
+    expect(find.text('3 shared favourites'), findsOneWidget);
+    expect(find.textContaining("Instance of 'FriendProfileController'"),
+        findsNothing);
+  });
+
+  for (final tab in [0, 2]) {
+    for (final media in ['movie', 'show']) {
+      testWidgets('$media review identifies its title on profile tab $tab',
+          (tester) async {
+        SafetyService.reset();
+        final fixture = FriendScreenFixture();
+        fixture.install();
+        addTearDown(fixture.dispose);
+        final controller = FriendProfileController(
+            auth: fixture.auth, subjectId: 'friend')
+          ..user = friendUser('friend')
+          ..selectedTab = tab
+          ..reviewsLoading = false
+          ..reviews = [
+            Review.fromJson({
+              'id': 'review',
+              'userId': 'friend',
+              'title': 'Worth watching',
+              'body': 'A great evening.',
+              'rating': 8,
+              media: media == 'movie' ? {'title': 'Alien'} : {'title': 'The OA'},
+            })
+          ];
+        addTearDown(controller.dispose);
+        await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+            value: fixture.auth,
+            child: MaterialApp(
+                theme: AppTheme.darkTheme,
+                home: Scaffold(
+                    body: Builder(
+                        builder: (context) => SingleChildScrollView(
+                            child: Column(
+                                children: buildFriendProfileContent(context,
+                                    controller: controller))))))));
+        await tester.pumpAndSettle();
+        expect(
+            find.text(media == 'movie' ? 'Alien' : 'The OA'), findsOneWidget);
+        expect(find.text('Worth watching'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      });
+    }
+  }
+
   testWidgets(
       'Activity keeps distant rows lazy and makes them reachable by scrolling',
       (tester) async {

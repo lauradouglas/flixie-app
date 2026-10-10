@@ -23,7 +23,7 @@ class ShowEpisodeCard extends StatelessWidget {
     final date = DateTime.tryParse(episode.airDate ?? '');
     final upcoming = date != null && date.isAfter(DateTime.now());
     return ColoredBox(
-        color: isNext ? context.colors.surfaceElevated : Colors.transparent,
+        color: Colors.transparent,
         child: Column(children: [
           Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -36,7 +36,7 @@ class ShowEpisodeCard extends StatelessWidget {
                               width: 74,
                               height: 56,
                               child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(5),
+                                  borderRadius: BorderRadius.circular(8),
                                   child: hideSpoilers
                                       ? ColoredBox(
                                           color: context.colors.surface,

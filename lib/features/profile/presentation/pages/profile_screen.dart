@@ -1,4 +1,5 @@
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
+import 'package:flixie_app/features/guest/presentation/guest_home_screen.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_library_totals.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -60,6 +61,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final dbUser =
         context.select<AuthProvider, models.User?>((auth) => auth.dbUser);
+    if (dbUser == null) return const GuestWelcomeScreen(you: true);
     final firebaseUser = context
         .select<AuthProvider, firebase.User?>((auth) => auth.firebaseUser);
 
@@ -130,7 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               alignment: Alignment.centerLeft,
                               child: TextButton.icon(
                                   onPressed: () =>
-                                      context.go('/social?tab=people'),
+                                      context.push('/profile/people'),
                                   icon: const Icon(Icons.people_outline,
                                       size: 19),
                                   label: const Text('Friends & following'))))),

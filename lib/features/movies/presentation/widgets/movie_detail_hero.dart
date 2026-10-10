@@ -1,3 +1,5 @@
+import 'media_backdrop_inset.dart';
+import 'movie_header_backdrop.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -15,7 +17,11 @@ import 'movie_detail_hero_tokens.dart';
 
 class MovieDetailHero extends StatefulWidget {
   const MovieDetailHero(
-      {super.key, required this.movie, required this.onShowScoreInfo});
+      {super.key,
+      required this.movie,
+      required this.onShowScoreInfo,
+      this.animateBackdropInset = false});
+  final bool animateBackdropInset;
   final Movie movie;
   final VoidCallback onShowScoreInfo;
   @override
@@ -233,8 +239,7 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 500;
         final safeTop = MediaQuery.paddingOf(context).top;
-        final heroContentTopPadding =
-            safeTop + MovieDetailHeroTokens.heroSurfaceTopPadding;
+        final hasBackdrop = movie.backdropPath?.trim().isNotEmpty == true;
         final heroScrimHeight =
             safeTop + MovieDetailHeroTokens.heroTopScrimHeight;
         final posterWidth = (constraints.maxWidth *
@@ -248,11 +253,15 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
             MediaQuery.textScalerOf(context).scale(1) > 1.3;
         return Stack(
           children: [
-            Padding(
-              padding: EdgeInsets.only(
-                top: heroContentTopPadding,
-                bottom: MovieDetailHeroTokens.heroSurfaceBottomPadding,
-              ),
+            if (hasBackdrop)
+              Positioned.fill(
+                  child: MovieHeaderBackdrop(path: movie.backdropPath!.trim())),
+            MediaBackdropInset(
+              animate: widget.animateBackdropInset,
+              hasBackdrop: hasBackdrop,
+              width: constraints.maxWidth,
+              top: safeTop + MovieDetailHeroTokens.heroSurfaceTopPadding,
+              bottom: MovieDetailHeroTokens.heroSurfaceBottomPadding,
               child: Flex(
                 direction: stacked ? Axis.vertical : Axis.horizontal,
                 crossAxisAlignment: CrossAxisAlignment.start,

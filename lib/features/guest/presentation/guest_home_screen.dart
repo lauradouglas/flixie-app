@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/home/presentation/widgets/trending_carousel_skeleton.dart';
 import 'package:flixie_app/features/home/presentation/widgets/in_cinemas_section.dart';
 import 'package:flixie_app/core/utils/genre_catalogue.dart';
 import 'package:flixie_app/core/widgets/genre_icon.dart';
@@ -34,7 +35,10 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() => _content = _load());
+    final content = _load();
+    setState(() {
+      _content = content;
+    });
     try {
       await Future.wait([
         _content,
@@ -51,9 +55,9 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
           TextButton(
               onPressed: () {
                 GuestAccess.clear();
-                context.go('/auth/login');
+                context.push('/auth/signup');
               },
-              child: const Text('Sign in')),
+              child: const Text('Join Flixie')),
         ]),
         body: RefreshIndicator(
             onRefresh: _refresh,
@@ -71,7 +75,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                     ]);
                   }
                   if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const GuestHomeLoadingSkeleton();
                   }
                   final (movies, community) = snapshot.data!;
                   return ListView(padding: const EdgeInsets.all(20), children: [
@@ -261,6 +265,22 @@ class GuestWelcomeScreen extends StatelessWidget {
                                                                         0, 55)),
                                                         child: const Text(
                                                             'Create account')),
+                                                    const SizedBox(height: 12),
+                                                    TextButton(
+                                                        onPressed: () {
+                                                          GuestAccess.clear();
+                                                          context.push(
+                                                              '/auth/login');
+                                                        },
+                                                        style: TextButton.styleFrom(
+                                                            minimumSize:
+                                                                const Size(
+                                                                    0, 48),
+                                                            foregroundColor:
+                                                                context.colors
+                                                                    .primaryText),
+                                                        child: const Text(
+                                                            'Already a member? Sign in')),
                                                   ]),
                                             ]))))))))),
       ]));
@@ -354,4 +374,21 @@ class GuestWelcomeScreen extends StatelessWidget {
           )),
         ]),
       );
+}
+
+class GuestHomeLoadingSkeleton extends StatelessWidget {
+  const GuestHomeLoadingSkeleton({super.key});
+  @override
+  Widget build(BuildContext context) =>
+      ListView(padding: const EdgeInsets.all(20), children: const [
+        SizedBox(height: 48),
+        SizedBox(height: 24),
+        Text('Trending now'),
+        SizedBox(height: 14),
+        TrendingCarouselSkeleton(),
+        SizedBox(height: 28),
+        Text('In cinemas now'),
+        SizedBox(height: 14),
+        TrendingCarouselSkeleton(),
+      ]);
 }

@@ -68,7 +68,7 @@ class Review {
       movieTitle: json['movie'] != null
           ? _nullableString((json['movie'] as Map<String, dynamic>)['title'])
           : json['show'] is Map
-              ? _nullableString(json['show']['name'])
+              ? _nullableString(json['show']['title'] ?? json['show']['name'])
               : _nullableString(json['movieTitle']),
       moviePosterPath: json['movie'] is Map<String, dynamic>
           ? _nullableString(

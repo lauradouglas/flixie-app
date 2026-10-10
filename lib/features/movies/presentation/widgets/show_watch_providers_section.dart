@@ -53,6 +53,15 @@ class _ShowWatchProvidersSectionState extends State<ShowWatchProvidersSection> {
         TextButton(onPressed: widget.onRetry, child: const Text('Retry')),
       ]);
     }
+    if (_ShowProviderTab.values
+                .where((tab) => _providersForTab(tab).isNotEmpty)
+                .length ==
+            1 &&
+        _providersForTab(_watchProviderTab).isEmpty) {
+      _watchProviderTab = _ShowProviderTab.values.firstWhere(
+          (tab) => _providersForTab(tab).isNotEmpty,
+          orElse: () => _ShowProviderTab.stream);
+    }
     final providers = _providersForTab(_watchProviderTab);
     final hasOptions =
         _ShowProviderTab.values.any((tab) => _providersForTab(tab).isNotEmpty);
@@ -64,7 +73,10 @@ class _ShowWatchProvidersSectionState extends State<ShowWatchProvidersSection> {
             await showSettingsEditDetailsSheet(context);
             if (mounted) await widget.onRegionChanged();
           }),
-      if (hasOptions)
+      if (_ShowProviderTab.values
+              .where((tab) => _providersForTab(tab).isNotEmpty)
+              .length >
+          1)
         Row(
             children: _ShowProviderTab.values
                 .map((tab) => Expanded(child: _providerTabButton(tab)))

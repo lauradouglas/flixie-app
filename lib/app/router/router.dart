@@ -364,9 +364,11 @@ GoRouter buildRouter(
               path: '/',
               pageBuilder: (context, state) => _calmPage(
                   state,
-                  authProvider.dbUser == null
-                      ? const GuestHomeScreen()
-                      : const HomeScreen()),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) => auth.dbUser == null
+                        ? const GuestHomeScreen()
+                        : const HomeScreen(),
+                  )),
             ),
           ]),
           StatefulShellBranch(observers: [
@@ -425,9 +427,18 @@ GoRouter buildRouter(
               path: '/profile',
               pageBuilder: (context, state) => _calmPage(
                   state,
-                  authProvider.dbUser == null
-                      ? const GuestWelcomeScreen(you: true)
-                      : const ProfileScreen()),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) => auth.dbUser == null
+                        ? const GuestWelcomeScreen(you: true)
+                        : const ProfileScreen(),
+                  )),
+              routes: [
+                GoRoute(
+                  path: 'people',
+                  pageBuilder: (context, state) =>
+                      _pushPage(state, const SocialScreen(initialTab: 0)),
+                ),
+              ],
             ),
           ]),
         ],

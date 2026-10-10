@@ -516,7 +516,9 @@ class GroupWatchRequestsSkeleton extends StatelessWidget {
 }
 
 class MediaDetailScreenSkeleton extends StatelessWidget {
-  const MediaDetailScreenSkeleton({super.key, this.title, this.poster});
+  const MediaDetailScreenSkeleton(
+      {super.key, this.title, this.poster, this.reserveBackdrop = false});
+  final bool reserveBackdrop;
   final String? title;
   final String? poster;
 
@@ -534,29 +536,39 @@ class MediaDetailScreenSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (reserveBackdrop)
+            SizedBox(
+                height: (MediaQuery.sizeOf(context).width * .38)
+                    .clamp(125.0, 190.0)),
           Stack(
+            clipBehavior: Clip.none,
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (poster != null && poster!.isNotEmpty)
-                    CachedNetworkImage(
-                      imageUrl: poster!.startsWith('http')
-                          ? poster!
-                          : 'https://image.tmdb.org/t/p/w342$poster',
-                      width: posterWidth,
-                      height: posterHeight,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) =>
-                          const SkeletonBox(borderRadius: 0),
-                      errorWidget: (_, __, ___) =>
-                          const SkeletonBox(borderRadius: 0),
-                    )
-                  else
-                    SkeletonBox(
-                        width: posterWidth,
-                        height: posterHeight,
-                        borderRadius: 0),
+                  ClipRRect(
+                      borderRadius: const BorderRadius.horizontal(
+                          right: Radius.circular(12)),
+                      child: SizedBox(
+                          width: posterWidth,
+                          height: posterHeight,
+                          child: poster != null && poster!.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: poster!.startsWith('http')
+                                      ? poster!
+                                      : 'https://image.tmdb.org/t/p/w342$poster',
+                                  width: posterWidth,
+                                  height: posterHeight,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) =>
+                                      const SkeletonBox(borderRadius: 0),
+                                  errorWidget: (_, __, ___) =>
+                                      const SkeletonBox(borderRadius: 0),
+                                )
+                              : SkeletonBox(
+                                  width: posterWidth,
+                                  height: posterHeight,
+                                  borderRadius: 0))),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Padding(
@@ -760,13 +772,19 @@ class ActivityRowsSkeleton extends StatelessWidget {
 
 /// Public card content stays visible while the authoritative detail loads.
 class MediaDetailPreview extends StatelessWidget {
-  const MediaDetailPreview({super.key, required this.title, this.poster});
+  const MediaDetailPreview(
+      {super.key,
+      required this.title,
+      this.poster,
+      this.reserveBackdrop = false});
+  final bool reserveBackdrop;
   final String title;
   final String? poster;
 
   @override
   Widget build(BuildContext context) => SafeArea(
-        child: MediaDetailScreenSkeleton(title: title, poster: poster),
+        child: MediaDetailScreenSkeleton(
+            title: title, poster: poster, reserveBackdrop: reserveBackdrop),
       );
 }
 

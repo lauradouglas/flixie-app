@@ -17,6 +17,7 @@ import 'movie_detail_action_flow_test.dart' show ActionAnalytics;
 
 class TvDetailFixture {
   final auth = ShowAuth();
+  int seasonCount = 1;
   final watched = <int, bool>{1: false, 2: false, 3: false};
   final writes = <http.Request>[];
   late final http.Client client = MockClient((request) async {
@@ -40,24 +41,25 @@ class TvDetailFixture {
             'numberOfEpisodes': 3,
             'status': 'Returning Series',
             'seasons': [
-              {
-                'id': 1,
-                'seasonNumber': 1,
-                'name': 'Season 1',
-                'episodeCount': 3,
-                'episodes': [
-                  for (var i = 1; i <= 3; i++)
-                    {
-                      'id': i,
-                      'seasonNumber': 1,
-                      'episodeNumber': i,
-                      'name': i == 1 ? 'Pilot reveal' : 'Episode $i reveal',
-                      'airDate': i == 3 ? '2100-01-01' : '2026-01-01',
-                      'overview': 'Secret story $i',
-                      'userState': {'watched': watched[i]}
-                    },
-                ]
-              }
+              for (var season = 1; season <= seasonCount; season++)
+                {
+                  'id': 1,
+                  'seasonNumber': season,
+                  'name': 'Season $season',
+                  'episodeCount': 3,
+                  'episodes': [
+                    for (var i = 1; i <= 3; i++)
+                      {
+                        'id': i,
+                        'seasonNumber': 1,
+                        'episodeNumber': i,
+                        'name': i == 1 ? 'Pilot reveal' : 'Episode $i reveal',
+                        'airDate': i == 3 ? '2100-01-01' : '2026-01-01',
+                        'overview': 'Secret story $i',
+                        'userState': {'watched': watched[i]}
+                      },
+                  ]
+                }
             ],
           }),
           200);
@@ -135,16 +137,63 @@ Future<void> openTvEpisodes(WidgetTester tester) async {
   expect(tab.hitTestable(), findsOneWidget);
   await tester.tap(tab.hitTestable());
   await tester.pumpAndSettle();
+  // The taller poster can leave the episode body outside the sliver viewport.
+  for (var step = 0;
+      step < 12 && find.byType(ShowEpisodeCard).evaluate().isEmpty;
+      step++) {
+    await tester.drag(
+        find.byType(CustomScrollView).first, const Offset(0, -140));
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
-  testWidgets('guest show offers Watchlist without member action clutter', (tester) async {
+  for (final count in [2, 3, 4]) {
+    testWidgets('season overview shows up to three of $count seasons',
+        (tester) async {
+      final fixture = TvDetailFixture()..seasonCount = count;
+      fixture.install();
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(tvDetailApp(fixture));
+      await tester.pumpAndSettle();
+      await scrollTvControlIntoView(tester, find.text('Seasons'));
+      final seasonsHeader = find.ancestor(
+          of: find.text('All episodes'), matching: find.byType(Row)).first;
+      expect(tester.getRect(find.text('All episodes')).right,
+          closeTo(tester.getRect(seasonsHeader).right, 1));
+      expect(find.text('Season 2'), findsOneWidget);
+      expect(find.text('Season 3'), count >= 3 ? findsOneWidget : findsNothing);
+      expect(find.text('Season 4'), findsNothing);
+      expect(find.text('Show remaining seasons'),
+          count > 3 ? findsOneWidget : findsNothing);
+      expect(find.text('Read more'), findsNothing);
+      expect(find.text('A familiar world. A new arrival.'), findsOneWidget);
+      if (count > 3) {
+        await scrollTvControlIntoView(
+            tester, find.text('Show remaining seasons'));
+        await tester.tap(find.text('Show remaining seasons'));
+        await tester.pumpAndSettle();
+        expect(find.text('Season 4'), findsOneWidget);
+        expect(find.text('Show fewer seasons'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('guest show offers Watchlist without member action clutter',
+      (tester) async {
     final fixture = TvDetailFixture()..install();
     fixture.auth.account = null;
     addTearDown(fixture.dispose);
     await tester.pumpWidget(tvDetailApp(fixture));
     await tester.pumpAndSettle();
     expect(find.text('Watchlist'), findsOneWidget);
+    final watchlistRow = find
+        .ancestor(of: find.text('Watchlist'), matching: find.byType(Row))
+        .first;
+    expect(find.descendant(of: watchlistRow, matching: find.text('Share')),
+        findsOneWidget);
+    expect(find.text('Share'), findsOneWidget);
     for (final label in ['Rate', 'Favourite', 'List']) {
       expect(find.text(label), findsNothing);
     }

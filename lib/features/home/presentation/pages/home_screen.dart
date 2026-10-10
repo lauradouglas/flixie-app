@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/guest/presentation/guest_home_screen.dart';
+import '../widgets/trending_carousel_skeleton.dart';
 import '../widgets/in_cinemas_section.dart';
 import '../models/home_image_urls.dart';
 import '../widgets/trending_carousel.dart';
@@ -579,6 +581,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final userId =
         context.select<AuthProvider, String?>((auth) => auth.dbUser?.id);
+    if (userId == null) return const GuestHomeScreen();
     return FlixiePageScaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
@@ -709,7 +712,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (_isLoading && movies.isEmpty)
-                  _buildPosterRailLoadingState('Trending now'),
+                  const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        HomeSectionHeader(title: 'Trending now'),
+                        SizedBox(height: 4),
+                        TrendingCarouselSkeleton()
+                      ]),
                 if (_error != null)
                   ErrorRetryWidget(message: _error!, onRetry: _loadAll),
                 if (movies.isNotEmpty) ...[

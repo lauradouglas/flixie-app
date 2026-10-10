@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/navigation/instant_swipe_page.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,8 +16,15 @@ import 'profile_controller_test.dart' show ProfileAuth;
 class ProfileScreenFixture {
   final auth = ProfileAuth();
   final paths = <String>[];
-  late final router = GoRouter(
-      routes: [GoRoute(path: '/', builder: (_, __) => const ProfileScreen())]);
+  late final router = GoRouter(routes: [
+    GoRoute(path: '/', builder: (_, __) => const ProfileScreen()),
+    GoRoute(
+        path: '/profile/people',
+        pageBuilder: (_, state) => InstantSwipePage(
+            key: state.pageKey,
+            child: Scaffold(
+                appBar: AppBar(), body: const Text('Friends fixture')))),
+  ]);
   late final client = MockClient((request) async {
     paths.add(request.url.path);
     Object value = [];
@@ -78,6 +86,29 @@ Future<void> openProfileTab(WidgetTester tester, String name) async {
 }
 
 void main() {
+  testWidgets('logout replaces the mounted profile with account invitation',
+      (tester) async {
+    final f = ProfileScreenFixture();
+    addTearDown(f.dispose);
+    await http.runWithClient(() async {
+      await tester.pumpWidget(f.app(1));
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileHeader), findsOneWidget);
+      f.auth.select(null);
+      await tester.pumpAndSettle();
+      expect(find.text('Create your account'), findsOneWidget);
+      expect(find.text('Create account'), findsOneWidget);
+      expect(find.text('Already a member? Sign in'), findsOneWidget);
+      expect(find.byType(ProfileHeader), findsNothing);
+      expect(find.text('Guest User'), findsNothing);
+      expect(find.text('Friends & following'), findsNothing);
+      f.auth.select('viewer');
+      await tester.pumpAndSettle();
+      expect(find.byType(ProfileHeader), findsOneWidget);
+      expect(find.text('Create your account'), findsNothing);
+    }, () => f.client);
+  });
+
   testWidgets(
       'notification update preserves header/library and avoids unused friends reads',
       (tester) async {
@@ -100,6 +131,26 @@ void main() {
           same(library));
       expect(find.text('7'), findsOneWidget);
       expect(f.paths, calls);
+    }, () => f.client);
+  });
+  testWidgets('Friends and following pushes and edge swipe restores profile',
+      (tester) async {
+    final f = ProfileScreenFixture();
+    addTearDown(f.dispose);
+    await http.runWithClient(() async {
+      await tester.pumpWidget(f.app(1));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Friends & following'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Friends & following'));
+      await tester.pumpAndSettle();
+      expect(find.text('Friends fixture'), findsOneWidget);
+      expect(f.router.canPop(), true);
+      await tester.dragFrom(const Offset(1, 250), const Offset(650, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Friends fixture'), findsNothing);
+      expect(find.text('Friends & following'), findsOneWidget);
+      expect(f.router.canPop(), false);
     }, () => f.client);
   });
   for (final size in [

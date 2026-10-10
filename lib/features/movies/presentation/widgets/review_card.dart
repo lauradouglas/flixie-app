@@ -19,10 +19,12 @@ class ReviewCard extends StatefulWidget {
     super.key,
     required this.review,
     required this.currentUserId,
+    this.showMediaTitle = false,
   });
 
   final Review review;
   final String? currentUserId;
+  final bool showMediaTitle;
 
   @override
   State<ReviewCard> createState() => _ReviewCardState();
@@ -299,6 +301,15 @@ class _ReviewCardState extends State<ReviewCard> {
                     ],
                   );
                 }),
+                if (widget.showMediaTitle &&
+                    review.movieTitle?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 12),
+                  Text(review.movieTitle!,
+                      style: TextStyle(
+                          color: context.colors.primaryText,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16)),
+                ],
                 if (review.title.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(review.title,

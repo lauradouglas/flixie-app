@@ -77,7 +77,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _openEntity(SearchEntityResult item) async {
     if (item.type == SearchEntityType.collection) {
-      if (!await GuestAccess.require(context, title: 'Explore your collections', path: '/search')) return;
+      if (!await GuestAccess.require(context,
+          title: 'Explore your collections', path: '/search')) return;
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -159,6 +160,9 @@ class _SearchNotificationsButton extends StatelessWidget {
   const _SearchNotificationsButton();
   @override
   Widget build(BuildContext context) {
+    final signedIn =
+        context.select<AuthProvider, bool>((auth) => auth.dbUser != null);
+    if (!signedIn) return const SizedBox.shrink();
     final count = context.select<AuthProvider, int>(
       (auth) => auth.unreadNotificationCount,
     );

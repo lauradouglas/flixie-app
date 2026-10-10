@@ -42,7 +42,10 @@ void main() {
             path: '/', builder: (_, __) => const GuestWelcomeScreen(you: true)),
         GoRoute(
             path: '/auth/signup',
-            builder: (_, __) => const Scaffold(body: Text('Signup fixture')))
+            builder: (_, __) => const Scaffold(body: Text('Signup fixture'))),
+        GoRoute(
+            path: '/auth/login',
+            builder: (_, __) => const Scaffold(body: Text('Login fixture'))),
       ]);
       await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
           value: auth,
@@ -107,6 +110,15 @@ void main() {
       router.pop();
       await tester.pumpAndSettle();
       expect(find.text('Create your account'), findsOneWidget);
+      await tester.ensureVisible(find.text('Already a member? Sign in'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Already a member? Sign in'));
+      await tester.pumpAndSettle();
+      expect(find.text('Login fixture'), findsOneWidget);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Create your account'), findsOneWidget);
+
       await tester.pumpWidget(const SizedBox());
       router.dispose();
       auth.dispose();

@@ -34,8 +34,13 @@ class ShowDetailActionFlow {
   final String? _viewer;
   bool get mounted => context.mounted && _data.owns(_generation, _viewer);
   Future<void> toggleWatchlist({bool offerUndo = true}) async {
-    if (!await GuestAccess.require(context, title: 'Save this show for later', message: 'Create an account to keep your watchlist and come back to this show whenever you’re ready.', path: '/shows/${_data.showId}', intent: 'watchlist')) return ;
-    if (!context.mounted) return ;
+    if (!await GuestAccess.require(context,
+        title: 'Save this show for later',
+        message:
+            'Create an account to keep your watchlist and come back to this show whenever you’re ready.',
+        path: '/shows/${_data.showId}',
+        intent: 'watchlist')) return;
+    if (!context.mounted) return;
     if (_data.updatingAction != null || !context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
@@ -108,8 +113,11 @@ class ShowDetailActionFlow {
   }
 
   Future<void> toggleFavorite({bool offerUndo = true}) async {
-    if (!await GuestAccess.require(context, title: 'Save your favourites', path: '/shows/${_data.showId}', intent: 'favorite')) return ;
-    if (!context.mounted) return ;
+    if (!await GuestAccess.require(context,
+        title: 'Save your favourites',
+        path: '/shows/${_data.showId}',
+        intent: 'favorite')) return;
+    if (!context.mounted) return;
     if (_data.updatingAction != null || !context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
     final analytics = context.read<AnalyticsController>();
@@ -209,8 +217,11 @@ class ShowDetailActionFlow {
   }
 
   Future<void> showAddToListSheet() async {
-    if (!await GuestAccess.require(context, title: 'Build your lists', path: '/shows/${_data.showId}', intent: 'list')) return ;
-    if (!context.mounted) return ;
+    if (!await GuestAccess.require(context,
+        title: 'Build your lists',
+        path: '/shows/${_data.showId}',
+        intent: 'list')) return;
+    if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     final show = _data.show;
@@ -238,8 +249,10 @@ class ShowDetailActionFlow {
   }
 
   Future<void> setSeasonWatched(TvSeason season, bool watched) async {
-    if (!await GuestAccess.require(context, title: 'Keep track of what you watch', path: '/shows/${_data.showId}')) return;
-    if (!context.mounted) return ;
+    if (!await GuestAccess.require(context,
+        title: 'Keep track of what you watch',
+        path: '/shows/${_data.showId}')) return;
+    if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     final show = _data.show;
@@ -280,9 +293,34 @@ class ShowDetailActionFlow {
         userId, show.id, season.seasonNumber, changes, watched);
   }
 
+  Future<void> catchUpToEpisode(TvEpisode selected,
+      {required bool includeSelected}) async {
+    if (!mounted) return;
+    if (!await GuestAccess.require(context,
+        title: 'Keep track of what you watch',
+        path: '/shows/${_data.showId}')) return;
+    if (!mounted) return;
+    final show = _data.show;
+    final userId = _data.auth.dbUser?.id;
+    if (show == null || userId == null) return;
+    final progress = TvShowEpisodeProgress(show);
+    final changes = show
+        .episodesForSeason(selected.seasonNumber)
+        .where((e) =>
+            !e.watched &&
+            progress.isReleased(e) &&
+            (e.episodeNumber < selected.episodeNumber ||
+                (includeSelected && e.episodeNumber == selected.episodeNumber)))
+        .toList();
+    if (changes.isEmpty) return;
+    await applySeasonProgress(
+        userId, show.id, selected.seasonNumber, changes, true,
+        recordWatchDate: false);
+  }
+
   Future<void> applySeasonProgress(String userId, int showId, int seasonNumber,
       List<TvEpisode> episodes, bool watched,
-      {bool undo = false}) async {
+      {bool undo = false, bool recordWatchDate = true}) async {
     if (!mounted || _data.updatingSeasonNumbers.contains(seasonNumber)) return;
     if (episodes.any((e) => _data.updatingEpisodeIds.contains(e.id))) return;
     _data.change(() => _data.updatingSeasonNumbers.add(seasonNumber));
@@ -296,7 +334,11 @@ class ShowDetailActionFlow {
           episodeId: episode.id,
           watched: watched,
           watchedAt: watched
-              ? (undo ? episode.watchedAt : DateTime.now())
+              ? (undo
+                      ? episode.watchedAt
+                      : recordWatchDate
+                          ? DateTime.now()
+                          : null)
                   ?.toUtc()
                   .toIso8601String()
               : null,
@@ -310,8 +352,15 @@ class ShowDetailActionFlow {
     _data.change(() {
       _data.show = _data.show!.withEpisodeProgress({
         for (final episode in applied)
-          episode.id: episode.withWatched(watched,
-              watched ? (undo ? episode.watchedAt : DateTime.now()) : null),
+          episode.id: episode.withWatched(
+              watched,
+              watched
+                  ? (undo
+                      ? episode.watchedAt
+                      : recordWatchDate
+                          ? DateTime.now()
+                          : null)
+                  : null),
       });
       _data.updatingSeasonNumbers.remove(seasonNumber);
     });
@@ -344,8 +393,10 @@ class ShowDetailActionFlow {
 
   Future<void> setEpisodeWatched(TvEpisode episode, bool watched,
       {bool undo = false}) async {
-    if (!await GuestAccess.require(context, title: 'Keep track of what you watch', path: '/shows/${_data.showId}')) return;
-    if (!context.mounted) return ;
+    if (!await GuestAccess.require(context,
+        title: 'Keep track of what you watch',
+        path: '/shows/${_data.showId}')) return;
+    if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     final showId = _data.show?.id;
@@ -533,8 +584,11 @@ class ShowDetailActionFlow {
   }
 
   void showRatingSheet() async {
-    if (!await GuestAccess.require(context, title: 'Rate this show', path: '/shows/${_data.showId}', intent: 'rate')) return ;
-    if (!context.mounted) return ;
+    if (!await GuestAccess.require(context,
+        title: 'Rate this show',
+        path: '/shows/${_data.showId}',
+        intent: 'rate')) return;
+    if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     var selectedRating = _data.userRating;
     var selectedRecommendation = _data.userRecommendation;
@@ -623,8 +677,13 @@ class ShowDetailActionFlow {
   }
 
   Future<void> showWriteReviewSheet() async {
-    if (!await GuestAccess.require(context, title: 'Share your thoughts', message: 'Create an account to write your review and discuss it with other film fans.', path: '/shows/${_data.showId}', intent: 'review')) return ;
-    if (!context.mounted) return ;
+    if (!await GuestAccess.require(context,
+        title: 'Share your thoughts',
+        message:
+            'Create an account to write your review and discuss it with other film fans.',
+        path: '/shows/${_data.showId}',
+        intent: 'review')) return;
+    if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
     final show = _data.show;

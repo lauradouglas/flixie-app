@@ -231,7 +231,7 @@ class _FriendProfileContent {
                         _sharedTasteLine(
                             context,
                             Icons.favorite_rounded,
-                            '$controller.sharedFavCount shared favourites',
+                            '${controller.sharedFavCount} shared favourites',
                             context.colors.danger),
                       ],
                     ],
@@ -272,6 +272,7 @@ class _FriendProfileContent {
         if (controller.reviews.isNotEmpty) ...[
           const SizedBox(height: 18),
           shared.ReviewCard(
+              showMediaTitle: true,
               review: controller.reviews.first,
               currentUserId: context.read<AuthProvider>().dbUser?.id),
         ],
@@ -346,6 +347,7 @@ class _FriendProfileContent {
         Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: shared.ReviewCard(
+                showMediaTitle: true,
                 review: review,
                 currentUserId: context.read<AuthProvider>().dbUser?.id)),
       if (controller.reviews.length > controller.reviewLimit)

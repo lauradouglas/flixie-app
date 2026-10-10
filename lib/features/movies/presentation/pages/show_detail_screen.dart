@@ -1,4 +1,5 @@
-import 'package:flixie_app/features/movies/presentation/widgets/media_synopsis.dart';
+import '../widgets/show_viewing_timeline.dart';
+import 'package:flixie_app/features/sharing/presentation/media_chat_share.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/settings_edit_profile_sheet.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import '../widgets/show_detail_metadata.dart';
@@ -56,7 +57,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   bool _hideEpisodeSpoilers = true;
   bool _savingSpoilerPreference = false;
 
-  bool _showFullOverview = false;
   bool _showAllSeasons = false;
   final _tabContentKey = GlobalKey();
   _ShowDetailTab _selectedTab = _ShowDetailTab.overview;
@@ -129,7 +129,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   void didUpdateWidget(covariant ShowDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.showId != widget.showId) {
-      _showFullOverview = false;
       _showAllSeasons = false;
       _data.load(widget.showId);
     }
@@ -167,8 +166,11 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       body: _data.isLoading
           ? widget.initialTitle != null
               ? MediaDetailPreview(
-                  title: widget.initialTitle!, poster: widget.initialPoster)
-              : const SafeArea(child: MediaDetailScreenSkeleton())
+                  title: widget.initialTitle!,
+                  poster: widget.initialPoster,
+                  reserveBackdrop: true)
+              : const SafeArea(
+                  child: MediaDetailScreenSkeleton(reserveBackdrop: true))
           : _data.error != null
               ? _ErrorState(message: _data.error!, onRetry: _load)
               : _buildBody(context),
@@ -181,6 +183,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       color: _primary,
       onRefresh: _load,
       child: SafeArea(
+          top: false,
           bottom: false,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -239,9 +242,14 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
   Widget _buildSelectedTab(BuildContext context, TvShow show) {
     switch (_selectedTab) {
       case _ShowDetailTab.overview:
+        final hasSynopsis = show.overview?.trim().isNotEmpty == true;
+        final friendSummary = _data.friendSummary ?? show.friendSummary;
         final sections = [
-          _buildSynopsis(context, show),
-          _buildFriendSummary(show),
+          if (hasSynopsis) Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _buildSynopsis(context, show)),
+          if (friendSummary != null && friendSummary.friendCount > 0)
+            _buildFriendSummary(show),
           _buildSeasonOverview(show),
           _buildCastSection(context, show),
           _buildSimilarSection(context, show),
@@ -253,7 +261,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
             .toList();
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           for (var index = 0; index < sections.length; index++) ...[
-            if (index > 0) _sectionGap(),
+            if (index > 0 && !(hasSynopsis && index == 1)) _sectionGap(),
             sections[index],
           ],
         ]);
@@ -282,7 +290,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       );
 
   Widget _buildSliverAppBar(BuildContext context, TvShow show) =>
-      ShowDetailHero(show: show);
+      ShowDetailHero(show: show, animateBackdropInset: true);
 
   Widget _buildSynopsis(BuildContext context, TvShow show) {
     final text = show.overview;
@@ -290,14 +298,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _buildSectionHeader(context, 'About the show'),
       const SizedBox(height: 10),
-      MediaSynopsis(
-        text: text,
-        style:
-            TextStyle(color: context.colors.light, fontSize: 14, height: 1.7),
-        expanded: _showFullOverview,
-        onToggle: () => setState(() => _showFullOverview = !_showFullOverview),
-        actionColor: context.colors.primaryText,
-      ),
+      Text(text,
+          style: TextStyle(
+              color: context.colors.light, fontSize: 14, height: 1.7)),
     ]);
   }
 
@@ -357,152 +360,15 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         (_data.detailsLoading || _data.detailErrors.contains('episodes'))) {
       return _episodeLoadingState();
     }
-    final progress = TvShowEpisodeProgress(show);
-    final next = progress.nextReleased;
-    final episode = next ?? progress.nextScheduled;
-    final hidden = _hideEpisodeSpoilers && episode != null && !episode.watched;
-    final busy =
-        episode != null && _data.updatingEpisodeIds.contains(episode.id);
-    final seasonEpisodes = progress.releasedEpisodes
-        .where((item) => next == null || item.seasonNumber == next.seasonNumber)
-        .toList();
-    final watched = seasonEpisodes.where((item) => item.watched).length;
-    final total = seasonEpisodes.length;
-    final lavender = Theme.of(context).brightness == Brightness.light
-        ? context.colors.primaryText
-        : const Color(0xFFC7B5FF);
-    final peach = context.colors.tertiary;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
-      decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.light
-              ? context.colors.surfaceElevated
-              : const Color(0xFF211738),
-          borderRadius: BorderRadius.circular(16)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(
-              progress.hasNewEpisode
-                  ? Icons.auto_awesome_rounded
-                  : progress.isCaughtUp
-                      ? Icons.task_alt_rounded
-                      : Icons.local_activity_outlined,
-              color: peach,
-              size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(progress.nextLabel,
-                  style: TextStyle(
-                      color: context.colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700))),
-        ]),
-        if (episode != null) ...[
-          const SizedBox(height: 10),
-          InkWell(
-              onTap: () => _showEpisodeSheet(episode),
-              borderRadius: BorderRadius.circular(12),
-              child: Row(children: [
-                SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: hidden
-                            ? ColoredBox(
-                                color: context.colors.surface,
-                                child: Icon(Icons.visibility_off_outlined,
-                                    color: lavender, size: 22))
-                            : EpisodeStill(path: episode.stillPath))),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(
-                          'Season ${episode.seasonNumber} · Episode ${episode.episodeNumber}',
-                          style: TextStyle(
-                              color: context.colors.white,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Text(hidden ? 'Spoilers tucked away' : episode.name,
-                          style: TextStyle(color: context.colors.light)),
-                      if (episode.runtime != null)
-                        Text('${episode.runtime} min',
-                            style: TextStyle(color: context.colors.light)),
-                      if (next == null)
-                        Text('Expected ${_dateLabel(episode.airDate)}',
-                            style: TextStyle(color: context.colors.light)),
-                    ])),
-              ])),
-        ],
-        const SizedBox(height: 10),
-        Text(
-            next == null
-                ? '$watched of $total episodes watched'
-                : '$watched of $total watched this season',
-            style: TextStyle(color: context.colors.light, fontSize: 13)),
-        if (total > 0) ...[
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-              value: watched / total,
-              minHeight: 6,
-              borderRadius: BorderRadius.circular(6),
-              color: lavender,
-              backgroundColor: context.colors.surface),
-        ],
-        if (next != null) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                      backgroundColor: lavender,
-                      foregroundColor:
-                          Theme.of(context).brightness == Brightness.light
-                              ? Colors.white
-                              : const Color(0xFF1A102B),
-                      minimumSize: const Size(48, 46),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      textStyle: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-                  onPressed:
-                      busy ? null : () => _flow.setEpisodeWatched(next, true),
-                  icon: const Icon(Icons.check_rounded, size: 20),
-                  label: Text(busy ? 'Saving…' : 'Mark watched'))),
-        ],
-        Center(
-            child: TextButton(
-                style: TextButton.styleFrom(
-                    foregroundColor: lavender,
-                    minimumSize: const Size(48, 48),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    textStyle: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
-                onPressed: () {
-                  setState(() {
-                    _selectedTab = _ShowDetailTab.episodes;
-                    if (episode != null) {
-                      _data.selectedSeasonNumber = episode.seasonNumber;
-                    }
-                  });
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    final target = _tabContentKey.currentContext;
-                    if (mounted && target != null) {
-                      Scrollable.ensureVisible(target,
-                          alignment: 0.15,
-                          duration: const Duration(milliseconds: 250));
-                    }
-                  });
-                },
-                child: Text(
-                    progress.hasStarted ? 'Edit progress' : 'View episodes'))),
-      ]),
+    final next = TvShowEpisodeProgress(show).nextReleased;
+    return ShowViewingTimeline(
+      show: show,
+      hideSpoilers: _hideEpisodeSpoilers,
+      busy: next != null && _data.updatingEpisodeIds.contains(next.id),
+      onMarkWatched:
+          next == null ? null : () => _flow.setEpisodeWatched(next, true),
+      onOpenEpisode: _showEpisodeSheet,
+      onViewEpisodes: () => _openEpisodes(next?.seasonNumber),
     );
   }
 
@@ -522,14 +388,21 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Widget _buildSeasonOverview(TvShow show) {
     if (show.seasons.isEmpty) return const SizedBox.shrink();
-    final seasons = _showAllSeasons ? show.seasons : show.seasons.take(2);
+    final seasons = _showAllSeasons ? show.seasons : show.seasons.take(3);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Expanded(child: _buildSectionHeader(context, 'Seasons')),
         Flexible(
+          child: Align(
+            alignment: Alignment.centerRight,
             child: TextButton(
-                onPressed: () => _openEpisodes(),
-                child: const Text('All episodes', textAlign: TextAlign.end))),
+              style: TextButton.styleFrom(
+                  alignment: Alignment.centerRight, padding: EdgeInsets.zero),
+              onPressed: () => _openEpisodes(),
+              child: const Text('All episodes', textAlign: TextAlign.end),
+            ),
+          ),
+        ),
       ]),
       for (final season in seasons) ...[
         InkWell(
@@ -538,8 +411,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(children: [
                 SizedBox(
-                  width: 48,
-                  height: 72,
+                  width: 40,
+                  height: 60,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: ShowPoster(path: season.posterPath),
@@ -585,7 +458,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         ),
         Divider(height: 1, color: context.colors.tabBarBorder),
       ],
-      if (show.seasons.length > 2)
+      if (show.seasons.length > 3)
         TextButton(
             onPressed: () => setState(() => _showAllSeasons = !_showAllSeasons),
             child: Text(_showAllSeasons
@@ -596,7 +469,21 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   void _showEpisodeSheet(TvEpisode episode) {
     final flow = _flow;
+    final show = _data.show;
+    final earlier = show == null
+        ? 0
+        : show
+            .episodesForSeason(episode.seasonNumber)
+            .where((e) =>
+                !e.watched &&
+                e.episodeNumber < episode.episodeNumber &&
+                TvShowEpisodeProgress(show).isReleased(e))
+            .length;
     showShowEpisodeSheet(context, episode,
+        hideSpoilers: _hideEpisodeSpoilers && !episode.watched,
+        earlierUnwatched: earlier,
+        onCatchUp: (include) =>
+            flow.catchUpToEpisode(episode, includeSelected: include),
         onToggleWatched: () =>
             flow.setEpisodeWatched(episode, !episode.watched));
   }
@@ -680,6 +567,21 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
                     : _flow.showAddToListSheet,
               ),
             ),
+          Expanded(
+            child: _statusActionItem(
+              icon: Icons.ios_share_rounded,
+              label: 'Share',
+              color: context.colors.secondary,
+              isActive: true,
+              isLoading: false,
+              onTap: () => MediaChatShare(context).show(ChatShareMedia(
+                id: _data.show!.id,
+                title: _data.show!.name,
+                posterPath: _data.show!.posterPath,
+                isShow: true,
+              )),
+            ),
+          ),
         ]),
       ],
     );
@@ -823,27 +725,6 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
       (total, season) => total + season.watchedEpisodeCount,
     );
   }
-}
-
-String _dateLabel(String? date) {
-  if (date == null || date.isEmpty) return '-';
-  final parsed = DateTime.tryParse(date);
-  if (parsed == null) return date;
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec'
-  ];
-  return '${parsed.day} ${months[parsed.month - 1]} ${parsed.year}';
 }
 
 class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {

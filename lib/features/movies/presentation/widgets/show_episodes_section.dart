@@ -1,5 +1,4 @@
 import 'package:flixie_app/features/movies/presentation/widgets/show_episode_card.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/show_detail_images.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flutter/material.dart';
 
@@ -65,70 +64,25 @@ class ShowEpisodesSection extends StatelessWidget {
     final complete =
         released.isNotEmpty && released.every((episode) => episode.watched);
     final busy = updatingSeasons.contains(selected.seasonNumber);
-    // Season labels can wrap; match their actual scaled height rather than
-    // assuming a single line under the poster.
-    final labelHeight = show.seasons.map((season) {
-      final painter = TextPainter(
-          text: TextSpan(
-              text: season.seasonNumber == 0
-                  ? 'Specials'
-                  : 'Season ${season.seasonNumber}',
-              style: DefaultTextStyle.of(context).style),
-          textDirection: Directionality.of(context),
-          textScaler: MediaQuery.textScalerOf(context))
-        ..layout(maxWidth: 96);
-      final height = painter.height;
-      painter.dispose();
-      return height;
-    }).reduce((a, b) => a > b ? a : b);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SizedBox(
-        height: 152 + labelHeight,
-        child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: show.seasons.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final season = show.seasons[index];
-              final active = selected.seasonNumber == season.seasonNumber;
-              return Semantics(
-                  selected: active,
-                  button: true,
-                  child: InkWell(
-                      onTap: () => onSeasonSelected(season.seasonNumber),
-                      borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                          width: 96,
-                          child: Column(children: [
-                            Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: active
-                                            ? FlixieColors.primary
-                                            : Colors.transparent,
-                                        width: 2)),
-                                child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: SizedBox(
-                                        height: 128,
-                                        width: 86,
-                                        child: ShowPoster(
-                                            path: season.posterPath ??
-                                                show.posterPath)))),
-                            const SizedBox(height: 6),
-                            Text(
-                                season.seasonNumber == 0
-                                    ? 'Specials'
-                                    : 'Season ${season.seasonNumber}',
-                                style: TextStyle(
-                                    color: active
-                                        ? context.colors.textPrimary
-                                        : context.colors.light)),
-                          ]))));
-            }),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          for (final season in show.seasons)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(season.seasonNumber == 0
+                    ? 'Specials'
+                    : 'Season ${season.seasonNumber}'),
+                selected: selected.seasonNumber == season.seasonNumber,
+                showCheckmark: false,
+                onSelected: (_) => onSeasonSelected(season.seasonNumber),
+              ),
+            ),
+        ]),
       ),
+      const SizedBox(height: 12),
       SwitchListTile.adaptive(
         contentPadding: EdgeInsets.zero,
         title: const Text('Hide spoilers'),

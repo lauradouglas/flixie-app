@@ -1,3 +1,4 @@
+import 'trending_carousel_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/models/movie_short.dart';
@@ -75,12 +76,7 @@ class InCinemasSectionState extends State<InCinemasSection> {
         Text('${widget.region == 'GB' ? 'UK' : widget.region} cinema releases',
             style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 14),
-        if (_loading && _movies.isEmpty)
-          const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                  child: CircularProgressIndicator(
-                      semanticsLabel: 'Loading cinema releases'))),
+        if (_loading && _movies.isEmpty) const TrendingCarouselSkeleton(),
         if (_failed)
           Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,

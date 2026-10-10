@@ -54,6 +54,38 @@ class FastlaneTest < Minitest::Test
   def teardown
     ENV.replace(@previous_env)
   end
+  def test_production_submit_sends_for_review_and_includes_notes
+    @runner.run(:android, :submit, build_number: 99)
+    upload = @runner.calls.find { |kind, _| kind == :play }.last
+    assert_equal 'production', upload[:track]
+    assert_equal 'completed', upload[:release_status]
+    assert_equal false, upload[:changes_not_sent_for_review]
+    assert_equal false, upload[:rescue_changes_not_sent_for_review]
+    assert_equal false, upload[:skip_upload_changelogs]
+    assert_equal true, upload[:skip_upload_screenshots]
+  end
+
+  def test_apple_submit_preserves_manual_release_and_supplies_notes
+    ENV['APP_STORE_CONNECT_KEY_ID'] = 'fixture-key'
+    ENV['APP_STORE_CONNECT_ISSUER_ID'] = 'fixture-issuer'
+    ENV['APP_STORE_CONNECT_KEY_FILE'] = '/tmp/fixture.p8'
+    ENV['RELEASE_VERSION'] = '2.0.1'
+    @runner.define_singleton_method(:build) { |_| '/tmp/fixture.ipa' }
+    @runner.run(:ios, :submit, build_number: 99, uploaded: true)
+    upload = @runner.calls.find { |kind, _| kind == :apple_screenshots }.last
+    assert_equal true, upload[:submit_for_review]
+    assert_equal false, upload[:automatic_release]
+    assert_equal false, upload[:reject_if_possible]
+    assert_equal '99', upload[:build_number]
+    assert_equal '2.0.1', upload[:app_version]
+    assert_equal true, upload[:skip_screenshots]
+    assert_match(/without signing in/, upload[:release_notes]['en-GB'])
+    @runner.run(:ios, :submit, build_number: 100, uploaded: true, replace_review: true)
+    replacement = @runner.calls.reverse.find { |kind, _| kind == :apple_screenshots }.last
+    assert_equal true, replacement[:reject_if_possible]
+    assert_equal '100', replacement[:build_number]
+  end
+
   def test_screenshot_sdk_process_does_not_inherit_fastlane_bundle
     ENV['BUNDLE_GEMFILE'] = '/tmp/fastlane-only-Gemfile'
     ENV['BUNDLE_PATH'] = '/tmp/fastlane-only-gems'

@@ -1,7 +1,10 @@
+import 'media_backdrop_inset.dart';
+import 'show_status_badge.dart';
+import 'movie_header_backdrop.dart';
+import 'movie_detail_hero_tokens.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/show_detail_images.dart';
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:flixie_app/features/sharing/presentation/media_chat_share.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flutter/material.dart';
 
@@ -9,7 +12,9 @@ import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 class ShowDetailHero extends StatefulWidget {
-  const ShowDetailHero({super.key, required this.show});
+  const ShowDetailHero(
+      {super.key, required this.show, this.animateBackdropInset = false});
+  final bool animateBackdropInset;
   final TvShow show;
   @override
   State<ShowDetailHero> createState() => _ShowDetailHeroState();
@@ -20,56 +25,87 @@ class _ShowDetailHeroState extends State<ShowDetailHero> {
   Widget build(BuildContext context) {
     final show = widget.show;
     return SliverToBoxAdapter(
-        child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(children: [
-                Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _heroIconButton(
-                          icon: flixieBackIcon(context,
-                              backIcon: Icons.arrow_back_ios_new_rounded),
-                          onTap: () => flixieBackOrHome(context)),
-                      _heroIconButton(
-                          icon: Icons.ios_share_rounded,
-                          onTap: () => MediaChatShare(context).show(
-                              ChatShareMedia(
-                                  id: show.id,
-                                  title: show.name,
-                                  posterPath: show.posterPath,
-                                  isShow: true))),
-                    ]),
-                const SizedBox(height: 12),
-                LayoutBuilder(builder: (context, constraints) {
-                  final stacked = constraints.maxWidth < 300 ||
-                      MediaQuery.textScalerOf(context).scale(1) > 1.5;
-                  final poster = SizedBox(
-                      width: 112,
-                      height: 168,
-                      child: InkWell(
-                          onTap: () => _showPosterViewer(show),
-                          child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: ShowPoster(path: show.posterPath))));
-                  final info = _buildHeroInformation(show, compact: true);
-                  return stacked
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [poster, const SizedBox(height: 16), info])
-                      : Row(children: [
-                          poster,
-                          const SizedBox(width: 20),
-                          Expanded(child: info)
-                        ]);
-                }),
-              ]),
-            )));
+      child: LayoutBuilder(builder: (context, constraints) {
+        final safeTop = MediaQuery.paddingOf(context).top;
+        final hasBackdrop = show.backdropPath?.trim().isNotEmpty == true;
+        final stacked = constraints.maxWidth < 330 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3;
+        final posterWidth = (constraints.maxWidth *
+                (constraints.maxWidth < 500
+                    ? MovieDetailHeroTokens.posterCompactWidthFactor
+                    : MovieDetailHeroTokens.posterRegularWidthFactor))
+            .clamp(MovieDetailHeroTokens.posterMinWidth,
+                MovieDetailHeroTokens.posterMaxWidth);
+        final poster = SizedBox(
+          width: posterWidth,
+          child: AspectRatio(
+            aspectRatio: 2 / 3,
+            child: InkWell(
+              onTap: () => _showPosterViewer(show),
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.horizontal(right: Radius.circular(12)),
+                child: ShowPoster(path: show.posterPath),
+              ),
+            ),
+          ),
+        );
+        final info = Padding(
+          padding: const EdgeInsets.only(right: 16, top: 4),
+          child: _buildHeroInformation(show, compact: true),
+        );
+        return Stack(children: [
+          if (hasBackdrop)
+            Positioned.fill(
+                child: MovieHeaderBackdrop(path: show.backdropPath!.trim())),
+          MediaBackdropInset(
+            animate: widget.animateBackdropInset,
+            hasBackdrop: hasBackdrop,
+            width: constraints.maxWidth,
+            top: safeTop,
+            bottom: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (stacked)
+                  Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        poster,
+                        const SizedBox(height: 16),
+                        Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: info)
+                      ])
+                else
+                  Row(
+                      crossAxisAlignment: hasBackdrop
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
+                      children: [
+                        poster,
+                        const SizedBox(width: 12),
+                        Expanded(child: info)
+                      ]),
+              ],
+            ),
+          ),
+          Positioned(
+            top: safeTop + MovieDetailHeroTokens.heroControlsTopInset,
+            left: MovieDetailHeroTokens.pageHorizontalPadding,
+            child: _heroIconButton(
+              icon: flixieBackIcon(context,
+                  backIcon: Icons.arrow_back_ios_new_rounded),
+              onTap: () => flixieBackOrHome(context),
+            ),
+          ),
+        ]);
+      }),
+    );
   }
 
   Widget _buildHeroInformation(TvShow show, {required bool compact}) {
-    final year = DateTime.tryParse(show.firstAirDate ?? '')?.year;
+    final years = showYearRange(show);
     final seasons = show.numberOfSeasons ?? show.seasons.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,15 +129,11 @@ class _ShowDetailHeroState extends State<ShowDetailHero> {
         const SizedBox(height: 7),
         Text(
             [
-              if (year != null) '$year',
+              if (years != null) years,
               if (seasons > 0)
                 '$seasons ${seasons == 1 ? 'season' : 'seasons'}',
             ].join('  ·  '),
             style: TextStyle(color: context.colors.light, fontSize: 14)),
-        if ((show.status ?? '').isNotEmpty) ...[
-          const SizedBox(height: 8),
-          _StatusChip(label: show.status!),
-        ],
       ],
     );
   }
@@ -213,15 +245,5 @@ class _ShowScoreBadge extends StatelessWidget {
                 : 'No FlixScore yet')),
       ),
     );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return FlixiePill.label(label: Text(label));
   }
 }

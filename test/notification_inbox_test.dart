@@ -5,6 +5,24 @@ import 'package:flixie_app/features/profile/presentation/widgets/notification_in
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 void main() {
+  test('community reaction identifies the hydrated sender and their border',
+      () {
+    final notification = FlixieNotification.fromJson({
+      'userId': 'me',
+      'type': 'COMMUNITY_REACTION',
+      'data': {'actorId': 'actor'},
+      'senderUser': {
+        'id': 'actor',
+        'username': 'Robin',
+        'profileBadges': ['EARLY_ADOPTER']
+      }
+    });
+    expect(notificationHeadline(notification),
+        'Robin reacted to your community post');
+    expect(notification.senderInitials, 'R');
+    expect(notification.senderProfileBadges, ['EARLY_ADOPTER']);
+  });
+
   test(
       'community reply digest uses the conversation summary and becomes unread again',
       () {

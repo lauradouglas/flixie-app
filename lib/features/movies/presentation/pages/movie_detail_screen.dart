@@ -1,3 +1,4 @@
+import '../widgets/movie_detail_loading_sections.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_synopsis.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import '../controllers/movie_detail_controller.dart';
@@ -150,6 +151,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       return child;
     }
     if (state == 'loading') {
+      if (key == 'providers') return const MovieProvidersSkeleton();
+      if (key == 'credits') return const MovieCastSkeleton();
+      if (key == 'images') return child;
       if (child is SizedBox && child.child == null) {
         return const SizedBox.shrink();
       }
@@ -193,8 +197,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         backgroundColor: context.colors.background,
         body: widget.initialTitle != null
             ? MediaDetailPreview(
-                title: widget.initialTitle!, poster: widget.initialPoster)
-            : const SafeArea(child: MediaDetailScreenSkeleton()),
+                title: widget.initialTitle!,
+                poster: widget.initialPoster,
+                reserveBackdrop: true)
+            : const SafeArea(
+                child: MediaDetailScreenSkeleton(reserveBackdrop: true)),
       );
     }
 
@@ -275,6 +282,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             slivers: [
               SliverToBoxAdapter(
                 child: MovieDetailHero(
+                    animateBackdropInset: true,
                     movie: movie,
                     onShowScoreInfo: () => _showFlixScoreInfo(context)),
               ),
@@ -661,9 +669,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   /// with a separate watch-history action.
   Widget _buildWatchEntryStatusRow() {
     if (_data.watchHistoryLoading && !_data.watchHistoryLoaded) {
-      return const ContentPlaceholder(
-          label: 'Loading watch history',
-          style: ContentPlaceholderStyle.compact);
+      return const MovieWatchEntrySkeleton();
     }
     if (_data.sectionStates['history'] == 'error') {
       return TextButton.icon(

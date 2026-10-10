@@ -71,7 +71,8 @@ String notificationHeadline(FlixieNotification n) {
         : 'People have replied to your community post';
   }
   if (n.type == FlixieNotification.communityReaction) {
-    return 'Someone reacted to your community post';
+    final name = n.senderName.isEmpty ? 'Someone' : n.senderName;
+    return '$name reacted to your community post';
   }
   final name = n.senderName.isEmpty ? 'Someone' : n.senderName;
   if (n.type == FlixieNotification.friendRequest) {

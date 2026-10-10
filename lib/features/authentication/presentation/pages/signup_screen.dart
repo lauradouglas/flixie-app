@@ -649,7 +649,13 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 22),
               TermsAgreementField(onChanged: (value) => _termsAccepted = value),
               const SizedBox(height: 16),
-              if (!context.read<AuthProvider>().needsSocialProfile) TextButton(onPressed: () { GuestAccess.clear(); context.go('/'); }, child: const Text('Keep exploring')),
+              if (!context.read<AuthProvider>().needsSocialProfile)
+                TextButton(
+                    onPressed: () {
+                      GuestAccess.clear();
+                      context.go('/');
+                    },
+                    child: const Text('Keep exploring')),
               PrimaryButton(
                 label: 'Continue',
                 isLoading: isLoading,
@@ -666,7 +672,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         ?.copyWith(color: context.colors.light),
                   ),
                   TextButton(
-                    onPressed: isLoading ? null : _leaveSignup,
+                    onPressed: isLoading
+                        ? null
+                        : () => context.pushReplacement('/auth/login'),
                     style: TextButton.styleFrom(
                       foregroundColor: context.colors.primaryTint,
                       padding: const EdgeInsets.symmetric(horizontal: 8),

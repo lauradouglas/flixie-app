@@ -7,8 +7,14 @@ import 'package:flixie_app/models/show.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
 void showShowEpisodeSheet(BuildContext context, TvEpisode episode,
-    {required VoidCallback onToggleWatched}) {
-  final still = showImageUrl(episode.stillPath, 'w780');
+    {required VoidCallback onToggleWatched,
+    bool hideSpoilers = false,
+    int earlierUnwatched = 0,
+    ValueChanged<bool>? onCatchUp}) {
+  final still = hideSpoilers ? null : showImageUrl(episode.stillPath, 'w780');
+  var includeSelected = false;
+  final released =
+      DateTime.tryParse(episode.airDate ?? '')?.isAfter(DateTime.now()) != true;
   showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
@@ -20,154 +26,186 @@ void showShowEpisodeSheet(BuildContext context, TvEpisode episode,
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
     builder: (sheetContext) {
-      return DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.68,
-        minChildSize: 0.45,
-        maxChildSize: 0.92,
-        builder: (_, scrollController) {
-          return ListView(
-            controller: scrollController,
-            padding: EdgeInsets.zero,
-            children: [
-              Stack(
-                children: [
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: still == null
-                        ? ColoredBox(color: context.colors.surface)
-                        : CachedNetworkImage(
-                            imageUrl: still,
-                            fit: BoxFit.cover,
-                          ),
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0.08),
-                            context.colors.background.withValues(alpha: 0.92),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        width: 42,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.32),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 14,
-                    right: 12,
-                    child: IconButton.filled(
-                      onPressed: () => Navigator.pop(sheetContext),
-                      icon: const Icon(Icons.close_rounded),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.black.withValues(alpha: 0.42),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      return StatefulBuilder(builder: (sheetContext, setSheetState) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.68,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          builder: (_, scrollController) {
+            return ListView(
+              controller: scrollController,
+              padding: EdgeInsets.zero,
+              children: [
+                Stack(
                   children: [
-                    Text(
-                      'Season ${episode.seasonNumber} · Episode ${episode.episodeNumber}',
-                      style: const TextStyle(
-                        color: FlixieColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: still == null
+                          ? ColoredBox(color: context.colors.surface)
+                          : CachedNetworkImage(
+                              imageUrl: still,
+                              fit: BoxFit.cover,
+                            ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      episode.name,
-                      style: TextStyle(
-                        color: context.colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        height: 1.08,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _EpisodeInfoChip(
-                          icon: Icons.calendar_month_rounded,
-                          label: _dateLabel(episode.airDate),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.08),
+                              context.colors.background.withValues(alpha: 0.92),
+                            ],
+                          ),
                         ),
-                        if (episode.runtime != null)
-                          _EpisodeInfoChip(
-                            icon: Icons.schedule_rounded,
-                            label: '${episode.runtime}m',
-                          ),
-                        if (episode.voteAverage != null)
-                          _EpisodeInfoChip(
-                            icon: Icons.star_rounded,
-                            label:
-                                '${episode.voteAverage!.toStringAsFixed(1)}/10',
-                          ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 18),
-                    _CompactPillButton(
-                      icon: episode.watched
-                          ? Icons.check_circle
-                          : Icons.check_circle_outline,
-                      label:
-                          episode.watched ? 'Mark unwatched' : 'Mark watched',
-                      onTap: () {
-                        Navigator.pop(sheetContext);
-                        onToggleWatched();
-                      },
+                    Positioned(
+                      top: 10,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.32),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      ),
                     ),
-                    if ((episode.overview ?? '').isNotEmpty) ...[
-                      const SizedBox(height: 22),
+                    Positioned(
+                      top: 14,
+                      right: 12,
+                      child: IconButton.filled(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black.withValues(alpha: 0.42),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Overview',
-                        style: TextStyle(
-                          color: context.colors.white,
-                          fontSize: 17,
+                        'Season ${episode.seasonNumber} · Episode ${episode.episodeNumber}',
+                        style: const TextStyle(
+                          color: FlixieColors.primary,
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
-                        episode.overview!,
+                        hideSpoilers ? 'Title hidden' : episode.name,
                         style: TextStyle(
-                          color: context.colors.light,
-                          fontSize: 15,
-                          height: 1.42,
+                          color: context.colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          height: 1.08,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _EpisodeInfoChip(
+                            icon: Icons.calendar_month_rounded,
+                            label: _dateLabel(episode.airDate),
+                          ),
+                          if (episode.runtime != null)
+                            _EpisodeInfoChip(
+                              icon: Icons.schedule_rounded,
+                              label: '${episode.runtime}m',
+                            ),
+                          if (episode.voteAverage != null)
+                            _EpisodeInfoChip(
+                              icon: Icons.star_rounded,
+                              label:
+                                  '${episode.voteAverage!.toStringAsFixed(1)}/10',
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      if (earlierUnwatched > 0 && onCatchUp != null) ...[
+                        Text('Already seen the earlier episodes?',
+                            style: TextStyle(
+                                color: context.colors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        Text(
+                            'Mark $earlierUnwatched unwatched episodes before this one in Season ${episode.seasonNumber}.',
+                            style: TextStyle(color: context.colors.light)),
+                        if (!episode.watched && released)
+                          CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                  'Include episode ${episode.episodeNumber} too'),
+                              value: includeSelected,
+                              onChanged: (value) => setSheetState(
+                                  () => includeSelected = value ?? false)),
+                        FilledButton(
+                            onPressed: () {
+                              Navigator.pop(sheetContext);
+                              onCatchUp(includeSelected);
+                            },
+                            child: Text(
+                                'Mark ${earlierUnwatched + (includeSelected ? 1 : 0)} episodes watched')),
+                        const SizedBox(height: 12),
+                      ],
+                      if (released || episode.watched)
+                        _CompactPillButton(
+                          icon: episode.watched
+                              ? Icons.check_circle
+                              : Icons.check_circle_outline,
+                          label: episode.watched
+                              ? 'Mark unwatched'
+                              : 'Mark watched',
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            onToggleWatched();
+                          },
+                        ),
+                      if (!hideSpoilers &&
+                          (episode.overview ?? '').isNotEmpty) ...[
+                        const SizedBox(height: 22),
+                        Text(
+                          'Overview',
+                          style: TextStyle(
+                            color: context.colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          episode.overview!,
+                          style: TextStyle(
+                            color: context.colors.light,
+                            fontSize: 15,
+                            height: 1.42,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
-      );
+              ],
+            );
+          },
+        );
+      });
     },
   );
 }
