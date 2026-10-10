@@ -5,8 +5,9 @@ import '../pages/friends_activity_feed.dart';
 
 /// Mount scopes on first visit and retain their state and scroll position.
 class SocialActivityView extends StatefulWidget {
-  const SocialActivityView({super.key, this.feeds});
+  const SocialActivityView({super.key, this.feeds, this.active = true});
   final List<Widget>? feeds;
+  final bool active;
   @override
   State<SocialActivityView> createState() => _SocialActivityViewState();
 }
@@ -17,11 +18,15 @@ class _SocialActivityViewState extends State<SocialActivityView> {
   @override
   Widget build(BuildContext context) {
     final feeds = widget.feeds ??
-        const [
+        [
           CommunityActivityFeed(
-              initialFollowing: true, showAudienceSelector: false),
-          FriendsActivityFeed(),
-          CommunityActivityFeed(showAudienceSelector: false),
+              initialFollowing: true,
+              showAudienceSelector: false,
+              active: widget.active && _selected == 0),
+          const FriendsActivityFeed(),
+          CommunityActivityFeed(
+              showAudienceSelector: false,
+              active: widget.active && _selected == 2),
         ];
     return Column(children: [
       Padding(

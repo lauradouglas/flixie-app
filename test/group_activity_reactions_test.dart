@@ -16,6 +16,8 @@ import 'package:flixie_app/features/social/presentation/widgets/group_activity_c
 
 class _Auth extends ChangeNotifier implements AuthProvider {
   @override
+  int get activityVersion => 0;
+  @override
   User get dbUser => const User(
       id: 'me',
       username: 'Laura',

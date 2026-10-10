@@ -22,6 +22,9 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
   List<ActivityListItem> _items = const [];
   bool _loading = true;
   String? _error;
+  int _generation = 0;
+  String? _viewer;
+  bool _viewerKnown = false;
 
   @override
   void initState() {
@@ -39,6 +42,25 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
     _load(showSpinner: cached == null);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewer = context.watch<AuthProvider>().dbUser?.id;
+    final changed = _viewerKnown && _viewer != viewer;
+    _viewerKnown = true;
+    _viewer = viewer;
+    if (!changed) return;
+    _generation++;
+    _items = const [];
+    _loading = viewer != null;
+    _error = null;
+    if (viewer != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load(showSpinner: true);
+      });
+    }
+  }
+
   void _starsChanged() {
     if (mounted) setState(() {});
   }
@@ -52,6 +74,9 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
   Future<void> _load({bool showSpinner = false}) async {
     final auth = context.read<AuthProvider>();
     final userId = auth.dbUser?.id;
+    final generation = ++_generation;
+    bool owns() =>
+        mounted && generation == _generation && auth.dbUser?.id == userId;
     if (userId == null) {
       if (mounted) setState(() => _loading = false);
       return;
@@ -65,15 +90,15 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
         limit: 100,
         cachedFriends: auth.cachedFriends,
       );
-      if (mounted) {
+      if (owns()) {
         setState(() => _items = items);
       }
     } catch (_) {
-      if (mounted && _items.isEmpty) {
+      if (owns() && _items.isEmpty) {
         setState(() => _error = 'Couldn\'t load friend activity.');
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (owns()) setState(() => _loading = false);
     }
   }
 

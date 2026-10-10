@@ -1,3 +1,4 @@
+import '../models/home_image_urls.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -262,10 +263,8 @@ class PersonalizedRecommendationCard extends StatelessWidget {
   }
 
   Widget _poster(BuildContext context) {
-    final path = movie.poster;
-    if (path == null || path.isEmpty) return _fallbackPoster(context);
-    final url =
-        path.startsWith('http') ? path : 'https://image.tmdb.org/t/p/w500$path';
+    final url = homeRecommendationImageUrl(movie.poster);
+    if (url == null) return _fallbackPoster(context);
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,

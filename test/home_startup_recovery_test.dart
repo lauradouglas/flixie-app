@@ -19,7 +19,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 class Session extends AuthService {
   Session() : super(firebaseAuth: Firebase());
   final events = StreamController<fb.User?>.broadcast(sync: true);
-  final identity = Identity('home-startup-fixture');
+  var identity = Identity('home-startup-fixture');
   @override
   Stream<fb.User?> get authStateChanges => events.stream;
   @override
@@ -32,10 +32,17 @@ void main() {
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     MovieCacheService().clearCache();
+    HomeScreen.clearSessionSnapshotForTesting();
+    var profileCalls = 0;
+    final profileUsers = <String>[];
     final session = Session();
     final auth = AuthProvider(session, MovieService(),
         prefetchAfterAuth: false,
-        profileLoader: (id) async => profile(id),
+        profileLoader: (id) async {
+          profileCalls++;
+          profileUsers.add(id);
+          return profile(id);
+        },
         termsStatusLoader: () async => true);
     final cache = WatchRequestCache();
     final trending = Completer<http.Response>();
@@ -77,6 +84,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('Some Home sections couldn’t refresh.'), findsOneWidget);
       expect(find.text('Trending now'), findsOneWidget);
+      expect(profileCalls, 1);
       // Use Home's refresh action; the profile remains available throughout.
       final refresh = tester
           .widget<RefreshIndicator>(find.byType(RefreshIndicator))
@@ -85,8 +93,55 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await refresh;
       expect(recommendationCalls, 2);
+      expect(profileCalls, 2, reason: 'manual refresh fetches a new profile');
       expect(find.text('Some Home sections couldn’t refresh.'), findsNothing);
       expect(find.text('Trending now'), findsOneWidget);
+      // Resume updates the profile once; Home refreshes sections using that data.
+      await auth.handleAppResumed();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(profileCalls, 3, reason: 'Home must not refetch the resume profile');
+      expect(auth.activityIncludesRefreshedProfile, isTrue);
+      expect(find.text('Trending now'), findsOneWidget);
+      await auth.handleAppResumed();
+      await tester.pump();
+      expect(profileCalls, 3, reason: 'quick resume remains throttled');
+
+      final refreshAfterResume = tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await refreshAfterResume;
+      expect(profileCalls, 4,
+          reason: 'manual refresh ignores the resume reuse marker');
+
+      auth.markActivityChanged();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(auth.activityIncludesRefreshedProfile, isFalse);
+      expect(profileCalls, 5, reason: 'action updates still fetch a new profile');
+
+      session.identity = Identity('other-home-fixture');
+      session.events.add(session.identity);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(auth.dbUser?.id, 'other-home-fixture');
+      expect(auth.activityIncludesRefreshedProfile, isTrue,
+          reason: 'Home reuses the fresh profile belonging to the new account');
+      expect(profileCalls, 6, reason: 'switch restores the new account profile');
+      expect(profileUsers.last, 'other-home-fixture');
+      final switchedRefresh = tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await switchedRefresh;
+      expect(profileCalls, 7,
+          reason: 'the new account can still explicitly refresh its profile');
+      expect(profileUsers.sublist(5),
+          ['other-home-fixture', 'other-home-fixture']);
+      expect(auth.dbUser?.id, 'other-home-fixture');
       await tester.pumpWidget(const SizedBox());
       auth.dispose();
       cache.dispose();
@@ -95,8 +150,9 @@ void main() {
     },
         () => MockClient((request) async {
               final path = request.url.path;
-              if (path == '/community/activity')
+              if (path == '/community/activity') {
                 return response({'items': [], 'nextCursor': null});
+              }
               if (path.contains('/trending/')) {
                 if (!trending.isCompleted) return await trending.future;
                 return response([

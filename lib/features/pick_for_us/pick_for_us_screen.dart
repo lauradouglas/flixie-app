@@ -1,99 +1,51 @@
+export 'data/pick_for_us_service.dart';
+export 'models/pick_for_us_result.dart';
+import 'data/pick_for_us_service.dart';
+import 'models/pick_for_us_result.dart';
+import 'controllers/pick_people_controller.dart';
+import 'widgets/pick_people_picker.dart';
+import 'widgets/pick_result_card.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/watchlist/domain/tonight_filters.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/api/api_client.dart';
-import 'package:flixie_app/features/social/data/friend_service.dart';
-import 'package:flixie_app/features/social/data/group_service.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
-import 'package:flixie_app/models/movie_short.dart';
 
-class PickForUsResult {
-  final MovieShort movie;
-  final int runtime;
-  const PickForUsResult(this.movie, this.runtime);
-  factory PickForUsResult.fromJson(Map<String, dynamic> json) =>
-      PickForUsResult(
-          MovieShort.fromJson(json), (json['runtime'] as num).toInt());
-}
-
-class PickForUsResponse {
-  final List<PickForUsResult> choices;
-  final String? message;
-  const PickForUsResponse(this.choices, this.message);
-}
-
-class PickForUsService {
-  Future<FriendsData> friends(String id) => FriendService.getFriends(id);
-  Future<List<Group>> groups(String id) => GroupService.getUserGroups(id);
-  Future<PickForUsResponse> pick(
-      {String? friendId,
-      String? groupId,
-      String request = '',
-      bool allowRewatches = false,
-      Set<String> avoid = const {},
-      Set<int> excludeMovieIds = const {},
-      List<int> genreIds = const [],
-      bool includePossible = true,
-      bool includeUnknownContent = false,
-      required int maxMinutes,
-      required String mood,
-      required String venue,
-      required String watching,
-      required bool openToRent}) async {
-    final data = await ApiClient.post('/recommendations/pick-for-us',
-        timeout: const Duration(seconds: 60),
-        body: {
-          if (friendId != null) 'friendId': friendId,
-          if (groupId != null) 'groupId': groupId,
-          'maxMinutes': maxMinutes,
-          'mood': mood,
-          'request': request,
-          'allowRewatches': allowRewatches,
-          'avoid': avoid.toList(),
-          if (excludeMovieIds.isNotEmpty)
-            'excludeMovieIds': excludeMovieIds.toList(),
-          'genreIds': genreIds,
-          'includePossible': includePossible,
-          'includeUnknownContent': includeUnknownContent,
-          'venue': venue,
-          'watching': watching,
-          'openToRent': openToRent,
-        }) as Map<String, dynamic>;
-    return PickForUsResponse(
-        (data['choices'] as List)
-            .map((e) => PickForUsResult.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        data['message'] as String?);
-  }
-}
-
-class PickForUsScreen extends StatefulWidget {
+class PickForUsScreen extends StatelessWidget {
   const PickForUsScreen({super.key, required this.userId, this.service});
   final String userId;
   final PickForUsService? service;
   @override
-  State<PickForUsScreen> createState() => _PickForUsScreenState();
+  Widget build(BuildContext context) => _PickForUsFlow(
+      key: ValueKey((userId, service)), userId: userId, service: service);
 }
 
-class _PickForUsScreenState extends State<PickForUsScreen> {
+class _PickForUsFlow extends StatefulWidget {
+  const _PickForUsFlow({super.key, required this.userId, this.service});
+  final String userId;
+  final PickForUsService? service;
+  @override
+  State<_PickForUsFlow> createState() => _PickForUsScreenState();
+}
+
+class _PickForUsScreenState extends State<_PickForUsFlow> {
   late final PickForUsService _service = widget.service ?? PickForUsService();
   final _scroll = ScrollController();
-  final _search = TextEditingController();
-  List<Friendship> _friends = [];
-  List<Group> _groups = [];
-  String? _friendId, _groupId, _error, _peopleError;
+  late final _peopleController =
+      PickPeopleController(userId: widget.userId, service: _service);
+  List<Friendship> get _friends => _peopleController.friends;
+  List<Group> get _groups => _peopleController.groups;
+  String? _friendId, _groupId, _error;
   String _company = 'solo';
   WatchlistMood _mood = WatchlistMood.any;
   int _step = 0, _minutes = 120, _selectedPick = 0;
   String _venue = 'streaming', _watching = 'together';
   bool _openToRent = false, _allowRewatches = false;
-  bool _loadingPeople = false, _picking = false, _refining = false;
+  bool _picking = false, _refining = false;
   final Set<String> _avoid = {};
   final Set<int> _shownIds = {};
   List<int> _genreIds = [];
@@ -134,51 +86,18 @@ class _PickForUsScreenState extends State<PickForUsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPeople();
+    _peopleController.addListener(_peopleChanged);
   }
 
   @override
   void dispose() {
     _scroll.dispose();
-    _search.dispose();
+    _peopleController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadPeople() async {
-    if (_loadingPeople) return;
-    setState(() {
-      _loadingPeople = true;
-      _peopleError = null;
-    });
-    // Social loading must never hold up a solo pick. Each list can recover independently.
-    await Future.wait([
-      () async {
-        try {
-          final friends = await _service.friends(widget.userId);
-          if (mounted) setState(() => _friends = friends.friendships);
-        } catch (_) {
-          if (mounted) {
-            setState(() => _peopleError =
-                'Some viewers couldn’t load. Retry, or pick just for you.');
-          }
-        }
-      }(),
-      () async {
-        try {
-          final groups = await _service.groups(widget.userId);
-          if (mounted) {
-            setState(
-                () => _groups = groups.where((g) => g.id != null).toList());
-          }
-        } catch (_) {
-          if (mounted) {
-            setState(() => _peopleError =
-                'Some viewers couldn’t load. Retry, or pick just for you.');
-          }
-        }
-      }(),
-    ]);
-    if (mounted) setState(() => _loadingPeople = false);
+  void _peopleChanged() {
+    if (mounted) setState(() {});
   }
 
   void _top() {
@@ -469,7 +388,7 @@ class _PickForUsScreenState extends State<PickForUsScreen> {
           }.entries)
             _pill(entry.value, _company == entry.key, () {
               _company = entry.key;
-              _search.clear();
+              _peopleController.load(_company);
             }),
         ]),
         if (!_solo) ..._people(),
@@ -569,94 +488,26 @@ class _PickForUsScreenState extends State<PickForUsScreen> {
         ),
       ];
 
-  List<Widget> _people() {
-    final query = _search.text.trim().toLowerCase();
-    final friends = _friends
-        .map((f) => f.friendUser)
-        .whereType<FriendshipUser>()
-        .where((f) => f.displayName.toLowerCase().contains(query))
-        .toList();
-    final groups =
-        _groups.where((g) => g.name.toLowerCase().contains(query)).toList();
-    return [
-      const SizedBox(height: 12),
-      if (_loadingPeople) const LinearProgressIndicator(),
-      if (_peopleError != null) ...[
-        _note(_peopleError!),
-        TextButton(
-            onPressed: _loadingPeople ? null : _loadPeople,
-            child: const Text('Retry viewers')),
-      ],
-      TextField(
-          controller: _search,
-          onChanged: (_) => setState(() {}),
-          decoration: InputDecoration(
-              labelText:
-                  _company == 'friend' ? 'Find a friend' : 'Find a group',
-              prefixIcon: const Icon(Icons.search))),
-      const SizedBox(height: 8),
-      if (!_loadingPeople &&
-          (_company == 'friend' ? friends.isEmpty : groups.isEmpty))
-        _note(query.isNotEmpty
-            ? 'No matches. Try another name.'
-            : _peopleError != null
-                ? 'Your saved viewers will appear here when loading succeeds.'
-                : _company == 'friend'
-                    ? 'No friends yet. You can pick solo, or add friends in Social.'
-                    : 'No groups yet. You can pick solo, or create a group in Social.'),
-      ConstrainedBox(
-          constraints:
-              BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .3),
-          child: ListView(
-            shrinkWrap: true,
-            primary: false,
-            children: _company == 'friend'
-                ? [
-                    for (final friend in friends)
-                      Semantics(
-                          selected: _friendId == friend.id,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 4),
-                            leading: ProfileAvatarView(
-                                avatar: friend.avatar,
-                                profileBadges: friend.profileBadges,
-                                fallbackText:
-                                    friend.initials ?? friend.displayName,
-                                fallbackColor: FlixieColors.primary,
-                                size: 40),
-                            title: Text(friend.displayName),
-                            trailing: Icon(_friendId == friend.id
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_off),
-                            onTap: () => setState(() {
-                              _friendId = friend.id;
-                              _groupId = null;
-                            }),
-                          )),
-                  ]
-                : [
-                    for (final group in groups)
-                      Semantics(
-                          selected: _groupId == group.id,
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.groups_outlined),
-                            title: Text(group.name),
-                            subtitle:
-                                const Text('Accepted members · 2–12 viewers'),
-                            trailing: Icon(_groupId == group.id
-                                ? Icons.radio_button_checked
-                                : Icons.radio_button_off),
-                            onTap: () => setState(() {
-                              _groupId = group.id;
-                              _friendId = null;
-                            }),
-                          )),
-                  ],
-          )),
-    ];
-  }
+  List<Widget> _people() => [
+        PickPeoplePicker(
+            key: ValueKey(_company),
+            company: _company,
+            friends: _friends,
+            groups: _groups,
+            loading: _peopleController.loading(_company),
+            error: _peopleController.error(_company),
+            friendId: _friendId,
+            groupId: _groupId,
+            onRetry: () => _peopleController.load(_company),
+            onFriend: (id) => setState(() {
+                  _friendId = id;
+                  _groupId = null;
+                }),
+            onGroup: (id) => setState(() {
+                  _groupId = id;
+                  _friendId = null;
+                }))
+      ];
 
   List<Widget> _results() {
     final choices = _result!.choices;
@@ -692,7 +543,7 @@ class _PickForUsScreenState extends State<PickForUsScreen> {
           ]),
         ],
         const SizedBox(height: 20),
-        _choice(choices[_selectedPick]),
+        PickResultCard(pick: choices[_selectedPick], solo: _solo),
         Wrap(alignment: WrapAlignment.center, spacing: 12, children: [
           TextButton(
               onPressed: _picking ? null : () => _pick(different: true),
@@ -779,80 +630,5 @@ class _PickForUsScreenState extends State<PickForUsScreen> {
                 ]),
               ))),
     );
-  }
-
-  Widget _choice(PickForUsResult pick) {
-    final movie = pick.movie;
-    final poster = movie.poster;
-    final image = poster == null
-        ? null
-        : poster.startsWith('http')
-            ? poster
-            : 'https://image.tmdb.org/t/p/w342$poster';
-    final artwork = ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: image == null
-            ? Container(
-                width: 104,
-                height: 156,
-                color: context.colors.surface,
-                child: const Icon(Icons.movie_outlined, size: 40))
-            : CachedNetworkImage(
-                imageUrl: image,
-                width: 104,
-                height: 156,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                    width: 104,
-                    height: 156,
-                    color: context.colors.surface,
-                    child: const Icon(Icons.movie_outlined, size: 40))));
-    final title =
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(movie.name,
-          style: Theme.of(context)
-              .textTheme
-              .headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w800)),
-      const SizedBox(height: 8),
-      _note('${pick.runtime} min'),
-    ]);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      LayoutBuilder(
-          builder: (context, constraints) => constraints.maxWidth < 360 &&
-                  MediaQuery.textScalerOf(context).scale(16) > 22
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [artwork, const SizedBox(height: 16), title])
-              : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  artwork,
-                  const SizedBox(width: 20),
-                  Expanded(child: title)
-                ])),
-      if (movie.overview?.isNotEmpty == true) ...[
-        const SizedBox(height: 20),
-        Text(movie.overview!, style: const TextStyle(height: 1.5))
-      ],
-      if (movie.recommendationReasons.isNotEmpty) ...[
-        _heading('Why this fits'),
-        for (final reason in movie.recommendationReasons)
-          Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child:
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Icon(Icons.check, size: 20, color: context.colors.secondary),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: Text(reason, style: const TextStyle(height: 1.5))),
-              ])),
-      ],
-      const SizedBox(height: 16),
-      if (!_solo)
-        Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-                onPressed: () => context.push('/movies/${movie.id}'),
-                child: const Text('View movie details'))),
-    ]);
   }
 }

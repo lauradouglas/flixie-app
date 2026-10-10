@@ -1,153 +1,127 @@
 # Flixie
 
-A Flutter frontend for the Flixie backend, targeting **Android** and **iOS**.
+Flixie is a Flutter app for discovering, tracking and discussing movies and TV,
+and arranging Watch Plans. The mobile app targets iOS and Android. Its API lives
+in the sibling `../FlixieBE` repository; `admin-dashboard/` is a separate web app.
 
-## Getting Started
+## Start locally
 
-### Prerequisites
+Use **Flutter 3.44.0**, the version pinned by the regression workflow. Native
+builds also need Xcode/CocoaPods for iOS or the Android SDK/JDK for Android.
+See [testing setup](docs/testing.md) for the pinned Patrol tools.
 
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) ≥ 3.2.0
-- Android Studio or Xcode (for device/emulator builds)
-- A Firebase project with **Email/Password** authentication enabled
+Obtain the development Firebase configuration, using `.firebase.json.example`
+as the field reference. Keep the local `.firebase.json` out of Git. Native runs
+also need the project's `GoogleService-Info.plist` / `google-services.json`.
+Configuration is read by `lib/core/auth/firebase_options.dart`; contributors
+should not replace generated options or create a new Firebase project to run
+this existing app.
 
-### Firebase Setup
-
-1. Create a project at [Firebase Console](https://console.firebase.google.com/).
-2. Enable **Email/Password** sign-in under *Authentication → Sign-in method*.
-3. Register your Android and/or iOS apps in *Project Settings → Your apps*.
-4. Download the config files:
-   - **Android**: `google-services.json` → place in `android/app/`
-   - **iOS**: `GoogleService-Info.plist` → add to the `Runner` target in Xcode
-5. Open `lib/firebase_options.dart` and replace every `YOUR_*` placeholder with the
-   real values from your Firebase project (or run `flutterfire configure` to generate
-   this file automatically).
-
-### Setup
-
-```bash
-# Install dependencies
+```sh
 flutter pub get
-
-# Run on a connected device or emulator
-flutter run
+flutter run --dart-define-from-file=.firebase.json -d <development-device>
 ```
 
-Debug runs default to `http://localhost:3000`. Profile and release builds default
-to the production Azure API. To run a debug build against production:
+Debug runs use `http://localhost:3000`; start the sibling backend for local API
+work. Android emulators reach the host through `http://10.0.2.2:3000`; physical
+devices need the host's LAN address:
 
-```bash
-flutter run --dart-define=USE_PROD_API=true
+```sh
+flutter run --dart-define-from-file=.firebase.json -d <development-device> \
+  --dart-define=API_BASE_URL=http://10.0.2.2:3000
 ```
 
-The VS Code launch menu also includes **Mobile - Production API**. An explicit
-`--dart-define=API_BASE_URL=...` takes precedence over these defaults. For example,
-Android Emulator can reach the computer's backend with
-`--dart-define=API_BASE_URL=http://10.0.2.2:3000`; physical devices need the
-computer's LAN address. Keep API overrides out of `.firebase.json` when using
-automatic selection. Stop and rerun the app after changing compile-time flags.
+Profile/release runs default to the production API. `USE_PROD_API=true` selects
+it for debug runs; an explicit `API_BASE_URL` takes precedence. Restart the run
+after changing compile-time flags. The VS Code launch menu contains development
+and production API configurations.
 
-### Building
+## Find the code
 
-```bash
-# Android APK
-flutter build apk --release
-
-# iOS (requires macOS + Xcode)
-sh scripts/prepare-ios-release.sh
-# Then open ios/Runner.xcworkspace and choose Product > Archive.
-```
-
-Run the iOS preparation command again after simulator testing with a local
-backend. It restores the production HTTPS API and Firebase configuration used
-by Xcode archives; `.firebase.json` must be available locally.
-
-## GitHub Actions
-
-The project includes automated workflows for building and validating the application on every push to the `main` branch.
-
-### Android Build (`android_build.yml`)
-- Triggered on pushes to `main` and `AndroidBuild`.
-- Builds both the **APK** and **App Bundle (AAB)** in release mode.
-- Artifacts are uploaded and available for download from the action run summary.
-
-### iOS Build (`build.yml`)
-- Triggered on pushes and pull requests to `main`.
-- Validates the iOS build (using `--no-codesign`) on a `macos-latest` runner.
-
-### Required Repository Secrets
-To enable these workflows, the following GitHub Secrets must be configured in the repository:
-
-| Secret Name | Description |
-|---|---|
-| `API_BASE_URL` | The base URL for the backend API |
-| `FIREBASE_*` | All Firebase configuration keys (see `.firebase.json.example`) |
-| `GOOGLE_SERVICES_JSON_BASE64` | Base64 encoded content of `google-services.json` |
-| `GOOGLE_SERVICE_INFO_PLIST_BASE64` | Base64 encoded content of `GoogleService-Info.plist` |
-
-### Testing
-
-```bash
-flutter test
-```
-
-## Project Structure
-
-```
+```text
 lib/
-├── main.dart
-├── firebase_options.dart
-├── presentation/                # Presentation shared modules/controllers
-├── domain/                      # Use cases and repository contracts
-├── data/                        # Repository implementations
-├── providers/                   # App/session state providers
-├── screens/                     # Feature screens and screen-local widgets
-├── services/                    # External/API/Firebase service clients
-├── widgets/                     # Shared UI scaffolding primitives
-└── theme/                       # Design tokens and ThemeData
-test/
-├── widget_test.dart                 # Unit & widget tests
-└── stats_widgets_test.dart          # Stats reusable widget tests
-android/                         # Android-specific configuration
-ios/                             # iOS-specific configuration
+  main.dart           # Bootstrap and app lifecycle
+  app/                # Router and theme
+  core/               # Shared API, auth, navigation, storage and UI
+  features/           # Product features; start here for most changes
+  models/             # Models currently shared across features
+test/                 # Unit, widget and golden regressions; fixtures in support/
+patrol_test/          # Native journeys on dedicated test devices
+android/, ios/        # Native integration and configuration
 ```
 
-## Architecture Rules
+Read [the architecture guide](docs/architecture.md) for ownership rules and the
+Watchlist reference. Use these starting points:
 
-- UI flows should go through `presentation` controllers/use-cases/repositories, not direct `UserService` or `FriendService` calls.
-- Dependency direction: `presentation -> domain`, `data -> domain`, `data -> services`.
-- Shared authenticated screen chrome uses `FlixiePageScaffold`, `FlixieTitleAppBar`, and `FlixieSectionHeader`.
-- See `docs/architecture.md` for conventions, migration status, and PR checklist guardrails.
-
-## Authentication Flow
-
-| Route | Description |
+| Work | Start here |
 |---|---|
-| `/auth/login` | Email + password sign-in |
-| `/auth/signup` | Create a new account (name, email, password) |
-| `/auth/forgot-password` | Send a Firebase password-reset email |
-| `/` | Home (requires auth) |
-| `/search` | Search (requires auth) |
-| `/profile` | Profile + sign-out (requires auth) |
+| Watchlist | `lib/features/watchlist/presentation/pages/watchlist_screen.dart` |
+| Home | `lib/features/home/presentation/pages/home_screen.dart` |
+| Movie/TV details | `lib/features/movies/presentation/pages/` |
+| Movie List Detail | `lib/features/movies/presentation/pages/movie_list_detail_screen.dart` and the [ownership map](docs/architecture.md#movie-list-detail-ownership) |
+| Profiles | `lib/features/profile/presentation/` |
+| Social tabs and their state owners | `lib/features/social/presentation/pages/social_screen.dart` and the [Social ownership map](docs/architecture.md#social-ownership) |
+| Communities and chat | `lib/features/social/` |
+| Watch Plans | `lib/features/watch_plans/` |
+| Search | `lib/features/movies/presentation/pages/search_screen.dart` and the [Search ownership map](docs/architecture.md#search-ownership) |
+| Group Insights | `lib/features/social/presentation/widgets/insights_tab.dart` and the [Insights ownership map](docs/architecture.md#group-insights-ownership) |
+| Create a Watch Plan | `lib/features/movies/presentation/widgets/watch_request_sheet.dart` and the [composer ownership map](docs/architecture.md#watch-request-composer-ownership) |
+| Navigation | `lib/app/router/router.dart` and `lib/core/navigation/` |
+| Session/authentication | `lib/core/auth/` |
+| Colours, typography and shared UI | `lib/app/theme/` and `lib/core/widgets/` |
 
-Unauthenticated users are automatically redirected to `/auth/login`.
+Other roots have separate purposes: `scripts/` contains development/release
+checks, `fastlane/` contains store lanes, `assets/` contains shipped resources,
+`third_party/` contains a documented Firebase App Check patch, and `design/`
+contains design explorations. `build/`, `coverage/` and local `output/` are
+outputs. Product decisions and historical work live in [product memory](docs/product-ideas.md).
 
-## Colour Scheme
+## Check your change
 
-The app uses the current Flixie dark palette:
+Start with relevant files and tests:
 
-| Token | Colour | Hex |
-|---|---|---|
-| Primary | Purple | `#9B6BFF` |
-| Secondary | Cyan | `#00D1C7` |
-| Tertiary | Peach | `#F1A77A` |
-| Success | Green | `#00D97E` |
-| Warning | Gold | `#FFC857` |
-| Danger | Red | `#E57373` |
-| Background | Deep Plum | `#120A24` |
-| Surface | Plum | `#1A1033` |
-| Surface Elevated | Plum Elevated | `#27194A` |
+```sh
+flutter analyze lib/features/watchlist test/features/watchlist
+flutter test test/features/watchlist/watchlist_controller_test.dart \
+  test/watchlist_screen_states_test.dart test/watchlist_recommendation_batch_test.dart
+```
 
-### Store deployments
+Run affected existing tests too; many remain directly under `test/`. New tests
+should follow their feature's path. [Testing guidance](docs/testing.md) lists
+native coverage, fixture isolation and golden review rules.
 
-Use the [Fastlane deployment lanes](docs/fastlane.md) to build signed iOS/Android
-artifacts, upload to TestFlight, and create Google Play drafts.
+Watchlist paging and the other critical native journeys use a **dedicated**
+simulator/emulator: Patrol reinstalls the app on the selected device.
+
+```sh
+scripts/test-patrol.sh -d <dedicated-test-device> \
+  -t patrol_test/watchlist_paging_test.dart
+```
+
+Run `scripts/test-regression.sh` for an explicitly requested complete local
+check. GitHub's regression workflow runs analysis and Flutter tests on PRs and
+main pushes; its slower Patrol job is an optional manual run. The separate iOS
+and Android build workflows check native builds. See their YAML for exact
+triggers and configuration; a local pass does not verify GitHub runner setup.
+
+## Release and contribution guidance
+
+Read [AGENTS.md](AGENTS.md) for repository rules, [the Flutter guide](docs/flutter-expert-guidance.md)
+for engineering guidance, and [architecture](docs/architecture.md) before a
+structural change. Preserve badge borders, privacy, responsive layout and
+user-action regressions. Build 70 compatibility was retired on 6 October 2026.
+
+Store builds/uploads use [Fastlane](docs/fastlane.md). For an Xcode archive after
+local simulator testing, `sh scripts/prepare-ios-release.sh` prepares the release
+configuration; then use `ios/Runner.xcworkspace`. Icon resources are maintained
+directly; follow [the logo guide](docs/app-logo-installation.md).
+
+Track cleanup and runtime evidence in [performance baselines](docs/performance-baselines.md).
+
+Watch Plans ownership: start with
+[`watch_requests_screen.dart`](lib/features/social/presentation/pages/watch_requests_screen.dart),
+then its [controller](lib/features/social/presentation/controllers/watch_requests_controller.dart)
+for loading/state, or the named [action flows](lib/features/social/presentation/watch_requests/)
+for responses, schedules, completion and choices. The
+[cleanup record](docs/performance/2026-10-07-watch-requests-cleanup.md) includes
+local fixture setup and before/after evidence.

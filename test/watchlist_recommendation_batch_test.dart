@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/watchlist/presentation/widgets/watchlist_movie_row.dart';
 import 'support/watchlist_auth.dart';
 export 'support/watchlist_auth.dart' show TestAuth;
 import 'dart:async';

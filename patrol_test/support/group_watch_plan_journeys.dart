@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:patrol_finders/patrol_finders.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flixie_app/models/user.dart';
 import 'package:flixie_app/core/auth/watch_plan_reminder_policy.dart';
 import 'package:flixie_app/core/widgets/movie_search_result_tile.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
@@ -13,11 +14,12 @@ import 'store_screenshot_fixture.dart';
 import 'group_watch_plan_fixture.dart';
 
 typedef GroupJourney = Future<void> Function(PatrolTester tester);
-Future<void> openGroup(PatrolTester $, GroupWatchPlanFixture api) async {
+Future<void> openGroup(PatrolTester $, GroupWatchPlanFixture api,
+    {StoreScreenshotAuth? viewer}) async {
   // ignore: invalid_use_of_visible_for_testing_member
   SharedPreferences.setMockInitialValues({});
   useApiFixture(api.client);
-  final auth = StoreScreenshotAuth();
+  final auth = viewer ?? StoreScreenshotAuth();
   final router = GoRouter(routes: [
     GoRoute(
         path: '/',
@@ -32,6 +34,16 @@ Future<void> openGroup(PatrolTester $, GroupWatchPlanFixture api) async {
   await $.pumpWidgetAndSettle(storeScreenshotApp(auth, router));
 }
 
+class _SwitchableGroupAuth extends StoreScreenshotAuth {
+  String viewerId = GroupWatchPlanFixture.viewer;
+  @override
+  User get dbUser => super.dbUser.copyWith(id: viewerId);
+  void switchMember() {
+    viewerId = GroupWatchPlanFixture.ellis;
+    notifyListeners();
+  }
+}
+
 Future<void> tapGroup(PatrolTester $, String text) async {
   final buttons = find.ancestor(
       of: find.text(text),
@@ -44,6 +56,41 @@ Future<void> tapGroup(PatrolTester $, String text) async {
 }
 
 void groupWatchPlanJourneys(void Function(String, GroupJourney) register) {
+  register(
+      'four members: account change closes a schedule sheet without a write',
+      ($) async {
+    final api = GroupWatchPlanFixture()..schedule();
+    final auth = _SwitchableGroupAuth();
+    await openGroup($, api, viewer: auth);
+    await tapGroup($, 'Update date or time');
+    expect(find.byType(BottomSheet), findsOneWidget);
+    auth.switchMember();
+    await $.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(api.writes, isEmpty);
+  });
+  register(
+      'four members: simultaneous refresh signals fetch the collection once',
+      ($) async {
+    final api = GroupWatchPlanFixture();
+    await openGroup($, api);
+    api.calls.clear();
+    TabRefreshController.social.value++;
+    TabRefreshController.watchPlans.value++;
+    await $.pumpAndSettle();
+    expect(
+        api.calls
+            .where((call) => call == 'GET /groups/fixture-group/requests')
+            .length,
+        1);
+    expect(
+        api.calls
+            .where((call) => call == 'GET /groups/fixture-group/members')
+            .length,
+        1);
+    expect(find.text('Alien'), findsWidgets);
+  });
+
   register(
       'four members: incoming update refreshes the open plan to the latest date',
       ($) async {

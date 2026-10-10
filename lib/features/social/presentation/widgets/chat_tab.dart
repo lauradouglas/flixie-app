@@ -1,14 +1,13 @@
+import 'group_chat/group_chat_messages.dart';
+import '../../data/group_chat_service.dart';
+import '../controllers/group_chat_session.dart';
+import 'group_chat/group_chat_request_sheet.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:flixie_app/features/social/presentation/widgets/chat_read_observer.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/conversation.dart';
-import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/models/group_watch_request.dart';
 import 'package:flixie_app/models/notification.dart';
@@ -17,20 +16,21 @@ import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/profile/data/notification_service.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
-import 'package:flixie_app/features/social/presentation/widgets/chat_bubble.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_input.dart';
-import 'package:flixie_app/features/social/presentation/widgets/watch_request_chat_card.dart';
-import 'package:flixie_app/core/safety/safety_actions.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 
 class GroupChatTab extends StatefulWidget {
-  const GroupChatTab({super.key, required this.groupId, this.active = true});
+  const GroupChatTab(
+      {super.key,
+      required this.groupId,
+      this.active = true,
+      this.service = const GroupChatService()});
 
   final String groupId;
   final bool active;
+  final GroupChatService service;
 
   @override
   State<GroupChatTab> createState() => GroupChatTabState();
@@ -38,14 +38,14 @@ class GroupChatTab extends StatefulWidget {
 
 class GroupChatTabState extends State<GroupChatTab> {
   final TextEditingController _messageController = TextEditingController();
-  String? _conversationId;
-  bool _initLoading = true;
+  late final GroupChatSession _session;
+  String? get _conversationId => _session.conversationId;
+  bool get _initLoading => _session.loading;
+  String? get _initError => _session.error;
   bool _sending = false;
-  String? _initError;
   AuthProvider? _authProvider;
-  // userId → username, populated from the members subcollection
-  Map<String, String> _memberUsernames = {};
-  Map<String, GroupMember> _membersById = {};
+  Map<String, String> get _memberUsernames => _session.usernames;
+  Map<String, GroupMember> get _membersById => _session.members;
 
   // Watch-request card state: postgres UUID → full GroupWatchRequest from API
   final Map<String, GroupWatchRequest> _requestCache = {};
@@ -64,32 +64,54 @@ class GroupChatTabState extends State<GroupChatTab> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (_authProvider == null) {
-      _authProvider = context.read<AuthProvider>();
-      _authProvider!.addListener(_onAuthChanged);
+    final auth = context.read<AuthProvider>();
+    if (_authProvider != auth) {
+      _authProvider?.removeListener(_onAuthChanged);
+      _authProvider = auth;
+      auth.addListener(_onAuthChanged);
     }
+    _onAuthChanged();
   }
 
-  void _onAuthChanged() {
-    // Retry init if we were waiting for the user to load
-    if (_initLoading && _authProvider?.dbUser != null) {
-      _initConversation();
-    }
+  void _onAuthChanged() =>
+      _session.bind(widget.groupId, _authProvider?.dbUser?.id);
+
+  @override
+  void didUpdateWidget(GroupChatTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _onAuthChanged();
+  }
+
+  void _onSessionChanged() {
+    if (!mounted) return;
+    setState(() {
+      _messageController.clear();
+      _sending = false;
+      _requestCache.clear();
+      _msgIdToReqId.clear();
+      _respondMap.clear();
+      _respondingIds.clear();
+      _fetchingRequests = false;
+      _requestsLoaded = !_session.loading && _session.error == null;
+      for (final r in _session.requests) {
+        _requestCache[r.id] = r;
+        if (r.databaseRequestId != null) {
+          _requestCache[r.databaseRequestId!] = r;
+        }
+        if (r.linkedMessageId != null) _msgIdToReqId[r.linkedMessageId!] = r.id;
+      }
+    });
   }
 
   @override
   void initState() {
     super.initState();
+    _session = GroupChatSession(service: widget.service)
+      ..addListener(_onSessionChanged);
     SafetyService.changes.addListener(_onSafetyChanged);
-    // Use addPostFrameCallback so context is fully ready
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _initConversation();
-        SafetyService.blockedUsers().then<void>((_) {
-          if (mounted) setState(() {});
-        }).catchError((_) {});
-      }
-    });
+    SafetyService.blockedUsers().then<void>((_) {
+      if (mounted) setState(() {});
+    }).catchError((_) {});
   }
 
   void _onSafetyChanged() {
@@ -100,86 +122,19 @@ class GroupChatTabState extends State<GroupChatTab> {
   void dispose() {
     SafetyService.changes.removeListener(_onSafetyChanged);
     _authProvider?.removeListener(_onAuthChanged);
+    _session.dispose();
     _messageController.dispose();
     super.dispose();
   }
 
-  Future<void> _initConversation() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) {
-      // dbUser not ready yet - listener will retry once it loads
-      return;
-    }
-    if (!_initLoading) return; // already resolved
-    try {
-      final results = await Future.wait([
-        GroupService.getGroup(widget.groupId),
-        GroupService.getGroupMembers(widget.groupId),
-      ]);
-      final group = results[0] as Group;
-      final members = results[1] as List<GroupMember>;
-      final memberIds = members.map((m) => m.memberId).toList();
-      if (!memberIds.contains(userId)) memberIds.add(userId);
-
-      final conversation = await ChatService.getOrCreateGroupConversation(
-        creatorId: userId,
-        pgGroupId: widget.groupId,
-        name: group.name,
-        memberIds: memberIds,
-      );
-
-      if (mounted) {
-        // Fetch member usernames and watch requests in parallel so that
-        // request cards render with correct state on first paint (no flicker).
-        final conversationId = conversation.id;
-        final parallelResults = await Future.wait([
-          ChatService.fetchMemberUsernames(conversationId)
-              .catchError((_) => <String, String>{}),
-          GroupService.getConversationWatchRequests(
-            conversationId,
-            filter: WatchRequestFilter.all,
-            userId: userId,
-          ).catchError((_) => <GroupWatchRequest>[]),
-        ]);
-        if (mounted) {
-          final usernames = parallelResults[0] as Map<String, String>;
-          final requests = parallelResults[1] as List<GroupWatchRequest>;
-          setState(() {
-            _conversationId = conversationId;
-            _memberUsernames = usernames;
-            _membersById = {
-              for (final member in members) member.memberId: member,
-            };
-            for (final r in requests) {
-              _requestCache[r.id] = r;
-              if (r.databaseRequestId != null) {
-                _requestCache[r.databaseRequestId!] = r;
-              }
-              if (r.linkedMessageId != null) {
-                _msgIdToReqId[r.linkedMessageId!] = r.id;
-              }
-            }
-            _requestsLoaded = true;
-            _initLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      logger.e('Chat init error: $e');
-      if (mounted) {
-        setState(() {
-          _initLoading = false;
-          _initError = 'Could not load chat';
-        });
-      }
-    }
-  }
-
   Future<void> _sendMessage() async {
+    final generation = _session.generation;
     final text = _messageController.text.trim();
     final conversationId = _conversationId;
     final userId = context.read<AuthProvider>().dbUser?.id;
-    if (text.isEmpty || conversationId == null || userId == null) return;
+    if (_sending || text.isEmpty || conversationId == null || userId == null) {
+      return;
+    }
     final analytics = context.read<AnalyticsController>();
 
     setState(() => _sending = true);
@@ -193,7 +148,7 @@ class GroupChatTabState extends State<GroupChatTab> {
       await analytics.groupMessageSent(groupType: 'unknown');
     } catch (e) {
       logger.e('Send message error: $e');
-      if (mounted) {
+      if (mounted && _session.owns(generation)) {
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(
               type: FlixieToastType.error,
@@ -201,7 +156,9 @@ class GroupChatTabState extends State<GroupChatTab> {
         );
       }
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted && _session.owns(generation)) {
+        setState(() => _sending = false);
+      }
     }
   }
 
@@ -209,6 +166,7 @@ class GroupChatTabState extends State<GroupChatTab> {
   /// Also builds a legacy messageId→pgUUID map from the Firestore watchRequests
   /// subcollection for messages that don't carry pgGroupRequestId directly.
   Future<void> _ensureRequests() async {
+    final generation = _session.generation;
     if (_requestsLoaded || _fetchingRequests) return;
     final conversationId = _conversationId;
     if (conversationId == null) return;
@@ -222,6 +180,7 @@ class GroupChatTabState extends State<GroupChatTab> {
         userId: userId,
       );
 
+      if (!_session.owns(generation)) return;
       // Backward-compat: scan the Firestore watchRequests subcollection ONLY
       // to build the messageId → pgGroupRequestId mapping for legacy messages.
       // Once the BE writes pgGroupRequestId on the message doc itself, this
@@ -245,8 +204,7 @@ class GroupChatTabState extends State<GroupChatTab> {
         logger.w('[WR] Firestore watchRequests fetch failed (non-fatal): $e');
       }
 
-      if (!mounted) return;
-      if (!mounted) return;
+      if (!mounted || !_session.owns(generation)) return;
       setState(() {
         for (final r in requests) {
           _requestCache[r.id] = r;
@@ -262,15 +220,17 @@ class GroupChatTabState extends State<GroupChatTab> {
         logger.d('[WR] requestCache: ${_requestCache.keys.toList()}');
         logger.d('[WR] msgIdToReqId: $_msgIdToReqId');
       });
-      _fetchingRequests = false;
+      if (_session.owns(generation)) _fetchingRequests = false;
     } catch (e) {
-      _fetchingRequests = false;
+      if (_session.owns(generation)) _fetchingRequests = false;
       logger.e('[WR] _ensureRequests error: $e');
     }
   }
 
   Future<void> _respondInChat(
       String pgId, WatchResponseDecision decision) async {
+    final generation = _session.generation;
+    if (_respondingIds.contains(pgId)) return;
     final conversationId = _conversationId;
     final userId = _authProvider?.dbUser?.id;
     final analytics = context.read<AnalyticsController>();
@@ -282,6 +242,7 @@ class GroupChatTabState extends State<GroupChatTab> {
     try {
       await GroupService.respondToWatchRequest(
           conversationId, pgId, userId, decision);
+      if (!_session.owns(generation)) return;
       final request = _requestCache[pgId];
       if (decision == WatchResponseDecision.accepted && request != null) {
         await analytics.watchPlanAccepted(
@@ -293,8 +254,10 @@ class GroupChatTabState extends State<GroupChatTab> {
           source: 'group',
         );
       }
+      if (!_session.owns(generation)) return;
       // Dismiss any watch-request notifications linked to this request.
       NotificationService.getNotifications(userId).then((notifs) {
+        if (!_session.owns(generation)) return;
         for (final n in notifs) {
           if ((n.type == FlixieNotification.movieWatchRequest ||
                   n.type == FlixieNotification.showWatchRequest) &&
@@ -306,10 +269,11 @@ class GroupChatTabState extends State<GroupChatTab> {
           }
         }
       }).catchError((_) {});
+      if (!_session.owns(generation)) return;
       _requestsLoaded = false;
       await _ensureRequests();
     } catch (e) {
-      if (mounted) {
+      if (mounted && _session.owns(generation)) {
         setState(() => _respondMap.remove(pgId));
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(
@@ -319,408 +283,42 @@ class GroupChatTabState extends State<GroupChatTab> {
         );
       }
     } finally {
-      if (mounted) setState(() => _respondingIds.remove(pgId));
+      if (mounted && _session.owns(generation)) {
+        setState(() => _respondingIds.remove(pgId));
+      }
     }
   }
 
-  Widget _modalCountPill(String label, Color color) {
-    return FlixiePill.label(label: Text(label));
-  }
-
-  void _showWatchRequestDetail(
-    BuildContext context,
-    ChatMessage msg,
-    List<ChatMessage> allMessages,
-    GroupWatchRequest? req,
-    String? currentUserId,
-  ) {
-    final payload = msg.watchRequestPayload;
-    final movieTitle =
-        req?.movieTitle ?? payload?['movieTitle'] as String? ?? 'Watch Plan';
-    final posterPath = req?.moviePosterPath ??
-        payload?['moviePosterPath'] as String? ??
-        payload?['posterPath'] as String?;
-    final requestMessage = [
-      req?.message,
-      payload?['message'] as String?,
-      (payload?['metadata'] as Map<String, dynamic>?)?['message'] as String?,
-    ]
-        .whereType<String>()
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty)
-        .firstOrNull;
-    final requesterUsername = req?.requesterUsername ??
-        payload?['requesterUsername'] as String? ??
-        msg.senderUsername;
-    final posterUrl = posterPath != null
-        ? 'https://image.tmdb.org/t/p/w500$posterPath'
-        : null;
-    final memberStatuses = req?.memberStatuses ?? <GroupRequestMemberStatus>[];
-
-    // Collect thread replies (messages whose replyToMessageId = this message)
-    final replies = allMessages
-        .where((m) => m.replyToMessageId == msg.id)
-        .toList()
-      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-
-    final replyController = TextEditingController();
-
-    showModalBottomSheet(
+  void _showWatchRequestDetail(BuildContext context, ChatMessage msg,
+      List<ChatMessage> messages, GroupWatchRequest? request, String? userId) {
+    final generation = _session.generation;
+    final conversationId = _conversationId!;
+    final usernames = _memberUsernames;
+    final members = _membersById;
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: context.colors.tabBarBackground,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetCtx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.82,
-        maxChildSize: 0.95,
-        builder: (_, scrollCtrl) {
-          bool isSendingReply = false;
-          return StatefulBuilder(
-            builder: (_, setSheetState) {
-              return Column(
-                children: [
-                  // Drag handle
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 12, bottom: 8),
-                    decoration: BoxDecoration(
-                      color: context.colors.medium.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      controller: scrollCtrl,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      children: [
-                        // Poster + title row
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: SizedBox(
-                                width: 80,
-                                height: 120,
-                                child: posterUrl != null
-                                    ? CachedNetworkImage(
-                                        imageUrl: posterUrl,
-                                        fit: BoxFit.cover,
-                                        placeholder: (_, __) => Container(
-                                            color: context.colors
-                                                .tabBarBackgroundFocused),
-                                        errorWidget: (_, __, ___) => Container(
-                                          color: context
-                                              .colors.tabBarBackgroundFocused,
-                                          child: Center(
-                                              child: Icon(Icons.movie_outlined,
-                                                  color: context.colors.medium,
-                                                  size: 28)),
-                                        ),
-                                      )
-                                    : Container(
-                                        decoration: BoxDecoration(
-                                          color: context
-                                              .colors.tabBarBackgroundFocused,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        child: Center(
-                                            child: Icon(Icons.movie_outlined,
-                                                color: context.colors.medium,
-                                                size: 28)),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(movieTitle,
-                                      style: TextStyle(
-                                          color: context.colors.white,
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w700)),
-                                  if (requesterUsername != null) ...[
-                                    const SizedBox(height: 4),
-                                    Text('Created by @$requesterUsername',
-                                        style: TextStyle(
-                                            color: context.colors.medium,
-                                            fontSize: 12)),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (requestMessage != null &&
-                            requestMessage.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color:
-                                  FlixieColors.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                  color: FlixieColors.primary
-                                      .withValues(alpha: 0.25)),
-                            ),
-                            child: Text(requestMessage,
-                                style: TextStyle(
-                                    color: context.colors.light,
-                                    fontSize: 13,
-                                    fontStyle: FontStyle.italic)),
-                          ),
-                        ],
-                        // Responses - grouped by status
-                        if (memberStatuses.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Text('RESPONSES',
-                                  style: TextStyle(
-                                      color: context.colors.medium,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.8)),
-                              const Spacer(),
-                              if (req?.acceptedCount != null &&
-                                  req!.acceptedCount > 0)
-                                _modalCountPill('✓ ${req.acceptedCount}',
-                                    context.colors.success),
-                              if (req?.maybeCount != null &&
-                                  req!.maybeCount > 0) ...[
-                                const SizedBox(width: 4),
-                                _modalCountPill('~ ${req.maybeCount}',
-                                    context.colors.warning),
-                              ],
-                              if (req?.declinedCount != null &&
-                                  req!.declinedCount > 0) ...[
-                                const SizedBox(width: 4),
-                                _modalCountPill('✗ ${req.declinedCount}',
-                                    context.colors.danger),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          for (final group in [
-                            (
-                              'ACCEPTED',
-                              context.colors.success,
-                              Icons.check_circle_outline
-                            ),
-                            (
-                              'MAYBE',
-                              context.colors.warning,
-                              Icons.help_outline
-                            ),
-                            (
-                              'DECLINED',
-                              context.colors.danger,
-                              Icons.cancel_outlined
-                            ),
-                          ]) ...[
-                            ...memberStatuses
-                                .where((s) => s.status == group.$1)
-                                .map((s) {
-                              final name = s.username?.isNotEmpty == true
-                                  ? s.username!
-                                  : s.memberId.substring(
-                                      0, s.memberId.length.clamp(0, 6));
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Row(
-                                  children: [
-                                    ProfileAvatarView(
-                                      avatar: s.avatar,
-                                      fallbackText: name.isNotEmpty
-                                          ? name[0].toUpperCase()
-                                          : '?',
-                                      fallbackColor: group.$2,
-                                      size: 28,
-                                      profileBadges: s.profileBadges,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text('@$name',
-                                          style: TextStyle(
-                                              color: context.colors.light,
-                                              fontSize: 13)),
-                                    ),
-                                    Icon(group.$3, size: 14, color: group.$2),
-                                  ],
-                                ),
-                              );
-                            }),
-                          ],
-                        ],
-                        // Thread replies
-                        const SizedBox(height: 16),
-                        Text(
-                            replies.isEmpty
-                                ? 'No replies yet'
-                                : 'REPLIES (${replies.length})',
-                            style: TextStyle(
-                                color: context.colors.medium,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8)),
-                        const SizedBox(height: 8),
-                        if (replies.isEmpty)
-                          Text('Be the first to comment!',
-                              style: TextStyle(
-                                  color: context.colors.medium, fontSize: 13))
-                        else
-                          ...replies.map((r) {
-                            final rUsername = r.senderUsername ??
-                                _memberUsernames[r.senderId] ??
-                                r.senderId.substring(
-                                    0, r.senderId.length.clamp(0, 6));
-                            final isMe = r.senderId == currentUserId;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor:
-                                        context.colors.tabBarBackgroundFocused,
-                                    child: Text(
-                                        rUsername.isNotEmpty
-                                            ? rUsername[0].toUpperCase()
-                                            : '?',
-                                        style: TextStyle(
-                                            color: context.colors.light,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700)),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(isMe ? 'You' : '@$rUsername',
-                                            style: TextStyle(
-                                                color: context.colors.medium,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600)),
-                                        const SizedBox(height: 2),
-                                        Text(r.text,
-                                            style: TextStyle(
-                                                color: context.colors.light,
-                                                fontSize: 13)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                      ],
-                    ),
-                  ),
-                  // Reply input
-                  Container(
-                    padding: EdgeInsets.fromLTRB(12, 8, 12,
-                        MediaQuery.of(sheetCtx).viewInsets.bottom + 8),
-                    decoration: BoxDecoration(
-                      color: context.colors.tabBarBackgroundFocused,
-                      border: Border(
-                          top: BorderSide(color: context.colors.tabBarBorder)),
-                    ),
-                    child: SafeArea(
-                      top: false,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: replyController,
-                              style: TextStyle(color: context.colors.light),
-                              textInputAction: TextInputAction.send,
-                              decoration: InputDecoration(
-                                hintText: 'Reply to this Watch Plan…',
-                                hintStyle:
-                                    TextStyle(color: context.colors.medium),
-                                filled: true,
-                                fillColor: context.colors.tabBarBackground,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide.none,
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (isSendingReply)
-                            const SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: FlixieColors.primary),
-                            )
-                          else
-                            IconButton(
-                              onPressed: () async {
-                                final text = replyController.text.trim();
-                                if (text.isEmpty) return;
-                                final cId = _conversationId;
-                                final uid = _authProvider?.dbUser?.id;
-                                if (cId == null || uid == null) return;
-                                setSheetState(() => isSendingReply = true);
-                                replyController.clear();
-                                try {
-                                  await ChatService.sendMessage(
-                                    conversationId: cId,
-                                    senderId: uid,
-                                    text: text,
-                                    replyToMessageId: msg.id,
-                                  );
-                                  if (sheetCtx.mounted) {
-                                    Navigator.pop(sheetCtx);
-                                  }
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context)
-                                        .showFlixieToast(
-                                      FlixieToast(
-                                          type: FlixieToastType.error,
-                                          content: const Text(
-                                              'Failed to send reply'),
-                                          backgroundColor:
-                                              context.colors.danger),
-                                    );
-                                  }
-                                } finally {
-                                  if (mounted) {
-                                    setSheetState(() => isSendingReply = false);
-                                  }
-                                }
-                              },
-                              icon: const Icon(Icons.send_rounded,
-                                  color: FlixieColors.primary),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => ListenableBuilder(
+          listenable: _session,
+          builder: (_, __) => !_session.owns(generation)
+              ? SafeArea(
+                  child: TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Chat session changed · Close')))
+              : GroupChatRequestSheet(
+                  message: msg,
+                  messages: messages,
+                  request: request,
+                  currentUserId: userId,
+                  conversationId: conversationId,
+                  memberUsernames: usernames,
+                  members: members,
+                  isCurrent: () => _session.owns(generation))),
     );
   }
 
@@ -731,8 +329,10 @@ class GroupChatTabState extends State<GroupChatTab> {
     }
     if (_initError != null) {
       return Center(
-          child: Text(_initError!,
-              style: TextStyle(color: context.colors.medium)));
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(_initError!, style: TextStyle(color: context.colors.medium)),
+        TextButton(onPressed: _session.retry, child: const Text('Retry chat')),
+      ]));
     }
 
     final conversationId = _conversationId!;
@@ -744,11 +344,19 @@ class GroupChatTabState extends State<GroupChatTab> {
         children: [
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
-              stream: ChatService.messagesStream(conversationId),
+              key: ValueKey(_session.generation),
+              stream: _session.messages,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData) {
                   return const ChatContentSkeleton();
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                      child: TextButton(
+                          onPressed: _session.retry,
+                          child:
+                              const Text('Could not load messages · Retry')));
                 }
                 final messages = snapshot.data ?? [];
                 if (messages.isEmpty) {
@@ -760,131 +368,22 @@ class GroupChatTabState extends State<GroupChatTab> {
                     ),
                   );
                 }
-                return ChatReadObserver(
+                return GroupChatMessages(
                     conversationId: conversationId,
+                    groupId: widget.groupId,
+                    currentUserId: currentUserId,
                     active: widget.active,
-                    child: ListView.builder(
-                      reverse: true,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 0, vertical: 8),
-                      itemCount: messages.length,
-                      itemBuilder: (_, i) {
-                        final msg = messages[i];
-                        final isMe = msg.senderId == currentUserId;
-                        if (!isMe && SafetyService.isBlocked(msg.senderId)) {
-                          return const SizedBox.shrink();
-                        }
-
-                        if (msg.type == 'watch_request') {
-                          // Resolve to a postgres UUID.
-                          // After the BE sets pgGroupRequestId on the message doc,
-                          // msg.watchRequestId IS the postgres UUID. Until then,
-                          // fall back to the _msgIdToReqId map built from the
-                          // Firestore watchRequests subcollection.
-                          final pgId =
-                              msg.watchRequestId ?? _msgIdToReqId[msg.id];
-                          if (!_requestsLoaded) {
-                            _ensureRequests();
-                          }
-                          final cachedReq = _requestCache[pgId] ??
-                              _requestCache[_msgIdToReqId[msg.id]];
-                          final respondKey = pgId ?? msg.id;
-                          final optimisticStatus = _respondMap[respondKey];
-                          String? myStatus = optimisticStatus;
-                          if (myStatus == null &&
-                              cachedReq != null &&
-                              currentUserId != null) {
-                            myStatus = cachedReq.memberStatuses
-                                    .where((s) => s.memberId == currentUserId)
-                                    .map((s) => s.status)
-                                    .where((s) =>
-                                        s == 'ACCEPTED' ||
-                                        s == 'DECLINED' ||
-                                        s == 'MAYBE')
-                                    .firstOrNull ??
-                                cachedReq.currentUserResponse?.apiValue;
-                          }
-                          return WatchRequestChatCard(
-                            msg: msg,
-                            senderAvatar: _membersById[msg.senderId]?.avatar,
-                            senderProfileBadges:
-                                _membersById[msg.senderId]?.profileBadges ??
-                                    const [],
-                            cachedRequest: cachedReq,
-                            currentUserId: currentUserId,
-                            myStatus: myStatus,
-                            memberUsernames: _memberUsernames,
-                            isResponding: _respondingIds.contains(respondKey),
-                            onAccept: () => _respondInChat(
-                                respondKey, WatchResponseDecision.accepted),
-                            onDecline: () => _respondInChat(
-                                respondKey, WatchResponseDecision.declined),
-                            onMaybe: () => _respondInChat(
-                                respondKey, WatchResponseDecision.maybe),
-                            onTap: () {
-                              if (cachedReq != null) {
-                                context.push(
-                                    '/groups/${widget.groupId}?tab=requests&requestId=${cachedReq.databaseRequestId ?? cachedReq.id}');
-                              } else {
-                                _showWatchRequestDetail(context, msg, messages,
-                                    cachedReq, currentUserId);
-                              }
-                            },
-                            onLongPress: isMe
-                                ? null
-                                : () => SafetyActions.contentMenu(
-                                      context,
-                                      targetType: 'WATCH_REQUEST_MESSAGE',
-                                      targetId: msg.id,
-                                      reportedUserId: msg.senderId,
-                                      username: msg.senderUsername ??
-                                          _memberUsernames[msg.senderId] ??
-                                          'User',
-                                      contentPreview:
-                                          msg.watchRequestPayload?['message']
-                                                  as String? ??
-                                              msg.text,
-                                    ),
-                          );
-                        }
-
-                        // Regular text bubble
-                        final sid = msg.senderId;
-                        final username = msg.senderUsername ??
-                            _memberUsernames[sid] ??
-                            sid.substring(0, sid.length.clamp(0, 6));
-                        final member = _membersById[sid];
-                        final startsSenderRun = i == messages.length - 1 ||
-                            messages[i + 1].senderId != sid;
-                        return ChatBubble(
-                          currentUserId: currentUserId,
-                          currentUsername:
-                              context.read<AuthProvider>().dbUser?.username,
-                          message: msg.text,
-                          senderUsername: username,
-                          isMe: isMe,
-                          sentAt: msg.createdAt,
-                          avatar: member?.avatar,
-                          initials: member?.initials,
-                          profileBadges: member?.profileBadges ?? const [],
-                          showSenderLabel: !isMe && startsSenderRun,
-                          onSenderTap:
-                              isMe ? null : () => context.push('/friends/$sid'),
-                          replyTo:
-                              msg.replyToMessageId != null ? '↩ replied' : null,
-                          onLongPress: isMe
-                              ? null
-                              : () => SafetyActions.contentMenu(
-                                    context,
-                                    targetType: 'GROUP_MESSAGE',
-                                    targetId: msg.id,
-                                    reportedUserId: sid,
-                                    username: username,
-                                    contentPreview: msg.text,
-                                  ),
-                        );
-                      },
-                    ));
+                    messages: messages,
+                    members: _membersById,
+                    memberUsernames: _memberUsernames,
+                    requests: _requestCache,
+                    messageRequestIds: _msgIdToReqId,
+                    responses: _respondMap,
+                    respondingIds: _respondingIds,
+                    onRespond: _respondInChat,
+                    onRequestDetail: (msg, all, request) =>
+                        _showWatchRequestDetail(
+                            context, msg, all, request, currentUserId));
               },
             ),
           ),

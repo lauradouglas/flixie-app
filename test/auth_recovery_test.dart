@@ -1,4 +1,6 @@
+import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/models/notification.dart';
+import 'package:flixie_app/models/friendship.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/widgets.dart';
@@ -78,6 +80,9 @@ class Prefetch implements AuthPrefetchCoordinator {
   @override
   Future<int?> fetchUnreadCount(String userId) async => 0;
   @override
+  Future<NotificationPage?> fetchNotificationPage(String userId) async =>
+      const NotificationPage([], unreadCount: 0);
+  @override
   Future<List<FlixieNotification>?> fetchNotifications(String userId) async =>
       [];
   @override
@@ -93,6 +98,142 @@ User profile(String id) => User(
     completedSetup: true,
     darkMode: true);
 void main() {
+  testWidgets(
+      'initial foreground and inactive interruptions reuse the startup profile without invalidating Home',
+      (tester) async {
+    final auth = Auth._();
+    final identity = Identity('one');
+    var profiles = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        prefetchCoordinator: Prefetch(),
+        termsStatusLoader: () async => true,
+        profileLoader: (id) async {
+          profiles++;
+          return profile(id);
+        });
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(identity);
+    await tester.pumpAndSettle();
+    final version = provider.activityVersion;
+    provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    provider.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(profiles, 1);
+    expect(identity.calls, [false]);
+    expect(provider.activityVersion, version);
+    expect(provider.dbUser?.id, 'one');
+    await provider.retrySession();
+    expect(profiles, 2, reason: 'explicit retry still forces a fresh profile');
+    provider.didChangeAppLifecycleState(AppLifecycleState.paused);
+  });
+
+  for (final background in [
+    AppLifecycleState.hidden,
+    AppLifecycleState.paused
+  ]) {
+    testWidgets('real $background return refreshes profile and Home once',
+        (tester) async {
+      final auth = Auth._();
+      var profiles = 0;
+      final provider = AuthProvider(auth, MovieService(),
+          prefetchAfterAuth: false,
+          prefetchCoordinator: Prefetch(),
+          termsStatusLoader: () async => true,
+          profileLoader: (id) async {
+            profiles++;
+            return profile(id);
+          });
+      addTearDown(() {
+        provider.dispose();
+        auth.changes.close();
+      });
+      auth.emit(Identity('one'));
+      await tester.pumpAndSettle();
+      final version = provider.activityVersion;
+      provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      provider.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      provider.didChangeAppLifecycleState(background);
+      provider.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(profiles, 2);
+      expect(provider.activityVersion, version + 1);
+      expect(provider.activityIncludesRefreshedProfile, isTrue);
+      provider.didChangeAppLifecycleState(AppLifecycleState.paused);
+    });
+  }
+
+  testWidgets(
+      'background return during startup terms resolution shares restoration',
+      (tester) async {
+    final auth = Auth._();
+    final identity = Identity('one');
+    final terms = Completer<bool>();
+    var profiles = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        prefetchCoordinator: Prefetch(),
+        termsStatusLoader: () => terms.future,
+        profileLoader: (id) async {
+          profiles++;
+          return profile(id);
+        });
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(identity);
+    await tester.pump();
+    expect(provider.dbUser?.id, 'one');
+    expect(provider.status, AuthStatus.unknown);
+    provider.didChangeAppLifecycleState(AppLifecycleState.paused);
+    provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    final joining = provider.handleAppResumed();
+    terms.complete(true);
+    await tester.pumpAndSettle();
+    await joining;
+    expect(profiles, 1);
+    expect(identity.calls, [false]);
+    expect(provider.status, AuthStatus.authenticated);
+    expect(provider.termsVerified, isTrue);
+  });
+
+  testWidgets('first foreground still retries a failed startup profile',
+      (tester) async {
+    final auth = Auth._();
+    var offline = true;
+    var profiles = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        prefetchCoordinator: Prefetch(),
+        termsStatusLoader: () async => true,
+        profileLoader: (id) async {
+          profiles++;
+          if (offline) throw StateError('offline');
+          return profile(id);
+        });
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pump();
+    expect(provider.recoveryError, isNotNull);
+    offline = false;
+    provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(profiles, 2);
+    expect(provider.recoveryError, isNull);
+    expect(provider.status, AuthStatus.authenticated);
+  });
+
   testWidgets('idle logout schedules navigation without a user gesture',
       (tester) async {
     final auth = Auth._();
@@ -107,6 +248,9 @@ void main() {
     auth.emit(Identity('one'));
     await tester.pumpAndSettle();
     expect(provider.status, AuthStatus.authenticated);
+    expect(provider.activityIncludesRefreshedProfile, isTrue);
+    provider.markActivityChanged();
+    expect(provider.activityIncludesRefreshedProfile, isFalse);
     expect(tester.binding.hasScheduledFrame, isFalse);
 
     final routedStatuses = <AuthStatus>[];
@@ -401,6 +545,69 @@ void main() {
     await auth.changes.close();
     await tester.pump();
   });
+  testWidgets(
+      'background cancels offline startup retry; foreground restores it',
+      (tester) async {
+    final auth = Auth._();
+    final identity = Identity('one');
+    var offline = true;
+    var profiles = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        termsStatusLoader: () async => true,
+        profileLoader: (id) async {
+          profiles++;
+          if (offline) throw StateError('offline');
+          return profile(id);
+        });
+    auth.emit(identity);
+    await tester.pump();
+    expect(provider.status, AuthStatus.unknown);
+    expect(provider.recoveryError, isNotNull);
+    provider.didChangeAppLifecycleState(AppLifecycleState.paused);
+    offline = false;
+    await tester.pump(const Duration(seconds: 60));
+    expect(profiles, 1);
+    provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(profiles, 2);
+    expect(provider.status, AuthStatus.authenticated);
+    expect(provider.recoveryError, isNull);
+    provider.dispose();
+    await auth.changes.close();
+  });
+
+  testWidgets(
+      'manual retry bypasses resume throttle and publishes refreshed profile',
+      (tester) async {
+    final auth = Auth._();
+    var profiles = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        prefetchCoordinator: Prefetch(),
+        termsStatusLoader: () async => true,
+        profileLoader: (id) async {
+          profiles++;
+          return profile(id);
+        });
+    auth.emit(Identity('one'));
+    await tester.pumpAndSettle();
+    await provider.handleAppResumed();
+    final version = provider.activityVersion;
+    expect(provider.activityIncludesRefreshedProfile, isTrue);
+    expect(profiles, 2);
+    await provider.handleAppResumed();
+    expect(profiles, 2);
+    await provider.retrySession();
+    expect(profiles, 3);
+    expect(provider.activityVersion, version + 1);
+    expect(provider.activityIncludesRefreshedProfile, isTrue);
+    expect(provider.status, AuthStatus.authenticated);
+    provider.dispose();
+    await auth.changes.close();
+    await tester.pump();
+  });
+
   testWidgets('missing initial auth event reaches a retry state',
       (tester) async {
     final auth = Auth._();
@@ -413,4 +620,71 @@ void main() {
     await auth.changes.close();
     await tester.pump();
   });
+  for (final transition in ['switch', 'logout', 'dispose']) {
+    testWidgets('account cache facade clears all sections on $transition',
+        (tester) async {
+      final auth = Auth._();
+      final provider = AuthProvider(auth, MovieService(),
+          prefetchAfterAuth: false,
+          profileLoader: (id) async => profile(id),
+          termsStatusLoader: () async => true);
+      auth.emit(Identity('robin'));
+      await tester.pumpAndSettle();
+      provider.updateCachedReviews([]);
+      provider.updateCachedSocialData(
+          friends: const FriendsData(
+              friendships: [], pendingFriends: [], requestedFriends: []),
+          activity: [],
+          groups: []);
+      provider.updateCachedMovieLists([]);
+      provider.updateCachedWatchRequests([]);
+      provider.updateCachedUserWatchProviderIds([8]);
+      provider.updateCachedNotifications(const [
+        FlixieNotification(
+            id: 'same-id',
+            userId: 'robin',
+            type: FlixieNotification.friendRequest,
+            message: 'Fixture',
+            read: false)
+      ]);
+      expect(provider.unreadNotificationCount, 1);
+      provider.removeCachedNotification('same-id');
+      if (transition == 'switch') {
+        auth.emit(Identity('sam'));
+        await tester.pumpAndSettle();
+      } else if (transition == 'logout') {
+        await provider.signOut();
+        await tester.pumpAndSettle();
+      } else {
+        provider.dispose();
+      }
+      expect([
+        provider.cachedFriendsActivity,
+        provider.cachedFriends,
+        provider.cachedGroups,
+        provider.cachedReviews,
+        provider.cachedMovieLists,
+        provider.cachedNotifications,
+        provider.cachedWatchRequests,
+        provider.cachedUserWatchProviderIds
+      ], everyElement(isNull));
+      expect(provider.cachedWatchProvidersByMovieId, isEmpty);
+      expect(provider.unreadNotificationCount, 0);
+      if (transition == 'switch') {
+        provider.updateCachedNotifications(const [
+          FlixieNotification(
+              id: 'same-id',
+              userId: 'sam',
+              type: FlixieNotification.friendRequest,
+              message: 'Fixture',
+              read: false)
+        ]);
+        expect(provider.cachedNotifications!.single.userId, 'sam');
+        expect(provider.unreadNotificationCount, 1);
+      }
+      if (transition != 'dispose') provider.dispose();
+      await auth.changes.close();
+      await tester.pump();
+    });
+  }
 }

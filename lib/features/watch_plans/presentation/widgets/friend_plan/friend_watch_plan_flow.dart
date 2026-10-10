@@ -1,12 +1,13 @@
+import 'friend_plan_stage_view.dart';
+import 'friend_plan_button.dart';
+import 'friend_plan_styles.dart';
+import 'friend_plan_choices.dart';
+import 'friend_plan_recap.dart';
 import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
-import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_formatters.dart';
-import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/core/calendar/watch_calendar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flixie_app/models/profile_avatar.dart';
@@ -181,22 +182,22 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               const SizedBox(height: 16),
               Text(
                   'This plan is closed. You can make another whenever you’re ready.',
-                  style: _body.copyWith(color: context.colors.light)),
+                  style: friendPlanBody.copyWith(color: context.colors.light)),
               _button('Plan another movie', Icons.add, widget.onNewPlan),
               _button('Close', Icons.close, widget.onClosePlan, primary: false),
             ] else if (r.isPending)
-              _invite()
+              _stage(FriendPlanStage.invitation)
             else if (needsMovie)
               _movies()
             else if (r.latestPendingProposal != null)
-              _schedule()
+              _stage(FriendPlanStage.schedule)
             else if (due)
-              _afterWatch()
+              _stage(FriendPlanStage.afterWatch)
             else if (r.scheduledFor != null &&
                 r.normalizedScheduleStatus == 'AGREED')
-              _scheduled()
+              _stage(FriendPlanStage.scheduled)
             else
-              _schedule(),
+              _stage(FriendPlanStage.schedule),
             if (!complete) _message(),
             if (!complete &&
                 !r.isPending &&
@@ -222,13 +223,16 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Text(title,
-                    style: _title.copyWith(color: context.colors.textPrimary)),
+                    style: friendPlanTitle.copyWith(
+                        color: context.colors.textPrimary)),
                 const SizedBox(height: 5),
                 Text('With $friend',
-                    style: _body.copyWith(color: context.colors.light)),
+                    style:
+                        friendPlanBody.copyWith(color: context.colors.light)),
                 const SizedBox(height: 8),
                 Text(stage == 'Scheduled' ? widget.scheduledLabel : stage,
-                    style: _body.copyWith(color: context.colors.light)),
+                    style:
+                        friendPlanBody.copyWith(color: context.colors.light)),
                 const SizedBox(height: 10),
                 _badge(
                     complete ? 'Watched' : stage,
@@ -317,23 +321,26 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         const SizedBox(height: 8),
         _movieLink(
             Text(title,
-                style: _title
+                style: friendPlanTitle
                     .copyWith(color: context.colors.textPrimary)
                     .copyWith(fontSize: 25, fontWeight: FontWeight.w900)),
             'watch-plan-summary-title'),
         const SizedBox(height: 2),
         Text('Watch plan',
-            style: _body.copyWith(color: context.colors.light).copyWith(
-                color: context.colors.primaryText,
-                fontWeight: FontWeight.w700)),
+            style: friendPlanBody
+                .copyWith(color: context.colors.light)
+                .copyWith(
+                    color: context.colors.primaryText,
+                    fontWeight: FontWeight.w700)),
         if (r.scheduledFor != null && !needsMovie) ...[
           const SizedBox(height: 8),
           Text(widget.scheduledLabel,
-              style: _body.copyWith(color: context.colors.light)),
+              style: friendPlanBody.copyWith(color: context.colors.light)),
         ],
         if (r.location?.isNotEmpty == true) ...[
           const SizedBox(height: 8),
-          Text(r.location!, style: _body.copyWith(color: context.colors.light)),
+          Text(r.location!,
+              style: friendPlanBody.copyWith(color: context.colors.light)),
         ],
         const SizedBox(height: 10),
         Row(children: [
@@ -345,322 +352,34 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     ]);
   }
 
-  Widget _invite() =>
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const SizedBox(height: 16),
-        if (r.candidates.length > 1)
-          Text(
-              '${r.candidates.length} starting suggestions. You can both add films after joining.',
-              style: _body.copyWith(color: context.colors.light))
-        else
-          Text(
-              r.proposedDate != null
-                  ? r.proposedDateOnly
-                      ? 'Accept to confirm this film and date.'
-                      : 'Accept to confirm this film and time.'
-                  : 'Join the plan, then choose a date together.',
-              style: _body.copyWith(color: context.colors.light)),
-        if (r.proposedDate != null) ...[
-          const SizedBox(height: 12),
-          Text(_date(r.proposedDate!, dateOnly: r.proposedDateOnly),
-              style: _title.copyWith(color: context.colors.textPrimary)),
-        ],
-        const SizedBox(height: 24),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          Column(children: [
-            _avatar(true, 64),
-            const SizedBox(height: 8),
-            Text('You', style: _body.copyWith(color: context.colors.light))
-          ]),
-          Column(children: [
-            _avatar(false, 64),
-            const SizedBox(height: 8),
-            Text(friend, style: _body.copyWith(color: context.colors.light))
-          ]),
-        ]),
-        const SizedBox(height: 24),
-        Text(
-            r.message?.trim().isNotEmpty == true
-                ? r.message!
-                : 'Fancy a movie night?',
-            style: _title.copyWith(color: context.colors.textPrimary)),
-        if (r.requesterId != widget.myUserId) ...[
-          _button('I’m in', Icons.check, widget.onAccept),
-          if (!needsMovie && r.proposedDate != null)
-            _button('Suggest another time', Icons.schedule,
-                widget.onSuggestSchedule,
-                primary: false),
-          _button('Not this time', Icons.close, widget.onDecline,
-              primary: false),
-        ] else
-          Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text('Waiting for $friend to join.',
-                  style: _body.copyWith(color: context.colors.light))),
-      ]);
+  Widget _stage(FriendPlanStage stage) => FriendPlanStageView(
+      stage: stage,
+      request: r,
+      myUserId: widget.myUserId,
+      title: title,
+      myAvatar: widget.myAvatar,
+      myProfileBadges: widget.myProfileBadges,
+      busy: widget.busy,
+      onAccept: widget.onAccept,
+      onDecline: widget.onDecline,
+      onSuggestSchedule: widget.onSuggestSchedule,
+      onRespondToProposal: widget.onRespondToProposal,
+      onConfirmWatched: widget.onConfirmWatched,
+      onNotThisTime: widget.onNotThisTime,
+      onChangeMovie: widget.onChangeMovie);
 
-  Widget _movies() {
-    if (_showFinalChoices && !_isCreator) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Your picks are saved. $friend will finalise the movie.',
-            style: _body.copyWith(color: context.colors.light)),
-        _button('Edit my picks', Icons.edit_outlined,
-            () => setState(() => _reviewMovies = false),
-            primary: false),
-      ]);
-    }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (!_showFinalChoices) ...[
-        Text('What could you watch?',
-            style: _title
-                .copyWith(color: context.colors.textPrimary)
-                .copyWith(fontSize: 22)),
-        const SizedBox(height: 6),
-      ],
-      Text(
-          _showFinalChoices
-              ? 'Choose the final movie for your plan.'
-              : 'Select every title you would happily watch.',
-          style: _body.copyWith(color: context.colors.light)),
-      const SizedBox(height: 16),
-      for (final candidate in r.candidates)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _choiceRow(candidate),
-        ),
-      if ((_isCreator || !_showFinalChoices) &&
-          r.candidates.where((c) => c.addedByUserId == widget.myUserId).length <
-              3)
-        Center(
-            child: TextButton.icon(
-          onPressed: widget.busy ? null : widget.onAddCandidate,
-          icon: const Icon(Icons.add_circle_outline),
-          label: const Text('Add another option'),
-          style:
-              TextButton.styleFrom(foregroundColor: context.colors.primaryText),
-        )),
-      if (!_showFinalChoices)
-        _button('Save my picks', Icons.playlist_add_check, () async {
-          final saved = await widget.onSaveCandidateChoices();
-          if (mounted && saved) setState(() => _reviewMovies = true);
-        })
-      else if (!_isCreator)
-        _button('Edit my picks', Icons.edit_outlined,
-            () => setState(() => _reviewMovies = false),
-            primary: false),
-    ]);
-  }
-
-  Widget _choiceRow(WatchPlanCandidate candidate) {
-    final selected = widget.candidateChoiceDraft.contains(candidate.id);
-    final approvals = [r.requesterId, r.recipientId]
-        .where(
-            (id) => id == widget.myUserId ? selected : candidate.selectedBy(id))
-        .length;
-    final both = approvals == 2;
-    return Semantics(
-      selected: selected,
-      button: true,
-      child: Material(
-        color: both
-            ? context.colors.success.withValues(alpha: .08)
-            : context.colors.background.withValues(alpha: .35),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-              color: both
-                  ? context.colors.success
-                  : selected
-                      ? FlixieColors.primary
-                      : context.colors.tabBarBorder,
-              width: both || selected ? 2 : 1),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: widget.busy
-              ? null
-              : () => _showFinalChoices
-                  ? widget.onSelectCandidate(candidate.id)
-                  : widget.onToggleCandidateChoice(candidate.id),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(children: [
-              WatchPlanPoster(
-                  path: candidate.posterPath,
-                  title: candidate.title,
-                  width: 48),
-              const SizedBox(width: 11),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(candidate.title ?? 'Movie option',
-                        style: TextStyle(
-                            color: context.colors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 4),
-                    Text(
-                        both
-                            ? 'Both would watch'
-                            : '$approvals of 2 would watch',
-                        style: TextStyle(
-                            color: both
-                                ? context.colors.success
-                                : context.colors.medium,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700)),
-                  ])),
-              if (_showFinalChoices) ...[
-                const SizedBox(width: 10),
-                SizedBox(
-                  width: 100,
-                  child: FilledButton(
-                    onPressed: widget.busy
-                        ? null
-                        : () => widget.onSelectCandidate(candidate.id),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 10),
-                      minimumSize: const Size(0, 44),
-                    ),
-                    child: const Text('Choose', textAlign: TextAlign.center),
-                  ),
-                ),
-              ],
-              if (!_showFinalChoices)
-                Icon(
-                    selected
-                        ? Icons.check_circle_rounded
-                        : Icons.circle_outlined,
-                    color: selected
-                        ? context.colors.success
-                        : context.colors.medium),
-            ]),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _schedule() {
-    final proposal = r.latestPendingProposal;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SizedBox(height: 20),
-      if (proposal == null) ...[
-        Text(
-            'Movie confirmed. Choose a date that works for you both. A time is optional.',
-            style: _body.copyWith(color: context.colors.light)),
-        _button(
-            'Suggest a date', Icons.calendar_month, widget.onSuggestSchedule),
-        _button('Change movie', Icons.movie_outlined, widget.onChangeMovie,
-            primary: false),
-      ] else ...[
-        Text(
-            proposal.proposerId == widget.myUserId
-                ? 'Your proposal'
-                : '$friend’s proposal',
-            style: _title.copyWith(color: context.colors.textPrimary)),
-        const SizedBox(height: 12),
-        Text(
-            proposal.proposedFor == null
-                ? 'Time to agree'
-                : _date(proposal.proposedFor!, dateOnly: proposal.dateOnly),
-            style: _body.copyWith(color: context.colors.light)),
-        if (proposal.location?.isNotEmpty == true)
-          Text(proposal.location!,
-              style: _body.copyWith(color: context.colors.light)),
-        const SizedBox(height: 16),
-        _person(
-            true,
-            proposal.proposerId == widget.myUserId ? 'Works for me' : 'Pending',
-            proposal.proposerId == widget.myUserId),
-        _person(
-            false,
-            proposal.proposerId != widget.myUserId ? 'Works for me' : 'Pending',
-            proposal.proposerId != widget.myUserId),
-        if (proposal.proposerId != widget.myUserId)
-          _button('Works for me', Icons.check,
-              () => widget.onRespondToProposal(proposal, 'accepted'))
-        else
-          Text('Waiting for $friend to confirm.',
-              style: _body.copyWith(color: context.colors.light)),
-        _button(
-            'Suggest another time', Icons.schedule, widget.onSuggestSchedule,
-            primary: false),
-        const SizedBox(height: 10),
-        Text('A new proposal needs agreement again.',
-            style: _body.copyWith(color: context.colors.light)),
-      ],
-    ]);
-  }
-
-  Widget _scheduled() =>
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const SizedBox(height: 20),
-        _badge('Both confirmed', context.colors.success),
-        const SizedBox(height: 16),
-        _person(true, 'Confirmed', true),
-        _person(false, 'Confirmed', true),
-        if (!r.watchConfirmations.any((c) => c.userId == widget.myUserId)) ...[
-          _button('Log watch', Icons.check_rounded, widget.onConfirmWatched),
-          const SizedBox(height: 8),
-          Text('Watched early? You can log it now.',
-              style: _body.copyWith(color: context.colors.medium)),
-        ],
-        _button('Add to calendar', Icons.calendar_month, () async {
-          final saved = await WatchCalendarService.addScheduledWatch(
-              title: title,
-              scheduledFor: r.scheduledFor!,
-              dateOnly: r.scheduledDateOnly,
-              location: r.location,
-              runtimeMinutes: r.movie?.runtimeMinutes);
-          if (!saved && mounted) {
-            ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
-                type: FlixieToastType.error,
-                content: const Text('Could not open your calendar.')));
-          }
-        }, primary: false),
-        _button('Reschedule', Icons.schedule, widget.onSuggestSchedule,
-            primary: false),
-      ]);
-
-  Widget _afterWatch() =>
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const SizedBox(height: 20),
-        Text('How did $title go?',
-            style: _title.copyWith(color: context.colors.textPrimary)),
-        const SizedBox(height: 8),
-        Text('Log your watch when you’re ready. You each respond separately.',
-            style: _body.copyWith(color: context.colors.light)),
-        if (!r.watchConfirmations.any((c) => c.userId == widget.myUserId)) ...[
-          _button('Log your watch', Icons.check, widget.onConfirmWatched),
-          _button('I didn’t make it', Icons.event_busy, widget.onNotThisTime,
-              primary: false),
-        ],
-        const SizedBox(height: 20),
-        Text('Your progress',
-            style: _title.copyWith(color: context.colors.textPrimary)),
-        for (final mine in [true, false])
-          Builder(builder: (_) {
-            final entry = r.watchConfirmations
-                .where((c) => c.userId == (mine ? widget.myUserId : other?.id))
-                .firstOrNull;
-            return _person(
-                mine,
-                entry == null
-                    ? 'To respond'
-                    : entry.watched
-                        ? 'Logged'
-                        : 'Didn’t make it',
-                entry != null);
-          }),
-        const SizedBox(height: 8),
-        Text('Missed it? Your friend can still log their watch.',
-            style: _body.copyWith(color: context.colors.light)),
-      ]);
+  Widget _movies() => FriendPlanChoices(
+      request: r,
+      myUserId: widget.myUserId,
+      showFinalChoices: _showFinalChoices,
+      candidateChoiceDraft: widget.candidateChoiceDraft,
+      busy: widget.busy,
+      onReviewChanged: (value) => setState(() => _reviewMovies = value),
+      onSaveCandidateChoices: widget.onSaveCandidateChoices,
+      onAddCandidate: widget.onAddCandidate,
+      onRemoveCandidate: widget.onRemoveCandidate,
+      onSelectCandidate: widget.onSelectCandidate,
+      onToggleCandidateChoice: widget.onToggleCandidateChoice);
 
   String? get backdrop => chosen?.backdropPath ?? r.movie?.backdropPath;
   Widget _movieHeader() =>
@@ -741,187 +460,15 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
             )),
       ]);
 
-  Widget _recap() {
-    final watched = r.watchConfirmations.where((c) => c.watched).toList();
-    final hidden =
-        hideMovieRatings(context, r.movieId, isShow: r.showId != null);
-    final ratings = hidden
-        ? <int>[]
-        : watched.map((c) => c.rating).whereType<int>().toList();
-    final mine = watched.where((c) => c.userId == widget.myUserId).firstOrNull;
-    final recommendations = watched.where((c) => c.recommended == true).length;
-    Widget metric(IconData icon, Color color, String value, String detail) =>
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(value,
-                    style: TextStyle(
-                        color: context.colors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(detail,
-                    style: _body.copyWith(color: context.colors.light)),
-              ])),
-        ]);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      WatchPlanSurface(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(Icons.bar_chart_rounded, color: context.colors.primaryText),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text('Your recap',
-                  style: _title.copyWith(color: context.colors.textPrimary)))
-        ]),
-        const SizedBox(height: 20),
-        LayoutBuilder(builder: (context, constraints) {
-          final people = metric(
-              Icons.people_outline,
-              context.colors.primaryText,
-              '${watched.length} watched',
-              watched.length == 2 ? 'You and $friend' : 'Of 2 people');
-          final score = metric(
-              Icons.star_rounded,
-              context.colors.warning,
-              hidden
-                  ? 'Scores hidden'
-                  : ratings.isEmpty
-                      ? 'No ratings yet'
-                      : '${(ratings.reduce((a, b) => a + b) / ratings.length).toStringAsFixed(1)} avg · ${ratings.length} ${ratings.length == 1 ? 'rating' : 'ratings'}',
-              hidden
-                  ? 'Rate to see scores'
-                  : ratings.isEmpty
-                      ? 'No one has rated yet'
-                      : ratings.length == 1
-                          ? 'Only 1 of 2 rated'
-                          : 'Both rated');
-          if (constraints.maxWidth < 300 ||
-              MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-            return Column(
-                children: [people, const SizedBox(height: 18), score]);
-          }
-          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: people),
-            Container(
-                width: 1,
-                height: 44,
-                margin: const EdgeInsets.symmetric(horizontal: 12),
-                color: context.colors.tabBarBorder),
-            Expanded(child: score)
-          ]);
-        }),
-        if (recommendations > 0)
-          Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                  recommendations == 2
-                      ? 'Both recommend it'
-                      : '1 recommends it',
-                  style: _body.copyWith(color: context.colors.success))),
-      ])),
-      for (final isMine in [true, false]) ...[
-        const SizedBox(height: 8),
-        WatchPlanSurface(
-            padding: const EdgeInsets.all(12), child: _recapPerson(isMine)),
-      ],
-      if (mine != null) ...[
-        const SizedBox(height: 24),
-        WatchPlanSurface(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Your review',
-              style: _title.copyWith(color: context.colors.textPrimary)),
-          const SizedBox(height: 8),
-          Text(
-              mine.reviewText?.trim().isNotEmpty == true
-                  ? mine.reviewText!
-                  : 'Share your thoughts on $title.',
-              style: _body.copyWith(color: context.colors.light)),
-          _button(
-              mine.reviewText?.trim().isNotEmpty == true
-                  ? 'Edit your thoughts'
-                  : 'Add your thoughts',
-              Icons.edit_outlined,
-              widget.onConfirmWatched,
-              primary: false),
-        ])),
-      ],
-      const SizedBox(height: 12),
-      _button('Plan another movie', Icons.add, widget.onNewPlan),
-      _message(),
-    ]);
-  }
-
-  Widget _recapPerson(bool mine) {
-    final entry = r.watchConfirmations
-        .where((c) => c.userId == (mine ? widget.myUserId : other?.id))
-        .firstOrNull;
-    final hidden = hideMovieRatings(context, r.movieId,
-        isShow: r.showId != null, ownerId: entry?.userId);
-    final score = entry?.watched != true
-        ? null
-        : entry?.rating == null
-            ? 'No rating added'
-            : hidden
-                ? 'Rated'
-                : '${entry!.rating}/10';
-    return LayoutBuilder(builder: (context, constraints) {
-      final compact = constraints.maxWidth < 300 ||
-          MediaQuery.textScalerOf(context).scale(1) > 1.3;
-      final rating = score == null
-          ? const SizedBox.shrink()
-          : Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 6,
-              children: [
-                  if (entry?.rating != null)
-                    Icon(Icons.star_rounded,
-                        size: 22, color: context.colors.warning),
-                  Text(score,
-                      style: _body.copyWith(color: context.colors.textPrimary)),
-                ]);
-      return Row(children: [
-        _avatar(mine, 44),
-        const SizedBox(width: 12),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(mine ? 'You' : friend,
-              style: _title.copyWith(
-                  color: context.colors.textPrimary, fontSize: 16)),
-          const SizedBox(height: 4),
-          Text(
-              entry == null
-                  ? 'To respond'
-                  : entry.watched
-                      ? 'Watched'
-                      : 'Didn’t make it',
-              style: _body.copyWith(color: context.colors.light)),
-          if (compact) rating,
-          if (!mine &&
-              entry?.watched == true &&
-              entry?.reviewText?.isNotEmpty == true)
-            Text(entry!.reviewText!,
-                style: _body.copyWith(color: context.colors.light)),
-        ])),
-        if (!compact)
-          Flexible(
-              fit: FlexFit.tight,
-              child: Align(alignment: Alignment.centerRight, child: rating)),
-        if (entry?.watched == true)
-          Padding(
-              padding: const EdgeInsets.only(left: 12),
-              child: Icon(Icons.check_circle,
-                  color: context.colors.success, size: 26)),
-      ]);
-    });
-  }
+  Widget _recap() => FriendPlanRecap(
+      title: title,
+      request: r,
+      myUserId: widget.myUserId,
+      myAvatar: widget.myAvatar,
+      myProfileBadges: widget.myProfileBadges,
+      busy: widget.busy,
+      onConfirmWatched: widget.onConfirmWatched,
+      onNewPlan: widget.onNewPlan);
 
   Widget _avatar(bool mine, double size) => ProfileAvatarView(
         avatar: mine ? widget.myAvatar : other?.avatar,
@@ -933,69 +480,18 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
         size: size,
       );
 
-  Widget _person(bool mine, String status, bool done) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(children: [
-          _avatar(mine, 36),
-          const SizedBox(width: 10),
-          Expanded(
-              child: Text(mine ? 'You' : friend,
-                  style: _body.copyWith(color: context.colors.light))),
-          Expanded(
-              child: Text(status,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                      color: done
-                          ? context.colors.success
-                          : context.colors.medium))),
-          const SizedBox(width: 8),
-          Icon(done ? Icons.check_circle : Icons.schedule,
-              size: 20,
-              color: done ? context.colors.success : context.colors.medium),
-        ]),
-      );
   Widget _message() => _button('Message $friend', Icons.chat_bubble_outline,
       other?.id == null ? null : () => context.push('/chat/${other!.id}'),
       primary: false);
   Widget _button(String label, IconData icon, VoidCallback? action,
           {bool primary = true}) =>
-      Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: SizedBox(
-          width: double.infinity,
-          child: primary
-              ? FilledButton.icon(
-                  onPressed: widget.busy ? null : action,
-                  icon: Icon(icon),
-                  label: Text(label,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16)))
-              : TextButton.icon(
-                  style: TextButton.styleFrom(
-                    foregroundColor: context.colors.primaryText,
-                    backgroundColor: context.colors.surfaceElevated,
-                    minimumSize: const Size(0, 48),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: widget.busy ? null : action,
-                  icon: Icon(icon),
-                  label: Text(label,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 16))),
-        ),
-      );
+      FriendPlanButton(
+          label: label,
+          icon: icon,
+          action: action,
+          primary: primary,
+          busy: widget.busy);
   Widget _badge(String label, Color color) {
     return FlixiePill.label(label: Text(label));
   }
-
-  String _date(DateTime value, {bool dateOnly = false}) => dateOnly
-      ? formatWatchPlanDateTime(value, dateOnly: true)
-      : '${MaterialLocalizations.of(context).formatMediumDate(value.toLocal())}, ${TimeOfDay.fromDateTime(value.toLocal()).format(context)}';
 }
-
-const _title = TextStyle(
-    color: FlixieColors.textPrimary, fontSize: 18, fontWeight: FontWeight.w800);
-const _body = TextStyle(color: FlixieColors.light, fontSize: 14, height: 1.4);

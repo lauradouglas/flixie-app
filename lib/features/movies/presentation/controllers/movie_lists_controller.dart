@@ -24,6 +24,22 @@ class MovieListsProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
   Future<void>? _loadFuture;
+  bool _disposed = false;
+  final Map<String, int> _itemVersions = {};
+  void _publish() {
+    if (!_disposed) notifyListeners();
+  }
+
+  void _invalidateItems(String listId) {
+    _itemVersions[listId] = (_itemVersions[listId] ?? 0) + 1;
+    isLoading = false;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   Future<void> loadLists() async {
     if (_loadFuture != null) return _loadFuture!;
@@ -36,7 +52,7 @@ class MovieListsProvider extends ChangeNotifier {
   Future<void> _loadLists() async {
     isLoading = lists.isEmpty;
     error = null;
-    notifyListeners();
+    _publish();
     try {
       lists = await UserService.getMovieLists(userId);
       _updateListCache();
@@ -44,7 +60,7 @@ class MovieListsProvider extends ChangeNotifier {
       error = _friendlyError(e);
     } finally {
       isLoading = false;
-      notifyListeners();
+      _publish();
     }
   }
 
@@ -88,11 +104,11 @@ class MovieListsProvider extends ChangeNotifier {
       lists = [...lists, created]
         ..sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
       _updateListCache();
-      notifyListeners();
+      _publish();
       return created;
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
+      _publish();
       return null;
     }
   }
@@ -126,11 +142,11 @@ class MovieListsProvider extends ChangeNotifier {
       // PATCH returns a deliberately small list record. Refresh the collection
       // so counts and poster previews are not temporarily replaced with zeroes.
       lists = await UserService.getMovieLists(userId);
-      notifyListeners();
+      _publish();
       return true;
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
+      _publish();
       return false;
     }
   }
@@ -141,99 +157,121 @@ class MovieListsProvider extends ChangeNotifier {
       lists = lists.where((l) => l.id != listId).toList();
       _updateListCache();
       listMovies.remove(listId);
-      notifyListeners();
+      _publish();
       return true;
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
+      _publish();
       return false;
     }
   }
 
   Future<void> loadListMovies(String listId) async {
+    if (_disposed) return;
+    final version = (_itemVersions[listId] ?? 0) + 1;
+    _itemVersions[listId] = version;
+    bool current() => !_disposed && _itemVersions[listId] == version;
     isLoading = true;
     error = null;
-    notifyListeners();
+    _publish();
     try {
-      listMovies[listId] = await UserService.getMovieListMovies(userId, listId);
+      final result = await UserService.getMovieListMovies(userId, listId);
+      if (current()) listMovies[listId] = result;
     } catch (e) {
-      error = _friendlyError(e);
+      if (current()) error = _friendlyError(e);
     } finally {
-      isLoading = false;
-      notifyListeners();
+      if (current()) {
+        isLoading = false;
+        _publish();
+      }
     }
   }
 
   Future<bool> addMovieToList(String listId, int movieId) async {
+    if (_disposed) return false;
     try {
       final entry = await UserService.addMovieToList(userId, listId, movieId);
+      if (_disposed) return false;
+      _invalidateItems(listId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
       current.removeWhere((e) => _entryMatchesMovie(e, movieId));
       current.insert(0, entry);
       listMovies[listId] = current;
-      notifyListeners();
+      _publish();
       return true;
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
+      _publish();
       return false;
     }
   }
 
   Future<bool> addShowToList(String listId, int showId) async {
+    if (_disposed) return false;
     try {
       await UserService.addShowToList(userId, listId, showId);
+      if (_disposed) return false;
+      _invalidateItems(listId);
       await loadListMovies(listId);
       return true;
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
+      _publish();
       return false;
     }
   }
 
   Future<bool> removeMovieFromList(String listId, int movieId) async {
+    if (_disposed) return false;
     try {
       await UserService.removeMovieFromList(userId, listId, movieId);
+      if (_disposed) return false;
+      _invalidateItems(listId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
       current.removeWhere((e) => _entryMatchesMovie(e, movieId));
       listMovies[listId] = current;
-      notifyListeners();
+      _publish();
       return true;
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
+      _publish();
       return false;
     }
   }
 
   Future<bool> removeShowFromList(String listId, int showId) async {
+    if (_disposed) return false;
     try {
       await UserService.removeShowFromList(userId, listId, showId);
+      if (_disposed) return false;
+      _invalidateItems(listId);
       final current = List<MovieListMovie>.from(listMovies[listId] ?? []);
       current.removeWhere((e) => _entryMatchesShow(e, showId));
       listMovies[listId] = current;
-      notifyListeners();
+      _publish();
       return true;
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
+      _publish();
       return false;
     }
   }
 
-  Future<List<MovieList>> getListsContainingMovie(int movieId) async {
+  Future<List<MovieList>> getListsContainingMedia(int mediaId,
+      {bool isShow = false}) async {
+    error = null;
     try {
-      final containing = await UserService.getMyListsContainingMovie(
+      final containing = await UserService.getMyListsContainingMedia(
         userId,
-        movieId,
+        mediaId,
+        isShow: isShow,
         lists: lists,
       );
       return containing.where((list) => !list.removed).toList(growable: false);
     } catch (e) {
       error = _friendlyError(e);
-      notifyListeners();
-      return const <MovieList>[];
+      _publish();
+      rethrow;
     }
   }
 

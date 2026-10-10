@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/startup_trace.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kDebugMode, visibleForTesting;
@@ -318,11 +319,28 @@ class ApiClient {
 
     for (var attempt = 0; attempt <= _maxRetries; attempt++) {
       try {
-        final response = await ((_testClient ?? _transport)?.get ??
-                http.get)(uri, headers: headers)
-            .timeout(_timeout);
+        final phase = uri.path == '/groups/home/watch-plans'
+            ? 'api.home-plans-group'
+            : RegExp(r'^/requests/[^/]+/all$').hasMatch(uri.path)
+                ? 'api.home-plans-direct'
+                : 'api.other';
+        final response = await StartupTrace.run(
+            '$phase.transport',
+            () => ((_testClient ?? _transport)?.get ?? http.get)(uri,
+                    headers: headers)
+                .timeout(_timeout));
+        final server = <String, Object?>{'status': response.statusCode};
+        for (final match in RegExp(r'(app|auth|data);dur=([0-9.]+)')
+            .allMatches(response.headers['server-timing'] ?? '')) {
+          final value = double.tryParse(match.group(2)!);
+          if (value != null && value.isFinite) {
+            server['${match.group(1)}Ms'] = value;
+          }
+        }
+        StartupTrace.mark('$phase.response', server);
         apiLogger.d('Response ${response.statusCode}');
-        return _parseResponse(response);
+        return StartupTrace.sync(
+            '$phase.decode', () => _parseResponse(response));
       } on ApiException catch (e) {
         if (e.statusCode == 500 &&
             e.code == 'DATABASE_ERROR' &&

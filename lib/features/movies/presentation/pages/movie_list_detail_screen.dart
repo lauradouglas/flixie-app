@@ -1,32 +1,27 @@
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
-import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
-import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'package:flixie_app/models/movie_short.dart';
-import 'package:flixie_app/models/movie_list.dart';
 import 'package:flixie_app/models/movie_list_movie.dart';
 import 'package:flixie_app/models/movie_list_membership.dart';
-import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/features/profile/data/user_service.dart';
-import 'package:flixie_app/features/social/data/friend_service.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/movies/presentation/controllers/movie_lists_controller.dart';
-import 'package:flixie_app/features/movies/data/search_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
 
-enum _ListSort { recentlyAdded, title, releaseYear, rating, addedBy }
+import 'package:flixie_app/features/movies/presentation/movie_list_selection.dart';
+import '../controllers/movie_list_detail_controller.dart';
+import '../movie_list_detail_actions.dart';
+import '../widgets/movie_list_detail/movie_list_header.dart';
+import '../widgets/movie_list_detail/movie_list_members_strip.dart';
+import '../widgets/movie_list_detail/movie_list_sort_toolbar.dart';
+import '../widgets/movie_list_detail/movie_list_poster_card.dart';
+import '../widgets/movie_list_detail/empty_movie_list_state.dart';
 
 class MovieListDetailScreen extends StatelessWidget {
   const MovieListDetailScreen({
@@ -48,7 +43,8 @@ class MovieListDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    final currentUserId =
+        context.select<AuthProvider, String?>((auth) => auth.dbUser?.id);
     final userId =
         (ownerUserId?.isNotEmpty ?? false) ? ownerUserId : currentUserId;
     if (userId == null) {
@@ -57,6 +53,7 @@ class MovieListDetailScreen extends StatelessWidget {
       );
     }
     return ChangeNotifierProvider(
+      key: ValueKey((currentUserId, userId, listId)),
       create: (_) => MovieListsProvider(
         userId: userId,
       )..loadListMovies(listId),
@@ -96,14 +93,24 @@ class _MovieListDetailView extends StatefulWidget {
 }
 
 class _MovieListDetailViewState extends State<_MovieListDetailView> {
-  _ListSort _sort = _ListSort.recentlyAdded;
+  MovieListSort _sort = MovieListSort.recentlyAdded;
   String? _addedByUserId;
-  models.User? _owner;
-  MovieListMembership? _membership;
-
+  late final MovieListDetailController _controller;
+  late final MovieListDetailActions _actions;
+  models.User? get _owner => _controller.owner;
+  MovieListMembership? get _membership => _controller.membership;
   bool get _canEdit => _membership?.canEdit ?? widget.canEdit;
-
   bool get _isOwner => _membership?.isOwner ?? widget.isOwner;
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_changed);
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -111,301 +118,32 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     if (widget.listName.startsWith('Movie Match with @')) {
       context.read<AnalyticsController>().tasteMatchViewed();
     }
-    final currentUser = context.read<AuthProvider>().dbUser;
-    if (currentUser?.id == widget.ownerUserId) {
-      _owner = currentUser;
-    } else {
-      _loadOwner(widget.ownerUserId);
-    }
-    _loadMembership();
+    _controller = MovieListDetailController(
+        listId: widget.listId,
+        ownerId: widget.ownerUserId,
+        viewer: context.read<AuthProvider>().dbUser,
+        currentViewer: () => context.read<AuthProvider>().dbUser?.id)
+      ..addListener(_changed);
+    _actions = MovieListDetailActions(
+        context: context,
+        listId: widget.listId,
+        listName: widget.listName,
+        ownerUserId: widget.ownerUserId,
+        controller: _controller,
+        refresh: _refresh);
+    _controller.refresh();
     if (widget.addOnOpen && widget.canEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _showAddMovieSheet();
+        if (mounted) _actions.showAddMovies();
       });
     }
   }
 
-  Future<void> _loadMembership() async {
-    try {
-      final membership = await UserService.getMovieListMembers(
-        widget.ownerUserId,
-        widget.listId,
-      );
-      if (mounted) {
-        setState(() => _membership = membership);
-        if (_owner?.id != membership.ownerId) {
-          _loadOwner(membership.ownerId);
-        }
-      }
-    } catch (_) {
-      // The collection can still render if membership metadata is unavailable.
-    }
-  }
-
-  Future<void> _loadOwner(String ownerId) async {
-    try {
-      final owner = await UserService.getUserById(ownerId);
-      if (mounted) setState(() => _owner = owner);
-    } catch (_) {
-      // The list remains usable if profile details cannot be loaded.
-    }
-  }
-
-  Future<void> _refresh() {
-    _loadMembership();
-    return context.read<MovieListsProvider>().loadListMovies(widget.listId);
-  }
-
-  Future<void> _showAddMovieSheet() async {
-    final provider = context.read<MovieListsProvider>();
-    final added = await showModalBottomSheet<bool>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: context.colors.surfaceElevated,
-      builder: (sheetContext) =>
-          ChangeNotifierProvider<MovieListsProvider>.value(
-        value: provider,
-        child: _AddMovieToListSheet(
-          listId: widget.listId,
-          listName: widget.listName,
-        ),
-      ),
-    );
-    if (added == true && mounted) {
-      await _refresh();
-    }
-  }
-
-  Future<void> _deleteList() async {
-    final confirmed = await showFlixiePromptSheet<bool>(
-      context: context,
-      builder: (dialogContext) => FlixiePromptSheetContent(
-        title: const Text('Delete this list?'),
-        content: const Text(
-          'The collection will be removed for everyone. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Keep list'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: context.colors.danger,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await UserService.deleteMovieList(widget.ownerUserId, widget.listId);
-      if (mounted) context.go('/movie-lists');
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-              type: FlixieToastType.error,
-              content: const Text('Unable to delete this list.')),
-        );
-      }
-    }
-  }
-
-  Future<void> _leaveList() async {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
-    if (currentUserId == null) return;
-    final confirmed = await showFlixiePromptSheet<bool>(
-      context: context,
-      builder: (dialogContext) => FlixiePromptSheetContent(
-        title: const Text('Leave this list?'),
-        content: const Text(
-          'It will disappear from your lists, but everyone else keeps access.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Leave'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await UserService.removeMovieListMember(
-        currentUserId,
-        widget.listId,
-        currentUserId,
-      );
-      if (mounted) context.go('/movie-lists');
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-              type: FlixieToastType.error,
-              content: const Text('Unable to leave this list.')),
-        );
-      }
-    }
-  }
-
-  Future<void> _removeMember(MovieListMember member) async {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
-    if (currentUserId == null) return;
-    try {
-      await UserService.removeMovieListMember(
-        currentUserId,
-        widget.listId,
-        member.id,
-      );
-      await _loadMembership();
-      if (mounted) Navigator.of(context).pop();
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-              type: FlixieToastType.error,
-              content: Text('Unable to remove @${member.username}.')),
-        );
-      }
-    }
-  }
-
-  Future<void> _addMember() async {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
-    if (currentUserId == null) return;
-    final friendsData = await FriendService.getFriends(currentUserId);
-    if (!mounted) return;
-    final existingIds =
-        _membership?.members.map((member) => member.id).toSet() ?? <String>{};
-    final available = friendsData.friendships
-        .map((friendship) => friendship.friendUser)
-        .whereType<FriendshipUser>()
-        .where((friend) => !existingIds.contains(friend.id))
-        .toList(growable: false);
-    final selected = await showModalBottomSheet<FriendshipUser>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: context.colors.surfaceElevated,
-      builder: (_) => _AddListMemberSheet(friends: available),
-    );
-    if (selected == null || !mounted) return;
-    try {
-      await UserService.addMovieListMember(
-        currentUserId,
-        widget.listId,
-        selected.id,
-      );
-      await _loadMembership();
-      if (mounted) Navigator.of(context).pop();
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-              type: FlixieToastType.error,
-              content: Text('Unable to add @${selected.username}.')),
-        );
-      }
-    }
-  }
-
-  Future<void> _showMembersSheet() async {
-    final membership = _membership;
-    if (membership == null) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      backgroundColor: context.colors.surfaceElevated,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-          child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${membership.members.length} member${membership.members.length == 1 ? '' : 's'}',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  if (membership.canManageMembers)
-                    TextButton.icon(
-                      onPressed: _addMember,
-                      icon: const Icon(Icons.person_add_alt_1_rounded),
-                      label: const Text('Add'),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ...membership.members.map(
-                (member) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: ProfileAvatarView(
-                    avatar: member.avatar,
-                    fallbackText: member.username.isEmpty
-                        ? '?'
-                        : member.username[0].toUpperCase(),
-                    fallbackColor: FlixieColors.primary,
-                    size: 40,
-                    profileBadges: member.profileBadges,
-                  ),
-                  title: Text('@${member.username}'),
-                  subtitle: member.id == membership.ownerId
-                      ? const Text('Owner')
-                      : null,
-                  trailing: membership.canManageMembers &&
-                          member.id != membership.ownerId
-                      ? IconButton(
-                          tooltip: 'Remove member',
-                          onPressed: () => _removeMember(member),
-                          icon: Icon(
-                            Icons.person_remove_outlined,
-                            color: context.colors.danger,
-                          ),
-                        )
-                      : null,
-                ),
-              ),
-              if (membership.canLeave)
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      _leaveList();
-                    },
-                    icon: const Icon(Icons.logout_rounded),
-                    label: const Text('Leave list'),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      )),
-    );
+  Future<void> _refresh() async {
+    await Future.wait([
+      _controller.refresh(),
+      context.read<MovieListsProvider>().loadListMovies(widget.listId)
+    ]);
   }
 
   @override
@@ -413,13 +151,32 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
     final provider = context.watch<MovieListsProvider>();
     final rawMovies =
         provider.listMovies[widget.listId] ?? const <MovieListMovie>[];
-    final movies = _sortedMovies(
+    if (_controller.accessDenied) {
+      return Scaffold(
+          appBar: AppBar(leading: const FlixieBackButton()),
+          body: RefreshIndicator(
+              onRefresh: _refresh,
+              child: const CustomScrollView(
+                  physics: AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                            child: Text('This list is no longer available.')))
+                  ])));
+    }
+    final movies = sortedMovieList(
       rawMovies
           .where((entry) =>
               _addedByUserId == null || entry.addedBy?.id == _addedByUserId)
           .toList(growable: false),
+      _sort,
     );
 
+    final width = MediaQuery.sizeOf(context).width;
+    final textScale = MediaQuery.textScalerOf(context).scale(13) / 13;
+    final columns =
+        ((width - 32) / (140 * textScale.clamp(1, 1.5))).floor().clamp(1, 4);
     return Scaffold(
       backgroundColor: context.colors.background,
       appBar: AppBar(
@@ -430,7 +187,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
           if (_canEdit)
             IconButton(
               tooltip: 'Add titles',
-              onPressed: _showAddMovieSheet,
+              onPressed: _actions.showAddMovies,
               icon: const Icon(Icons.add_rounded),
             ),
           PopupMenuButton<String>(
@@ -440,11 +197,11 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
               if (value == 'refresh') {
                 _refresh();
               } else if (value == 'members') {
-                await _showMembersSheet();
+                await _actions.showMembers();
               } else if (value == 'leave') {
-                await _leaveList();
+                await _actions.leaveList();
               } else if (value == 'delete') {
-                await _deleteList();
+                await _actions.deleteList();
               } else if (value == 'manage') {
                 context.push('/movie-lists');
               }
@@ -487,35 +244,35 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(
-                    child: _ListHeader(
+                    child: MovieListHeader(
                       listName: widget.listName,
                       owner: _owner,
                       membership: _membership,
                       canEdit: _canEdit,
                       isOwner: _isOwner,
                       movieCount: rawMovies.length,
-                      posterUrls: _posterUrls(rawMovies),
-                      onAddMovies: _showAddMovieSheet,
+                      posterUrls: movieListPosterUrls(rawMovies),
+                      onAddMovies: _actions.showAddMovies,
                     ),
                   ),
                   if (_membership != null)
                     SliverToBoxAdapter(
-                      child: _ListMembersStrip(
+                      child: MovieListMembersStrip(
                         membership: _membership!,
-                        onTap: _showMembersSheet,
+                        onTap: _actions.showMembers,
                       ),
                     ),
                   SliverToBoxAdapter(
-                    child: _SortToolbar(
+                    child: MovieListSortToolbar(
                       sort: _sort,
                       movieCount: rawMovies
-                          .where((entry) => _entryMovieId(entry) > 0)
+                          .where((entry) => entryMovieId(entry) > 0)
                           .length,
                       showCount: rawMovies
-                          .where((entry) => _entryShowId(entry) > 0)
+                          .where((entry) => entryShowId(entry) > 0)
                           .length,
                       onSortChanged: (sort) => setState(() => _sort = sort),
-                      contributors: _contributorsFor(rawMovies),
+                      contributors: movieListContributors(rawMovies),
                       selectedContributorId: _addedByUserId,
                       onContributorChanged: (id) =>
                           setState(() => _addedByUserId = id),
@@ -524,13 +281,13 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                   if (movies.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _EmptyListState(
+                      child: EmptyMovieListState(
                         isOwner: _canEdit,
                         message: provider.error ??
                             (rawMovies.isNotEmpty && _addedByUserId != null
                                 ? 'No titles added by this contributor yet.'
                                 : 'Start building this list.'),
-                        onAddMovies: _showAddMovieSheet,
+                        onAddMovies: _actions.showAddMovies,
                       ),
                     )
                   else
@@ -538,30 +295,24 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 120),
                       sliver: SliverGrid(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount:
-                              MediaQuery.sizeOf(context).width >= 700 ? 4 : 2,
-                          mainAxisExtent: ((MediaQuery.sizeOf(context).width -
-                                              32) /
-                                          (MediaQuery.sizeOf(context).width >=
-                                                  700
-                                              ? 4
-                                              : 2) -
-                                      12) *
-                                  1.5 +
-                              MediaQuery.textScalerOf(context).scale(160),
+                          crossAxisCount: columns,
+                          mainAxisExtent:
+                              ((width - 32 - 12 * (columns - 1)) / columns) *
+                                      1.5 +
+                                  MediaQuery.textScalerOf(context).scale(160),
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 18,
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             final entry = movies[index];
-                            return _MovieListPosterCard(
+                            return MovieListPosterCard(
                               entry: entry,
                               canEdit: _canEdit,
                               currentUserId:
                                   context.read<AuthProvider>().dbUser?.id,
                               onOpen: () {
-                                final movieId = _entryMovieId(entry);
+                                final movieId = entryMovieId(entry);
                                 if (movieId > 0) {
                                   context.push(movieDetailPath(
                                     movieId,
@@ -571,7 +322,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                                   ));
                                   return;
                                 }
-                                final showId = _entryShowId(entry);
+                                final showId = entryShowId(entry);
                                 if (showId > 0) {
                                   context.push(showDetailPath(
                                     showId,
@@ -579,8 +330,7 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
                                   ));
                                 }
                               },
-                              onRemove: () => _confirmRemove(
-                                context,
+                              onRemove: () => _actions.remove(
                                 provider,
                                 entry,
                               ),
@@ -595,1521 +345,4 @@ class _MovieListDetailViewState extends State<_MovieListDetailView> {
       ),
     );
   }
-
-  List<MovieListMovie> _sortedMovies(List<MovieListMovie> movies) {
-    final sorted = List<MovieListMovie>.from(movies);
-    switch (_sort) {
-      case _ListSort.recentlyAdded:
-        sorted.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
-        break;
-      case _ListSort.title:
-        sorted.sort((a, b) => _entryTitle(a).compareTo(_entryTitle(b)));
-        break;
-      case _ListSort.releaseYear:
-        sorted.sort(
-            (a, b) => _entryReleaseYear(b).compareTo(_entryReleaseYear(a)));
-        break;
-      case _ListSort.rating:
-        sorted.sort(
-            (a, b) => (_entryRating(b) ?? -1).compareTo(_entryRating(a) ?? -1));
-        break;
-      case _ListSort.addedBy:
-        sorted.sort((a, b) =>
-            (a.addedBy?.username ?? '').compareTo(b.addedBy?.username ?? ''));
-        break;
-    }
-    return sorted;
-  }
-
-  List<MovieListContributor> _contributorsFor(
-    List<MovieListMovie> movies,
-  ) {
-    final contributors = <String, MovieListContributor>{};
-    for (final entry in movies) {
-      final contributor = entry.addedBy;
-      if (contributor != null && contributor.id.isNotEmpty) {
-        contributors[contributor.id] = contributor;
-      }
-    }
-    final result = contributors.values.toList()
-      ..sort((a, b) => a.username.compareTo(b.username));
-    return result;
-  }
-
-  List<String> _posterUrls(List<MovieListMovie> movies) {
-    return movies
-        .map((entry) => entry.movie?.posterPath ?? entry.show?.posterPath)
-        .whereType<String>()
-        .take(4)
-        .map((path) => 'https://image.tmdb.org/t/p/w342$path')
-        .toList(growable: false);
-  }
-
-  Future<void> _confirmRemove(
-    BuildContext context,
-    MovieListsProvider provider,
-    MovieListMovie entry,
-  ) async {
-    final movieId = _entryMovieId(entry);
-    final showId = _entryShowId(entry);
-    if (movieId <= 0 && showId <= 0) return;
-    final title = _entryTitle(entry);
-    final confirmed = await showFlixiePromptSheet<bool>(
-      context: context,
-      builder: (dialogContext) => FlixiePromptSheetContent(
-        title: const Text('Remove from list?'),
-        content: Text(
-          entry.addedBy != null &&
-                  entry.addedBy!.id != context.read<AuthProvider>().dbUser?.id
-              ? 'Remove $title, added by @${entry.addedBy!.username}, from ${widget.listName}?'
-              : 'Remove $title from ${widget.listName}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    final analytics = context.read<AnalyticsController>();
-    final ok = movieId > 0
-        ? await provider.removeMovieFromList(widget.listId, movieId)
-        : await provider.removeShowFromList(widget.listId, showId);
-    if (ok) {
-      await (movieId > 0
-          ? analytics.movieRemovedFromList()
-          : analytics.showRemovedFromList());
-    }
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showFlixieToast(
-      FlixieToast(
-        type: FlixieToastType.error,
-        content: Text(
-          ok
-              ? 'Removed from list'
-              : (provider.error ?? 'Unable to remove movie'),
-        ),
-      ),
-    );
-  }
-}
-
-class _AddListMemberSheet extends StatefulWidget {
-  const _AddListMemberSheet({required this.friends});
-
-  final List<FriendshipUser> friends;
-
-  @override
-  State<_AddListMemberSheet> createState() => _AddListMemberSheetState();
-}
-
-class _AddListMemberSheetState extends State<_AddListMemberSheet> {
-  final _searchController = TextEditingController();
-  String _query = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _query.trim().toLowerCase();
-    final visible = query.isEmpty
-        ? widget.friends
-        : widget.friends
-            .where((friend) => [
-                  friend.username,
-                  friend.firstName ?? '',
-                  friend.lastName ?? '',
-                ].join(' ').toLowerCase().contains(query))
-            .toList(growable: false);
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          MediaQuery.viewInsetsOf(context).bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Add a friend',
-              style: TextStyle(
-                color: context.colors.light,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _searchController,
-              autofocus: true,
-              onChanged: (value) => setState(() => _query = value),
-              decoration: const InputDecoration(
-                hintText: 'Search friends',
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (visible.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text(
-                    'No friends available to add.',
-                    style: TextStyle(color: context.colors.medium),
-                  ),
-                ),
-              )
-            else
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: visible.length,
-                  itemBuilder: (_, index) {
-                    final friend = visible[index];
-                    return ListTile(
-                      onTap: () => Navigator.pop(context, friend),
-                      leading: ProfileAvatarView(
-                        avatar: friend.avatar,
-                        fallbackText: friend.username.isEmpty
-                            ? '?'
-                            : friend.username[0].toUpperCase(),
-                        fallbackColor: FlixieColors.primary,
-                        size: 38,
-                        profileBadges: friend.profileBadges,
-                      ),
-                      title: Text('@${friend.username}'),
-                      trailing: const Icon(Icons.add_circle_outline_rounded),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AddMovieToListSheet extends StatefulWidget {
-  const _AddMovieToListSheet({
-    required this.listId,
-    required this.listName,
-  });
-
-  final String listId;
-  final String listName;
-
-  @override
-  State<_AddMovieToListSheet> createState() => _AddMovieToListSheetState();
-}
-
-class _AddMovieToListSheetState extends State<_AddMovieToListSheet> {
-  final TextEditingController _controller = TextEditingController();
-  Timer? _debounce;
-  List<MovieShort> _results = const [];
-  bool _searching = false;
-  int? _addingMovieId;
-  String? _error;
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onQueryChanged(String value) {
-    _debounce?.cancel();
-    final query = value.trim();
-    if (query.length < 2) {
-      setState(() {
-        _results = const [];
-        _searching = false;
-        _error = null;
-      });
-      return;
-    }
-    setState(() {
-      _searching = true;
-      _error = null;
-    });
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _search(query);
-    });
-  }
-
-  Future<void> _search(String query) async {
-    try {
-      final response = await SearchService.search(query);
-      if (!mounted || _controller.text.trim() != query) return;
-      setState(() {
-        _results = response.results
-            .map((item) => item.show == null
-                ? item.movie
-                : MovieShort(
-                    id: item.show!.id,
-                    name: item.show!.name,
-                    poster: item.show!.posterPath,
-                    releaseDate: item.show!.firstAirDate,
-                    mediaType: 'tv'))
-            .whereType<MovieShort>()
-            .toList(growable: false);
-        _searching = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _searching = false;
-        _error = 'Unable to search titles right now.';
-      });
-    }
-  }
-
-  Future<void> _addMovie(MovieShort movie) async {
-    final provider = context.read<MovieListsProvider>();
-    final analytics = context.read<AnalyticsController>();
-    setState(() {
-      _addingMovieId = movie.id;
-      _error = null;
-    });
-    final ok = movie.mediaType == 'tv'
-        ? await provider.addShowToList(widget.listId, movie.id)
-        : await provider.addMovieToList(widget.listId, movie.id);
-    if (ok) await analytics.movieAddedToList();
-    if (!mounted) return;
-    setState(() => _addingMovieId = null);
-    if (ok) {
-      final messenger = ScaffoldMessenger.of(context);
-      // Keep the picker open so several titles can be added in one visit.
-      messenger.showFlixieToast(FlixieToast(
-          type: FlixieToastType.success, content: Text('Added ${movie.name}')));
-    } else {
-      setState(() {
-        _error = provider.error ?? 'Unable to add title.';
-      });
-    }
-  }
-
-  bool _isAlreadyInList(MovieListsProvider provider, MovieShort movie) {
-    final entries = provider.listMovies[widget.listId] ?? const [];
-    return entries.any((entry) => movie.mediaType == 'tv'
-        ? entry.showId == movie.id
-        : entry.showId == 0 && _entryMovieId(entry) == movie.id);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<MovieListsProvider>();
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final sheetHeight = MediaQuery.sizeOf(context).height * 0.78;
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 16),
-        child: SizedBox(
-          height: sheetHeight,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Add to ${widget.listName}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: context.colors.white,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(false),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _controller,
-                autofocus: true,
-                onChanged: _onQueryChanged,
-                style: TextStyle(color: context.colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Search movies or shows',
-                  hintStyle: TextStyle(color: context.colors.medium),
-                  prefixIcon: Icon(
-                    Icons.search_rounded,
-                    color: context.colors.medium,
-                  ),
-                  suffixIcon: _controller.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Clear',
-                          onPressed: () {
-                            _controller.clear();
-                            _onQueryChanged('');
-                          },
-                          icon: Icon(
-                            Icons.close_rounded,
-                            color: context.colors.medium,
-                          ),
-                        ),
-                  filled: true,
-                  fillColor: context.colors.tabBarBackgroundFocused,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: FlixieColors.primary),
-                  ),
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _error!,
-                  style: TextStyle(
-                    color: context.colors.danger,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Expanded(
-                child: _buildResults(provider),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildResults(MovieListsProvider provider) {
-    if (_searching) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_controller.text.trim().length < 2) {
-      return Center(
-        child: Text(
-          'Find movies or shows to start your collection.',
-          style: TextStyle(color: context.colors.medium),
-        ),
-      );
-    }
-    if (_results.isEmpty) {
-      return Center(
-        child: Text(
-          'No titles found.',
-          style: TextStyle(color: context.colors.medium),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      itemCount: _results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final movie = _results[index];
-        final alreadyAdded = _isAlreadyInList(provider, movie);
-        final isAdding = _addingMovieId == movie.id;
-        return _AddMovieResultTile(
-          movie: movie,
-          alreadyAdded: alreadyAdded,
-          isAdding: isAdding,
-          onAdd: alreadyAdded || _addingMovieId != null
-              ? null
-              : () => _addMovie(movie),
-        );
-      },
-    );
-  }
-}
-
-class _AddMovieResultTile extends StatelessWidget {
-  const _AddMovieResultTile({
-    required this.movie,
-    required this.alreadyAdded,
-    required this.isAdding,
-    required this.onAdd,
-  });
-
-  final MovieShort movie;
-  final bool alreadyAdded;
-  final bool isAdding;
-  final VoidCallback? onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final posterUrl = movie.poster == null
-        ? null
-        : 'https://image.tmdb.org/t/p/w185${movie.poster}';
-    final year = _extractYear(movie.releaseDate);
-
-    return Material(
-      color: alreadyAdded
-          ? FlixieColors.primary.withValues(alpha: .09)
-          : context.colors.tabBarBackgroundFocused,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: alreadyAdded
-              ? FlixieColors.primary.withValues(alpha: .45)
-              : Colors.transparent,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onAdd,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 48,
-                  height: 72,
-                  child: posterUrl == null
-                      ? Container(
-                          color: const Color(0xFF1E2D40),
-                          child: Icon(
-                            Icons.movie_outlined,
-                            color: context.colors.medium,
-                          ),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color: const Color(0xFF1E2D40),
-                            child: Icon(
-                              Icons.movie_outlined,
-                              color: context.colors.medium,
-                            ),
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      movie.name,
-                      style: TextStyle(
-                        color: context.colors.white,
-                        fontWeight: FontWeight.w600,
-                        height: 1.15,
-                      ),
-                    ),
-                    ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${movie.mediaType == 'tv' ? 'Show' : 'Movie'}${year == null ? '' : ' · $year'}',
-                        style: TextStyle(
-                          color: context.colors.medium,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                    if (alreadyAdded) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_rounded,
-                              size: 16, color: context.colors.primaryText),
-                          const SizedBox(width: 4),
-                          Flexible(
-                              child: Text('Added',
-                                  style: TextStyle(
-                                      color: context.colors.primaryText,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600))),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              if (isAdding)
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else if (!alreadyAdded)
-                IconButton.outlined(
-                  tooltip: 'Add ${movie.name}',
-                  onPressed: onAdd,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(44, 44),
-                    foregroundColor: context.colors.primaryText,
-                    side: BorderSide(
-                        color:
-                            context.colors.primaryText.withValues(alpha: .3)),
-                  ),
-                  icon: const Icon(Icons.add_rounded, size: 22),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ListMembersStrip extends StatelessWidget {
-  const _ListMembersStrip({
-    required this.membership,
-    required this.onTap,
-  });
-
-  final MovieListMembership membership;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final preview = membership.members.take(5).toList(growable: false);
-    final contributorCount = membership.scope == ListScope.group
-        ? membership.members.length
-        : (membership.members.length - 1).clamp(0, membership.members.length);
-    final everyoneCanAdd = membership.scope == ListScope.group ||
-        membership.whoCanAddItems.toLowerCase() == 'everyone';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: context.colors.surfaceElevated.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: FlixieColors.primary.withValues(alpha: 0.2),
-            ),
-          ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 34 + (preview.length - 1) * 20,
-                height: 34,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    for (var index = 0; index < preview.length; index++)
-                      Positioned(
-                        left: 2 + index * 20,
-                        top: 2,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: FlixieColors.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                          padding: const EdgeInsets.all(1),
-                          child: ProfileAvatarView(
-                            avatar: preview[index].avatar,
-                            fallbackText: preview[index].username.isEmpty
-                                ? '?'
-                                : preview[index].username[0].toUpperCase(),
-                            fallbackColor: FlixieColors.primary,
-                            size: 28,
-                            profileBadges: preview[index].profileBadges,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      membership.scope == 'GROUP'
-                          ? '${membership.groupName ?? 'Group'} · ${membership.members.length} members'
-                          : contributorCount == 0
-                              ? 'Only you can edit this list'
-                              : '$contributorCount contributor${contributorCount == 1 ? '' : 's'}',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      everyoneCanAdd
-                          ? membership.scope == ListScope.group
-                              ? 'Every group member can add titles'
-                              : 'Everyone can add titles'
-                          : 'Only the owner can edit this list',
-                      style: TextStyle(
-                        color: context.colors.medium,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: FlixieColors.primary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ListHeader extends StatelessWidget {
-  const _ListHeader({
-    required this.listName,
-    required this.owner,
-    required this.membership,
-    required this.canEdit,
-    required this.isOwner,
-    required this.movieCount,
-    required this.posterUrls,
-    required this.onAddMovies,
-  });
-
-  final String listName;
-  final models.User? owner;
-  final MovieListMembership? membership;
-  final bool canEdit;
-  final bool isOwner;
-  final int movieCount;
-  final List<String> posterUrls;
-  final VoidCallback onAddMovies;
-
-  @override
-  Widget build(BuildContext context) {
-    final isGroupList = membership?.scope == ListScope.group;
-    final identity = _listIdentity(listName);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: double.infinity,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isGroupList)
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: membership?.groupId == null
-                          ? null
-                          : () =>
-                              context.push('/groups/${membership!.groupId}'),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.groups_2_rounded,
-                                  color: FlixieColors.primary,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    membership?.groupName ?? 'Group list',
-                                    style: TextStyle(
-                                      color: context.colors.light,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                                if (membership?.groupId != null)
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: context.colors.medium,
-                                    size: 18,
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ProfileAvatarView(
-                                  avatar: owner?.avatar,
-                                  fallbackText: _ownerInitial(owner),
-                                  fallbackColor: FlixieColors.primary,
-                                  size: 22,
-                                  profileBadges:
-                                      owner?.profileBadges ?? const [],
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    owner == null
-                                        ? _visibilityLabel(
-                                            membership?.visibility)
-                                        : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
-                                    style: TextStyle(
-                                      color: context.colors.medium,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: owner == null
-                          ? null
-                          : () => context.push(
-                                isOwner ? '/profile' : '/friends/${owner!.id}',
-                              ),
-                      borderRadius: BorderRadius.circular(999),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 3, 8, 3),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ProfileAvatarView(
-                              avatar: owner?.avatar,
-                              fallbackText: _ownerInitial(owner),
-                              fallbackColor: FlixieColors.primary,
-                              size: 34,
-                              profileBadges: owner?.profileBadges ?? const [],
-                            ),
-                            const SizedBox(width: 9),
-                            Flexible(
-                              child: Text(
-                                owner == null
-                                    ? _visibilityLabel(membership?.visibility)
-                                    : '@${owner!.username} · ${_visibilityLabel(membership?.visibility)}',
-                                style: TextStyle(
-                                  color: context.colors.light,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            if (isOwner) ...[
-                              const SizedBox(width: 6),
-                              const FlixiePill.label(label: Text('Owner')),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                Text(
-                  identity.$1,
-                  style: TextStyle(
-                    color: context.colors.white,
-                    fontSize: 28,
-                    height: 1.25,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                if (identity.$2 != null) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    identity.$2!,
-                    style: TextStyle(
-                      color: context.colors.light,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                if (membership?.description?.trim().isNotEmpty == true) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    membership!.description!.trim(),
-                    style: TextStyle(
-                      color: context.colors.medium,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 7),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.video_library_outlined,
-                      color: context.colors.medium,
-                      size: 17,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$movieCount ${movieCount == 1 ? 'title' : 'titles'}',
-                      style: TextStyle(
-                        color: context.colors.medium,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                if (canEdit) ...[
-                  const SizedBox(height: 9),
-                  FilledButton.icon(
-                    onPressed: onAddMovies,
-                    icon: const Icon(Icons.add_rounded, size: 17),
-                    label: const Text('Add titles'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.white,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _ownerInitial(models.User? user) {
-    final username = user?.username.trim() ?? '';
-    return username.isEmpty ? '?' : username[0].toUpperCase();
-  }
-}
-
-class _SortToolbar extends StatelessWidget {
-  const _SortToolbar({
-    required this.sort,
-    required this.movieCount,
-    required this.showCount,
-    required this.onSortChanged,
-    required this.contributors,
-    required this.selectedContributorId,
-    required this.onContributorChanged,
-  });
-
-  final _ListSort sort;
-  final int movieCount;
-  final int showCount;
-  final ValueChanged<_ListSort> onSortChanged;
-  final List<MovieListContributor> contributors;
-  final String? selectedContributorId;
-  final ValueChanged<String?> onContributorChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Row(
-        children: [
-          if (sort == _ListSort.recentlyAdded)
-            Text(
-              'Recently added',
-              style: TextStyle(
-                color: context.colors.light,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
-            )
-          else
-            Text(
-              _mediaCountLabel(movieCount, showCount),
-              style: TextStyle(
-                color: context.colors.medium,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          const Spacer(),
-          PopupMenuButton<_ListSort>(
-            tooltip: 'Sort list',
-            color: context.colors.tabBarBackgroundFocused,
-            initialValue: sort,
-            onSelected: onSortChanged,
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: _ListSort.recentlyAdded,
-                child: Text('Recently added'),
-              ),
-              PopupMenuItem(
-                value: _ListSort.title,
-                child: Text('Title'),
-              ),
-              PopupMenuItem(
-                value: _ListSort.releaseYear,
-                child: Text('Release year'),
-              ),
-              PopupMenuItem(
-                value: _ListSort.rating,
-                child: Text('Rating'),
-              ),
-              PopupMenuItem(
-                value: _ListSort.addedBy,
-                child: Text('Added by'),
-              ),
-            ],
-            child: FlixiePill.label(
-                compact: false,
-                label: Text(_sortLabel(sort)),
-                avatar: const Icon(Icons.sort_rounded)),
-          ),
-          if (contributors.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              tooltip: 'Filter by contributor',
-              color: context.colors.tabBarBackgroundFocused,
-              onSelected: (value) =>
-                  onContributorChanged(value == '__all__' ? null : value),
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: '__all__',
-                  child: Row(
-                    children: [
-                      Icon(
-                        selectedContributorId == null
-                            ? Icons.check_rounded
-                            : Icons.people_outline_rounded,
-                        color: FlixieColors.primary,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 9),
-                      const Text('Anyone who added titles'),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
-                ...contributors.map(
-                  (contributor) => PopupMenuItem(
-                    value: contributor.id,
-                    child: Row(
-                      children: [
-                        ProfileAvatarView(
-                          avatar: contributor.avatar,
-                          fallbackText: contributor.username.isEmpty
-                              ? '?'
-                              : contributor.username[0].toUpperCase(),
-                          fallbackColor: FlixieColors.primary,
-                          size: 24,
-                          profileBadges: contributor.profileBadges,
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            contributor.id == selectedContributorId
-                                ? '@${contributor.username}  ✓'
-                                : '@${contributor.username}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: selectedContributorId == null
-                      ? context.colors.tabBarBackgroundFocused
-                      : FlixieColors.primary.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: selectedContributorId == null
-                        ? Colors.white.withValues(alpha: 0.1)
-                        : FlixieColors.primary,
-                  ),
-                ),
-                child: Icon(
-                  Icons.filter_list_rounded,
-                  color: selectedContributorId == null
-                      ? FlixieColors.primary
-                      : context.colors.light,
-                  size: 20,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _MovieListPosterCard extends StatelessWidget {
-  const _MovieListPosterCard({
-    required this.entry,
-    required this.canEdit,
-    required this.currentUserId,
-    required this.onOpen,
-    required this.onRemove,
-  });
-
-  final MovieListMovie entry;
-  final bool canEdit;
-  final String? currentUserId;
-  final VoidCallback onOpen;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final movie = entry.movie;
-    final show = entry.show;
-    final isShow = _entryShowId(entry) > 0;
-    final posterPath = movie?.posterPath ?? show?.posterPath;
-    final posterUrl = posterPath != null
-        ? 'https://image.tmdb.org/t/p/w500$posterPath'
-        : null;
-    final year = _extractYear(movie?.releaseDate ?? show?.firstAirDate);
-    final rating =
-        hideMovieRatings(context, entry.movieId, isShow: entry.showId > 0)
-            ? null
-            : _entryRating(entry);
-    final isRecent = _isRecentAddition(entry.createdAt);
-
-    return Material(
-      color: context.colors.tabBarBackgroundFocused,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onOpen,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  posterUrl == null
-                      ? Container(
-                          color: const Color(0xFF1E2D40),
-                          child: Center(
-                            child: Icon(
-                              Icons.movie_outlined,
-                              color: context.colors.medium,
-                            ),
-                          ),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            color: const Color(0xFF1E2D40),
-                            child: Center(
-                              child: Icon(
-                                Icons.movie_outlined,
-                                color: context.colors.medium,
-                              ),
-                            ),
-                          ),
-                        ),
-                  if (canEdit)
-                    Positioned(
-                      right: 4,
-                      top: 4,
-                      child: SizedBox(
-                        width: 32,
-                        height: 32,
-                        child: PopupMenuButton<String>(
-                          padding: EdgeInsets.zero,
-                          tooltip: 'List item actions',
-                          color: context.colors.tabBarBackgroundFocused,
-                          icon: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.16),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.more_horiz_rounded,
-                              color: Colors.white,
-                              size: 17,
-                            ),
-                          ),
-                          onSelected: (value) {
-                            if (value == 'remove') onRemove();
-                            if (value == 'contributor' &&
-                                entry.addedBy != null) {
-                              context.push('/friends/${entry.addedBy!.id}');
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: 'remove',
-                              height: 40,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.remove_circle_outline_rounded,
-                                    color: context.colors.danger,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 9),
-                                  const Text('Remove from list'),
-                                ],
-                              ),
-                            ),
-                            if (entry.addedBy != null)
-                              const PopupMenuItem(
-                                value: 'contributor',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.person_outline_rounded,
-                                        size: 18),
-                                    SizedBox(width: 9),
-                                    Text('View who added it'),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  if (entry.addedBy != null)
-                    Positioned(
-                      left: 7,
-                      bottom: 7,
-                      child: Tooltip(
-                        message: 'Added by @${entry.addedBy!.username}',
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.72),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: FlixieColors.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: ProfileAvatarView(
-                            avatar: entry.addedBy!.avatar,
-                            fallbackText: entry.addedBy!.username.isEmpty
-                                ? '?'
-                                : entry.addedBy!.username[0].toUpperCase(),
-                            fallbackColor: FlixieColors.primary,
-                            size: 27,
-                            profileBadges: entry.addedBy!.profileBadges,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (isRecent)
-                    const Positioned(
-                      left: 7,
-                      top: 7,
-                      child: FlixiePill.label(label: Text('New')),
-                    ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(9, 9, 9, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    height: MediaQuery.textScalerOf(context).scale(32),
-                    child: Text(
-                      _entryTitle(entry),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: context.colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        height: 1.15,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      if (year != null)
-                        Text(
-                          isShow ? '$year · Show' : year,
-                          style: TextStyle(
-                            color: context.colors.medium,
-                            fontSize: 12,
-                          ),
-                        ),
-                      const Spacer(),
-                      if (rating != null && rating > 0) ...[
-                        Icon(
-                          Icons.star_rounded,
-                          color: context.colors.tertiary,
-                          size: 13,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          rating.toStringAsFixed(1),
-                          style: TextStyle(
-                            color: context.colors.tertiary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (entry.addedBy != null) ...[
-                    const SizedBox(height: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            ProfileAvatarView(
-                              avatar: entry.addedBy!.avatar,
-                              fallbackText: entry.addedBy!.username.isEmpty
-                                  ? '?'
-                                  : entry.addedBy!.username[0].toUpperCase(),
-                              fallbackColor: FlixieColors.primary,
-                              size: 20,
-                              profileBadges: entry.addedBy!.profileBadges,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _addedByUsername(entry, currentUserId),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.colors.light,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _addedDateLabel(entry.createdAt),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: context.colors.medium,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyListState extends StatelessWidget {
-  const _EmptyListState({
-    required this.isOwner,
-    required this.message,
-    required this.onAddMovies,
-  });
-
-  final bool isOwner;
-  final String message;
-  final VoidCallback onAddMovies;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.playlist_add_rounded,
-              color: context.colors.medium,
-              size: 52,
-            ),
-            const SizedBox(height: 14),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.colors.medium),
-            ),
-            if (isOwner) ...[
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: onAddMovies,
-                icon: const Icon(Icons.search_rounded),
-                label: const Text('Add titles'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-int _entryMovieId(MovieListMovie entry) {
-  return entry.movieId != 0 ? entry.movieId : entry.movie?.id ?? 0;
-}
-
-int _entryShowId(MovieListMovie entry) {
-  return entry.showId != 0 ? entry.showId : entry.show?.id ?? 0;
-}
-
-int _entryReleaseYear(MovieListMovie entry) =>
-    int.tryParse(
-        _extractYear(entry.movie?.releaseDate ?? entry.show?.firstAirDate) ??
-            '') ??
-    0;
-
-String _entryTitle(MovieListMovie entry) {
-  return entry.movie?.title ?? entry.show?.name ?? 'Unknown title';
-}
-
-double? _entryRating(MovieListMovie entry) {
-  return entry.movie?.voteAverage ?? entry.show?.voteAverage;
-}
-
-String _addedByUsername(MovieListMovie entry, String? currentUserId) {
-  final byYou = entry.addedBy?.id.isNotEmpty == true &&
-      entry.addedBy!.id == currentUserId;
-  return byYou ? '@you' : '@${entry.addedBy?.username ?? 'someone'}';
-}
-
-bool _isRecentAddition(String? value) {
-  final addedAt = value == null ? null : DateTime.tryParse(value);
-  if (addedAt == null) return false;
-  return DateTime.now().difference(addedAt.toLocal()) <=
-      const Duration(hours: 48);
-}
-
-String _mediaCountLabel(int movieCount, int showCount) {
-  final parts = <String>[];
-  if (movieCount > 0) {
-    parts.add('$movieCount ${movieCount == 1 ? 'movie' : 'movies'}');
-  }
-  if (showCount > 0) {
-    parts.add('$showCount ${showCount == 1 ? 'show' : 'shows'}');
-  }
-  return parts.isEmpty ? 'Empty collection' : parts.join(' & ');
-}
-
-String? _extractYear(String? releaseDate) {
-  if (releaseDate == null || releaseDate.isEmpty) return null;
-  final parsed = DateTime.tryParse(releaseDate);
-  if (parsed != null) return parsed.year.toString();
-  return releaseDate.length >= 4 ? releaseDate.substring(0, 4) : null;
-}
-
-String _sortLabel(_ListSort sort) {
-  return switch (sort) {
-    _ListSort.recentlyAdded => 'Recently added',
-    _ListSort.title => 'Title',
-    _ListSort.releaseYear => 'Release year',
-    _ListSort.rating => 'Rating',
-    _ListSort.addedBy => 'Added by',
-  };
-}
-
-(String, String?) _listIdentity(String name) {
-  const marker = ' with @';
-  final index = name.indexOf(marker);
-  if (index <= 0) return (name, null);
-  return (name.substring(0, index), name.substring(index));
-}
-
-String _visibilityLabel(String? visibility) {
-  return switch (visibility?.toUpperCase()) {
-    'PUBLIC' => 'Public',
-    'FRIENDS' => 'Friends',
-    _ => 'Private',
-  };
-}
-
-String _addedDateLabel(String? value) {
-  final date = DateTime.tryParse(value ?? '');
-  if (date == null) return 'Added';
-  final days = DateTime.now().difference(date).inDays;
-  if (days <= 0) return 'Added today';
-  if (days == 1) return 'Added yesterday';
-  if (days < 7) return 'Added $days days ago';
-  if (days < 14) return 'Added last week';
-  if (days < 30) {
-    final weeks = days ~/ 7;
-    return 'Added $weeks weeks ago';
-  }
-  if (days < 60) return 'Added last month';
-  final months = days ~/ 30;
-  return 'Added $months months ago';
 }

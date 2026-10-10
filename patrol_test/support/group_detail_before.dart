@@ -1,0 +1,582 @@
+// Frozen pre-cleanup parent; unused child conversationId argument omitted.
+import 'package:flixie_app/core/widgets/flixie_back_button.dart';
+import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import 'package:flixie_app/models/group.dart';
+import 'package:flixie_app/models/group_member.dart';
+import 'package:flixie_app/models/group_watch_request.dart'
+    hide WatchRequestFilter, WatchRequestStatus, WatchResponseDecision;
+import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/features/social/data/chat_service.dart';
+import 'package:flixie_app/features/social/data/group_service.dart';
+import 'package:flixie_app/features/social/data/watch_request_cache.dart';
+import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/utils/app_logger.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
+import 'package:flixie_app/features/social/presentation/widgets/group_detail_activity_tab.dart';
+import 'package:flixie_app/features/social/presentation/widgets/chat_tab.dart';
+import 'package:flixie_app/features/social/presentation/widgets/insights_tab.dart';
+import 'package:flixie_app/features/watch_plans/presentation/pages/group_watch_plan_v2_screen.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
+import 'package:flixie_app/models/movie_list.dart';
+
+class BeforeGroupDetailScreen extends StatefulWidget {
+  const BeforeGroupDetailScreen({
+    super.key,
+    required this.groupId,
+    this.initialTab,
+    this.initialRequestId,
+  });
+
+  final String groupId;
+
+  /// 0=Chat, 1=Activity, 2=Requests, 3=Insights. Defaults to 1 (Activity).
+  final int? initialTab;
+  final String? initialRequestId;
+
+  @override
+  State<BeforeGroupDetailScreen> createState() => _BeforeGroupDetailScreenState();
+}
+
+class _BeforeGroupDetailScreenState extends State<BeforeGroupDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  Group? _group;
+  bool _loadingGroup = true;
+  bool _deletingGroup = false;
+  String? _loadError;
+  int _memberCount = 0;
+  List<GroupMember> _groupMembers = [];
+  List<GroupWatchRequest> _watchRequests = [];
+  String? _planBackdrop;
+  void _onPlanTabChanged() {
+    if (mounted) setState(() {});
+  }
+
+  List<MovieList> _groupLists = [];
+  String? _conversationId;
+  // Set by _RequestsTab when it refreshes - overrides the initial computed count.
+  int? _pendingCountOverride;
+
+  int get _pendingRequestCount {
+    if (_pendingCountOverride != null) return _pendingCountOverride!;
+    final userId =
+        _group != null ? context.read<AuthProvider>().dbUser?.id : null;
+    return _watchRequests.where((r) {
+      if (!r.canRespond) return false;
+      if (r.userId == userId) return false;
+      if (r.currentUserResponse != null) return false;
+      if (userId != null &&
+          r.memberStatuses.any((s) =>
+              s.memberId == userId &&
+              (s.status == 'ACCEPTED' ||
+                  s.status == 'DECLINED' ||
+                  s.status == 'MAYBE'))) {
+        return false;
+      }
+      return true;
+    }).length;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTab ?? 1,
+    );
+    _tabController.addListener(_onPlanTabChanged);
+    _loadGroup();
+  }
+
+  @override
+  void didUpdateWidget(covariant BeforeGroupDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextTab = widget.initialTab;
+    if (nextTab != null &&
+        nextTab != _tabController.index &&
+        nextTab >= 0 &&
+        nextTab < _tabController.length) {
+      _tabController.animateTo(nextTab);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadGroup() async {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    final requestCache = context.read<WatchRequestCache>();
+    final cachedRequests = requestCache.forGroup(widget.groupId);
+    setState(() {
+      _loadingGroup = _group == null;
+      _loadError = null;
+      if (cachedRequests.isNotEmpty) _watchRequests = cachedRequests;
+    });
+    try {
+      final results = await Future.wait([
+        GroupService.getGroup(widget.groupId),
+        GroupService.getGroupMembers(widget.groupId),
+        requestCache
+            .refreshGroup(widget.groupId)
+            .catchError((_) => <GroupWatchRequest>[]),
+        if (currentUserId != null)
+          UserService.getMovieLists(currentUserId)
+              .then((lists) => lists
+                  .where((list) => list.groupId == widget.groupId)
+                  .toList(growable: false))
+              .catchError((_) => <MovieList>[])
+        else
+          Future.value(<MovieList>[]),
+      ]);
+
+      if (mounted) {
+        setState(() {
+          _group = results[0] as Group;
+          final members = results[1] as List<GroupMember>;
+          _memberCount = members.where((m) => m.isAccepted).length;
+          _groupMembers = members;
+          _watchRequests = results[2] as List<GroupWatchRequest>;
+          _groupLists = results[3] as List<MovieList>;
+          _loadingGroup = false;
+        });
+        // Resolve the Firestore conversationId once group + members are known.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _loadConversationId();
+        });
+      }
+    } catch (e) {
+      logger.e('GroupDetail load group error: $e');
+      if (mounted) {
+        setState(() {
+          _loadingGroup = false;
+          _loadError = 'Couldn\'t load group. Check your connection.';
+        });
+      }
+    }
+  }
+
+  /// Resolve (or create) the Firestore conversation for this group so that
+  /// conversation-scoped watch-request endpoints can be used.
+  Future<void> _loadConversationId() async {
+    if (_conversationId != null) return;
+    final userId = context.read<AuthProvider>().dbUser?.id;
+    if (userId == null || _group == null || _groupMembers.isEmpty) return;
+    try {
+      final memberIds = _groupMembers.map((m) => m.memberId).toList();
+      if (!memberIds.contains(userId)) memberIds.add(userId);
+      final conv = await ChatService.getOrCreateGroupConversation(
+        creatorId: userId,
+        pgGroupId: widget.groupId,
+        name: _group!.name,
+        memberIds: memberIds,
+      );
+      if (mounted) setState(() => _conversationId = conv.id);
+    } catch (e) {
+      logger.e('Failed to resolve conversationId for watch requests: $e');
+    }
+  }
+
+  static const List<Color> _palette = [
+    FlixieColors.primary,
+    FlixieColors.secondary,
+    FlixieColors.tertiary,
+    FlixieColors.success,
+    FlixieColors.warning,
+  ];
+
+  Color _groupColor(String name) {
+    final hash = name.codeUnits.fold(0, (a, b) => a + b);
+    return _palette[hash % _palette.length];
+  }
+
+  String _groupAbbr(Group group) {
+    if (group.abbreviation != null && group.abbreviation!.isNotEmpty) {
+      return group.abbreviation!.toUpperCase();
+    }
+    final words = group.name.trim().split(RegExp(r'\s+'));
+    if (words.length >= 2) {
+      return '${words[0][0]}${words[1][0]}'.toUpperCase();
+    }
+    return group.name.isEmpty
+        ? '?'
+        : group.name.substring(0, group.name.length.clamp(1, 2)).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final planBackdrop = _tabController.index == 2 ? _planBackdrop : null;
+    final groupName = _group?.name ?? '';
+    final color =
+        groupName.isNotEmpty ? _groupColor(groupName) : FlixieColors.primary;
+
+    return PopScope(
+      canPop: !_deletingGroup,
+      child: Stack(
+        children: [
+          if (planBackdrop != null)
+            Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 560 + MediaQuery.paddingOf(context).top,
+                child: WatchPlanBackdrop(path: planBackdrop)),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            appBar: AppBar(
+              backgroundColor: planBackdrop == null
+                  ? context.colors.background
+                  : Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              elevation: 0,
+              leading: FlixieBackButton(enabled: !_deletingGroup),
+              titleSpacing: 0,
+              title: _loadingGroup
+                  ? const ContentPlaceholder(
+                      label: 'Loading group',
+                      style: ContentPlaceholderStyle.compact)
+                  : Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 19,
+                          backgroundColor: color.withValues(alpha: 0.24),
+                          child: SizedBox(
+                            width: 27,
+                            height: 27,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _group != null ? _groupAbbr(_group!) : '',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: TextStyle(
+                                  color: color,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _group?.name ?? 'Group',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: context.colors.light,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              Text(
+                                '$_memberCount member${_memberCount == 1 ? '' : 's'}',
+                                style: TextStyle(
+                                  color: context.colors.medium,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.more_vert, color: context.colors.light),
+                  onPressed:
+                      _deletingGroup ? null : () => _showGroupOptions(context),
+                ),
+              ],
+              bottom: _loadingGroup
+                  ? null
+                  : TabBar(
+                      controller: _tabController,
+                      isScrollable: false,
+                      tabAlignment: TabAlignment.fill,
+                      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                      labelPadding: EdgeInsets.zero,
+                      indicator: const UnderlineTabIndicator(
+                        borderSide: BorderSide(
+                          color: FlixieColors.primary,
+                          width: 3,
+                        ),
+                        // Each tab owns a consistent, touch-friendly indicator
+                        // width. Label-sized indicators shrink Chat's underline
+                        // to a near-invisible dot after the insets are applied.
+                        insets: EdgeInsets.symmetric(horizontal: 18),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.white.withValues(alpha: 0.08),
+                      labelColor: FlixieColors.primary,
+                      unselectedLabelColor: context.colors.medium,
+                      labelStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      tabs: [
+                        const Tab(text: 'Chat'),
+                        const Tab(text: 'Activity'),
+                        Tab(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Watch Plans'),
+                                if (_pendingRequestCount > 0) ...[
+                                  const SizedBox(width: 6),
+                                  FlixiePill.label(
+                                      label: Text('$_pendingRequestCount')),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Tab(text: 'Insights'),
+                      ],
+                    ),
+            ),
+            body: _loadingGroup
+                ? const Center(
+                    child:
+                        CircularProgressIndicator(color: FlixieColors.primary))
+                : _loadError != null
+                    ? ErrorRetryWidget(
+                        message: _loadError!,
+                        onRetry: _loadGroup,
+                      )
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          ListenableBuilder(
+                            listenable: _tabController,
+                            builder: (context, child) => GroupChatTab(
+                              groupId: widget.groupId,
+                              active: _tabController.index == 0 &&
+                                  !_tabController.indexIsChanging,
+                            ),
+                          ),
+                          GroupActivityTab(
+                            group: _group,
+                            memberCount: _memberCount,
+                            groupId: widget.groupId,
+                            initialRequests: _watchRequests,
+                            initialActivity: const [],
+                            groupLists: _groupLists,
+                            onRefresh: _loadGroup,
+                          ),
+                          GroupWatchPlanV2Screen(
+                            groupId: widget.groupId,
+                            groupName: _group?.name,
+                            initialRequestId: widget.initialRequestId,
+                            embedded: true,
+                            onBackdropChanged: (path) {
+                              if (mounted && path != _planBackdrop) {
+                                setState(() => _planBackdrop = path);
+                              }
+                            },
+                            onCountChanged: (count) {
+                              if (mounted) {
+                                setState(() => _pendingCountOverride = count);
+                              }
+                            },
+                          ),
+                          GroupInsightsTab(groupId: widget.groupId),
+                        ],
+                      ),
+          ),
+          if (_deletingGroup) ...[
+            const Positioned.fill(
+              child: ModalBarrier(
+                dismissible: false,
+                color: Color(0x99000000),
+              ),
+            ),
+            Positioned.fill(
+              child: Center(
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(
+                            color: FlixieColors.primary),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Deleting group…',
+                          style: TextStyle(
+                            color: context.colors.light,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Removing lists, requests and messages',
+                          style: TextStyle(
+                            color: context.colors.medium,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showGroupOptions(BuildContext pageContext) async {
+    final currentUserId = context.read<AuthProvider>().dbUser?.id;
+    final isOwner = _group?.ownerId == currentUserId;
+    final action = await showModalBottomSheet<String>(
+      context: pageContext,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) => SafeArea(
+          child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.colors.medium.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Icon(Icons.people_outline, color: context.colors.light),
+              title: Text('Members',
+                  style: TextStyle(color: context.colors.light)),
+              onTap: () => Navigator.pop(modalContext, 'members'),
+            ),
+            ListTile(
+              leading: Icon(Icons.info_outline, color: context.colors.light),
+              title: Text('Group Info',
+                  style: TextStyle(color: context.colors.light)),
+              onTap: () => Navigator.pop(modalContext),
+            ),
+            if (isOwner)
+              ListTile(
+                leading:
+                    Icon(Icons.delete_outline, color: context.colors.danger),
+                title: Text('Delete Group',
+                    style: TextStyle(color: context.colors.danger)),
+                onTap: () => Navigator.pop(modalContext, 'delete'),
+              ),
+          ],
+        ),
+      )),
+    );
+
+    if (!mounted) return;
+    if (action == 'members') {
+      context.push(
+        '/groups/${widget.groupId}/members',
+        extra: _group?.name ?? 'Group',
+      );
+      return;
+    }
+    if (action != 'delete') return;
+
+    final confirm = await showFlixiePromptSheet<bool>(
+      context: context,
+      builder: (dialogContext) => FlixiePromptSheetContent(
+        title:
+            Text('Delete Group', style: TextStyle(color: context.colors.light)),
+        content: Text(
+          'Permanently delete this group, its lists, requests, '
+          'chat messages and shared chat images? This cannot be undone.',
+          style: TextStyle(color: context.colors.medium),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: context.colors.danger,
+                foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    setState(() => _deletingGroup = true);
+    try {
+      await GroupService.deleteGroup(widget.groupId);
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      final cachedGroups = auth.cachedGroups;
+      if (cachedGroups != null) {
+        auth.updateCachedGroups(cachedGroups
+            .where((group) => group.id != widget.groupId)
+            .toList(growable: false));
+      }
+      ScaffoldMessenger.of(context).showFlixieToast(
+        FlixieToast(
+          type: FlixieToastType.success,
+          content: const Text('Group deleted permanently.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      context.pop(true);
+    } catch (e) {
+      logger.e('Delete group error: $e');
+      if (mounted) {
+        setState(() => _deletingGroup = false);
+        ScaffoldMessenger.of(context).showFlixieToast(
+          FlixieToast(
+            type: FlixieToastType.error,
+            content: const Text(
+              'Could not delete the group. Nothing was removed. Please try again.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+}

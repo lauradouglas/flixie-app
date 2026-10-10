@@ -1,6 +1,11 @@
+import '../widgets/group_detail/group_detail_tabs.dart';
+import '../widgets/group_detail/group_deletion_overlay.dart';
+import 'dart:async';
+import '../controllers/group_detail_controller.dart';
+import '../widgets/group_detail/group_detail_title.dart';
+import '../widgets/group_detail/group_detail_options.dart';
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -8,11 +13,9 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/group.dart';
-import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/models/group_watch_request.dart'
     hide WatchRequestFilter, WatchRequestStatus, WatchResponseDecision;
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/features/social/data/chat_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -22,8 +25,6 @@ import 'package:flixie_app/features/social/presentation/widgets/group_detail_act
 import 'package:flixie_app/features/social/presentation/widgets/chat_tab.dart';
 import 'package:flixie_app/features/social/presentation/widgets/insights_tab.dart';
 import 'package:flixie_app/features/watch_plans/presentation/pages/group_watch_plan_v2_screen.dart';
-import 'package:flixie_app/features/profile/data/user_service.dart';
-import 'package:flixie_app/models/movie_list.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   const GroupDetailScreen({
@@ -47,22 +48,19 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  Group? _group;
-  bool _loadingGroup = true;
+  late GroupDetailController _detail;
+  AuthProvider? _auth;
   bool _deletingGroup = false;
-  String? _loadError;
-  int _memberCount = 0;
-  List<GroupMember> _groupMembers = [];
-  List<GroupWatchRequest> _watchRequests = [];
   String? _planBackdrop;
+  int? _pendingCountOverride;
+  Group? get _group => _detail.group;
+  bool get _loadingGroup => _detail.loading;
+  String? get _loadError => _detail.error;
+  int get _memberCount => _detail.memberCount;
+  List<GroupWatchRequest> get _watchRequests => _detail.requests;
   void _onPlanTabChanged() {
     if (mounted) setState(() {});
   }
-
-  List<MovieList> _groupLists = [];
-  String? _conversationId;
-  // Set by _RequestsTab when it refreshes - overrides the initial computed count.
-  int? _pendingCountOverride;
 
   int get _pendingRequestCount {
     if (_pendingCountOverride != null) return _pendingCountOverride!;
@@ -90,15 +88,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     _tabController = TabController(
       length: 4,
       vsync: this,
-      initialIndex: widget.initialTab ?? 1,
+      initialIndex: (widget.initialTab ?? 1).clamp(0, 3),
     );
     _tabController.addListener(_onPlanTabChanged);
-    _loadGroup();
   }
 
   @override
   void didUpdateWidget(covariant GroupDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.groupId != widget.groupId) _bindOwner();
     final nextTab = widget.initialTab;
     if (nextTab != null &&
         nextTab != _tabController.index &&
@@ -109,116 +107,66 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = Provider.of<AuthProvider>(context);
+    if (_auth == null ||
+        !identical(_auth, auth) ||
+        _detail.accountId != auth.dbUser?.id) {
+      _auth = auth;
+      _bindOwner();
+    }
+  }
+
+  void _bindOwner() {
+    if (_auth == null) return;
+    if (_hasOwner) {
+      _detail.removeListener(_onDetailChanged);
+      _detail.dispose();
+    }
+    final account = _auth!.dbUser?.id;
+    final groupId = widget.groupId;
+    _detail = GroupDetailController(
+      groupId: groupId,
+      accountId: account,
+      isCurrent: () =>
+          mounted && widget.groupId == groupId && _auth?.dbUser?.id == account,
+      fetchRequests: context.read<WatchRequestCache>().refreshGroup,
+    );
+    _hasOwner = true;
+    _planBackdrop = null;
+    _pendingCountOverride = null;
+    _deletingGroup = false;
+    _detail.addListener(_onDetailChanged);
+    unawaited(_detail.load());
+  }
+
+  bool _hasOwner = false;
+
+  void _onDetailChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadGroup() async {
+    final owner = _detail;
+    await owner.load();
+    if (mounted && identical(owner, _detail) && owner.current) {
+      setState(() => _pendingCountOverride = null);
+    }
+  }
+
+  @override
   void dispose() {
+    _detail.removeListener(_onDetailChanged);
+    _detail.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadGroup() async {
-    final currentUserId = context.read<AuthProvider>().dbUser?.id;
-    final requestCache = context.read<WatchRequestCache>();
-    final cachedRequests = requestCache.forGroup(widget.groupId);
-    setState(() {
-      _loadingGroup = _group == null;
-      _loadError = null;
-      if (cachedRequests.isNotEmpty) _watchRequests = cachedRequests;
-    });
-    try {
-      final results = await Future.wait([
-        GroupService.getGroup(widget.groupId),
-        GroupService.getGroupMembers(widget.groupId),
-        requestCache
-            .refreshGroup(widget.groupId)
-            .catchError((_) => <GroupWatchRequest>[]),
-        if (currentUserId != null)
-          UserService.getMovieLists(currentUserId)
-              .then((lists) => lists
-                  .where((list) => list.groupId == widget.groupId)
-                  .toList(growable: false))
-              .catchError((_) => <MovieList>[])
-        else
-          Future.value(<MovieList>[]),
-      ]);
-
-      if (mounted) {
-        setState(() {
-          _group = results[0] as Group;
-          final members = results[1] as List<GroupMember>;
-          _memberCount = members.where((m) => m.isAccepted).length;
-          _groupMembers = members;
-          _watchRequests = results[2] as List<GroupWatchRequest>;
-          _groupLists = results[3] as List<MovieList>;
-          _loadingGroup = false;
-        });
-        // Resolve the Firestore conversationId once group + members are known.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _loadConversationId();
-        });
-      }
-    } catch (e) {
-      logger.e('GroupDetail load group error: $e');
-      if (mounted) {
-        setState(() {
-          _loadingGroup = false;
-          _loadError = 'Couldn\'t load group. Check your connection.';
-        });
-      }
-    }
-  }
-
-  /// Resolve (or create) the Firestore conversation for this group so that
-  /// conversation-scoped watch-request endpoints can be used.
-  Future<void> _loadConversationId() async {
-    if (_conversationId != null) return;
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null || _group == null || _groupMembers.isEmpty) return;
-    try {
-      final memberIds = _groupMembers.map((m) => m.memberId).toList();
-      if (!memberIds.contains(userId)) memberIds.add(userId);
-      final conv = await ChatService.getOrCreateGroupConversation(
-        creatorId: userId,
-        pgGroupId: widget.groupId,
-        name: _group!.name,
-        memberIds: memberIds,
-      );
-      if (mounted) setState(() => _conversationId = conv.id);
-    } catch (e) {
-      logger.e('Failed to resolve conversationId for watch requests: $e');
-    }
-  }
-
-  static const List<Color> _palette = [
-    FlixieColors.primary,
-    FlixieColors.secondary,
-    FlixieColors.tertiary,
-    FlixieColors.success,
-    FlixieColors.warning,
-  ];
-
-  Color _groupColor(String name) {
-    final hash = name.codeUnits.fold(0, (a, b) => a + b);
-    return _palette[hash % _palette.length];
-  }
-
-  String _groupAbbr(Group group) {
-    if (group.abbreviation != null && group.abbreviation!.isNotEmpty) {
-      return group.abbreviation!.toUpperCase();
-    }
-    final words = group.name.trim().split(RegExp(r'\s+'));
-    if (words.length >= 2) {
-      return '${words[0][0]}${words[1][0]}'.toUpperCase();
-    }
-    return group.name.isEmpty
-        ? '?'
-        : group.name.substring(0, group.name.length.clamp(1, 2)).toUpperCase();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final owner = _detail;
     final planBackdrop = _tabController.index == 2 ? _planBackdrop : null;
-    final groupName = _group?.name ?? '';
-    final color =
-        groupName.isNotEmpty ? _groupColor(groupName) : FlixieColors.primary;
 
     return PopScope(
       canPop: !_deletingGroup,
@@ -234,6 +182,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
           Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
+              toolbarHeight: 56 * MediaQuery.textScalerOf(context).scale(1),
               backgroundColor: planBackdrop == null
                   ? context.colors.background
                   : Colors.transparent,
@@ -242,121 +191,23 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
               elevation: 0,
               leading: FlixieBackButton(enabled: !_deletingGroup),
               titleSpacing: 0,
-              title: _loadingGroup
-                  ? const ContentPlaceholder(
-                      label: 'Loading group',
-                      style: ContentPlaceholderStyle.compact)
-                  : Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 19,
-                          backgroundColor: color.withValues(alpha: 0.24),
-                          child: SizedBox(
-                            width: 27,
-                            height: 27,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                _group != null ? _groupAbbr(_group!) : '',
-                                maxLines: 1,
-                                softWrap: false,
-                                style: TextStyle(
-                                  color: color,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _group?.name ?? 'Group',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: context.colors.light,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              Text(
-                                '$_memberCount member${_memberCount == 1 ? '' : 's'}',
-                                style: TextStyle(
-                                  color: context.colors.medium,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+              title: GroupDetailTitle(
+                  group: _group,
+                  loading: _loadingGroup,
+                  memberCount: _memberCount),
               actions: [
                 IconButton(
                   icon: Icon(Icons.more_vert, color: context.colors.light),
-                  onPressed:
-                      _deletingGroup ? null : () => _showGroupOptions(context),
+                  onPressed: _deletingGroup || _group == null
+                      ? null
+                      : () => _showGroupOptions(context),
                 ),
               ],
               bottom: _loadingGroup
                   ? null
-                  : TabBar(
+                  : GroupDetailTabs(
                       controller: _tabController,
-                      isScrollable: false,
-                      tabAlignment: TabAlignment.fill,
-                      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                      labelPadding: EdgeInsets.zero,
-                      indicator: const UnderlineTabIndicator(
-                        borderSide: BorderSide(
-                          color: FlixieColors.primary,
-                          width: 3,
-                        ),
-                        // Each tab owns a consistent, touch-friendly indicator
-                        // width. Label-sized indicators shrink Chat's underline
-                        // to a near-invisible dot after the insets are applied.
-                        insets: EdgeInsets.symmetric(horizontal: 18),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.white.withValues(alpha: 0.08),
-                      labelColor: FlixieColors.primary,
-                      unselectedLabelColor: context.colors.medium,
-                      labelStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      tabs: [
-                        const Tab(text: 'Chat'),
-                        const Tab(text: 'Activity'),
-                        Tab(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text('Watch Plans'),
-                                if (_pendingRequestCount > 0) ...[
-                                  const SizedBox(width: 6),
-                                  FlixiePill.label(
-                                      label: Text('$_pendingRequestCount')),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                        const Tab(text: 'Insights'),
-                      ],
-                    ),
+                      pendingCount: _pendingRequestCount),
             ),
             body: _loadingGroup
                 ? const Center(
@@ -368,6 +219,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                         onRetry: _loadGroup,
                       )
                     : TabBarView(
+                        key: ObjectKey(owner),
                         controller: _tabController,
                         children: [
                           ListenableBuilder(
@@ -379,13 +231,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                             ),
                           ),
                           GroupActivityTab(
+                            active: _tabController.index == 1 &&
+                                !_tabController.indexIsChanging,
                             group: _group,
                             memberCount: _memberCount,
                             groupId: widget.groupId,
-                            conversationId: _conversationId,
                             initialRequests: _watchRequests,
                             initialActivity: const [],
-                            groupLists: _groupLists,
+                            groupLists: _detail.lists,
+                            listsLoading: _detail.listsLoading,
+                            listsFailed: _detail.listsFailed,
                             onRefresh: _loadGroup,
                           ),
                           GroupWatchPlanV2Screen(
@@ -394,12 +249,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                             initialRequestId: widget.initialRequestId,
                             embedded: true,
                             onBackdropChanged: (path) {
-                              if (mounted && path != _planBackdrop) {
+                              if (mounted &&
+                                  identical(owner, _detail) &&
+                                  owner.current &&
+                                  path != _planBackdrop) {
                                 setState(() => _planBackdrop = path);
                               }
                             },
                             onCountChanged: (count) {
-                              if (mounted) {
+                              if (mounted &&
+                                  identical(owner, _detail) &&
+                                  owner.current) {
                                 setState(() => _pendingCountOverride = count);
                               }
                             },
@@ -408,47 +268,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
                         ],
                       ),
           ),
-          if (_deletingGroup) ...[
-            const Positioned.fill(
-              child: ModalBarrier(
-                dismissible: false,
-                color: Color(0x99000000),
-              ),
-            ),
-            Positioned.fill(
-              child: Center(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(
-                            color: FlixieColors.primary),
-                        const SizedBox(height: 14),
-                        Text(
-                          'Deleting group…',
-                          style: TextStyle(
-                            color: context.colors.light,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Removing lists, requests and messages',
-                          style: TextStyle(
-                            color: context.colors.medium,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          if (_deletingGroup)
+            const Positioned.fill(child: GroupDeletionOverlay()),
         ],
       ),
     );
@@ -457,57 +278,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
   Future<void> _showGroupOptions(BuildContext pageContext) async {
     final currentUserId = context.read<AuthProvider>().dbUser?.id;
     final isOwner = _group?.ownerId == currentUserId;
-    final action = await showModalBottomSheet<String>(
-      context: pageContext,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (modalContext) => SafeArea(
-          child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.colors.medium.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: Icon(Icons.people_outline, color: context.colors.light),
-              title: Text('Members',
-                  style: TextStyle(color: context.colors.light)),
-              onTap: () => Navigator.pop(modalContext, 'members'),
-            ),
-            ListTile(
-              leading: Icon(Icons.info_outline, color: context.colors.light),
-              title: Text('Group Info',
-                  style: TextStyle(color: context.colors.light)),
-              onTap: () => Navigator.pop(modalContext),
-            ),
-            if (isOwner)
-              ListTile(
-                leading:
-                    Icon(Icons.delete_outline, color: context.colors.danger),
-                title: Text('Delete Group',
-                    style: TextStyle(color: context.colors.danger)),
-                onTap: () => Navigator.pop(modalContext, 'delete'),
-              ),
-          ],
-        ),
-      )),
-    );
+    final owner = _detail;
+    final action = await showGroupDetailOptions(pageContext, isOwner: isOwner);
 
-    if (!mounted) return;
+    if (!mounted || !identical(owner, _detail) || !owner.current) return;
     if (action == 'members') {
       context.push(
         '/groups/${widget.groupId}/members',
@@ -542,12 +316,17 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         ],
       ),
     );
-    if (confirm != true || !mounted) return;
+    if (confirm != true ||
+        !mounted ||
+        !identical(owner, _detail) ||
+        !owner.current) {
+      return;
+    }
 
     setState(() => _deletingGroup = true);
     try {
-      await GroupService.deleteGroup(widget.groupId);
-      if (!mounted) return;
+      await GroupService.deleteGroup(owner.groupId);
+      if (!mounted || !identical(owner, _detail) || !owner.current) return;
       final auth = context.read<AuthProvider>();
       final cachedGroups = auth.cachedGroups;
       if (cachedGroups != null) {
@@ -565,7 +344,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       context.pop(true);
     } catch (e) {
       logger.e('Delete group error: $e');
-      if (mounted) {
+      if (mounted && identical(owner, _detail) && owner.current) {
         setState(() => _deletingGroup = false);
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(

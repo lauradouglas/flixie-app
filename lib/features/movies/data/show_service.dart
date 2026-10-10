@@ -45,10 +45,17 @@ class ShowService {
     return TvShow.fromJson(data);
   }
 
-  static Future<TvShow> getShowById(int id, {String? userId}) async {
+  static Future<TvShow> getShowById(int id,
+      {String? userId,
+      bool includeFriendSummary = true,
+      bool includeTrailers = true}) async {
     final data = await ApiClient.get(
       '/shows/id/$id',
-      queryParams: userId == null ? null : {'userId': userId},
+      queryParams: {
+        if (userId != null) 'userId': userId,
+        if (!includeFriendSummary) 'includeFriendSummary': 'false',
+        if (!includeTrailers) 'includeTrailers': 'false',
+      },
     );
     return TvShow.fromJson(data as Map<String, dynamic>);
   }

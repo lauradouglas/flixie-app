@@ -114,6 +114,19 @@ class PushNotificationService {
     _router = router;
   }
 
+  /// Releases the router owned by an app root that is being disposed.
+  /// A retiring root must not disconnect a newer root's router.
+  static void detachRouter(GoRouter router) {
+    if (!identical(_router, router)) {
+      return;
+    }
+    _router = null;
+    _navigatorKey = null;
+    _navigationReady = false;
+    _pendingNavigationTimer?.cancel();
+    _pendingNavigationTimer = null;
+  }
+
   /// Schedules two device-local nudges for a confirmed watch plan. They are
   /// deliberately local: no server job is required and each participant gets
   /// reminders according to their own device clock and permissions.

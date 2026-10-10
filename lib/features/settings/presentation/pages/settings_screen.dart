@@ -1,3 +1,8 @@
+import '../widgets/blocked_users_sheet.dart';
+import '../widgets/settings_edit_profile_sheet.dart';
+import '../widgets/episode_spoiler_setting.dart';
+export '../widgets/settings_edit_profile_sheet.dart'
+    show showSettingsEditDetailsSheet;
 import 'package:flixie_app/core/auth/social_auth_provider.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/social_auth_buttons.dart';
 import '../widgets/around_flixie_sharing_setting.dart';
@@ -5,10 +10,8 @@ import 'package:flixie_app/features/settings/presentation/widgets/movie_rating_p
 import '../widgets/appearance_setting.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/delete_account_button.dart';
 import 'package:flixie_app/core/legal/terms_of_use_screen.dart';
-import 'package:flixie_app/features/settings/data/episode_spoiler_preference.dart';
-import 'package:flixie_app/features/library_import/data/library_import_controller.dart';
+import 'package:flixie_app/features/library_import/data/library_import_session.dart';
 import 'package:flixie_app/features/library_import/presentation/library_import_screen.dart';
-import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/logout_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -17,12 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:flixie_app/models/country.dart';
-import 'package:flixie_app/models/user.dart' as user_model;
-import 'package:flixie_app/features/settings/presentation/controllers/settings_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/core/api/api_client.dart';
-import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/change_password_sheet.dart';
@@ -30,31 +28,9 @@ import 'package:flixie_app/features/settings/presentation/widgets/favorite_genre
 import 'package:flixie_app/features/settings/presentation/widgets/settings_tile.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/change_avatar_sheet.dart';
-import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flixie_app/core/analytics/analytics_consent.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/reviews/app_review_service.dart';
-
-Future<void> showSettingsEditDetailsSheet(BuildContext context) async {
-  final user = context.read<AuthProvider>().dbUser;
-  if (user == null) return;
-  await showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    useSafeArea: true,
-    isScrollControlled: true,
-    backgroundColor: context.colors.surface,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    clipBehavior: Clip.antiAlias,
-    builder: (context) => ConstrainedBox(
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .85),
-      child:
-          SingleChildScrollView(child: _SettingsEditProfileSheet(user: user)),
-    ),
-  );
-}
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -75,7 +51,8 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          if (!context.watch<AuthProvider>().hasConnectedSocialProvider) ...[
+          if (!context.select<AuthProvider, bool>(
+              (auth) => auth.hasConnectedSocialProvider)) ...[
             _sectionLabel(context, 'Sign-in methods'),
             Text(
                 'Connect ${SocialAuthProvider.available.map((provider) => provider.label).join(' or ')} to sign in to this same Flixie account.'),
@@ -93,20 +70,16 @@ class SettingsScreen extends StatelessWidget {
                   final auth = context.read<AuthProvider>();
                   final userId = auth.dbUser?.id;
                   if (userId == null) return;
-                  final importController = LibraryImportController(
-                      userId: userId,
-                      isCurrentUser: () => auth.dbUser?.id == userId);
+                  final importController = context
+                      .read<LibraryImportSession>()
+                      .forUser(userId,
+                          isCurrentUser: () => auth.dbUser?.id == userId);
                   await Navigator.of(context, rootNavigator: true).push<void>(
                     MaterialPageRoute(
                         builder: (_) => LibraryImportScreen(
                               controller: importController,
                             )),
                   );
-                  if (auth.dbUser?.id == userId) {
-                    TabRefreshController.watchlist.value++;
-                    TabRefreshController.requestHomeRefresh();
-                    await auth.refreshUserData();
-                  }
                 },
               ),
               SettingsTile(
@@ -130,7 +103,8 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               for (final provider in SocialAuthProvider.values)
-                if (context.watch<AuthProvider>().isProviderConnected(provider))
+                if (context.select<AuthProvider, bool>(
+                    (auth) => auth.isProviderConnected(provider)))
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 14),
@@ -157,7 +131,8 @@ class SettingsScreen extends StatelessWidget {
                           color: context.colors.success, size: 20),
                     ]),
                   ),
-              if (context.watch<AuthProvider>().hasPassword)
+              if (context
+                  .select<AuthProvider, bool>((auth) => auth.hasPassword))
                 SettingsTile(
                   icon: Icons.lock_outline,
                   label: 'Change Password',
@@ -194,7 +169,8 @@ class SettingsScreen extends StatelessWidget {
           _sectionLabel(context, 'Around Flixie sharing'),
           _SettingsGroup(children: [
             AroundFlixieSharingSetting(
-              key: ValueKey(context.watch<AuthProvider>().dbUser?.id),
+              key: ValueKey(context
+                  .select<AuthProvider, String?>((auth) => auth.dbUser?.id)),
             )
           ]),
           const SizedBox(height: 24),
@@ -202,7 +178,7 @@ class SettingsScreen extends StatelessWidget {
           _SettingsGroup(
             children: [
               const MovieRatingPrivacySetting(),
-              const _EpisodeSpoilerSetting(),
+              const EpisodeSpoilerSetting(),
               Consumer<AnalyticsController>(
                 builder: (context, analytics, _) => SettingsTile(
                   icon: Icons.analytics_outlined,
@@ -342,7 +318,7 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: context.colors.background,
       builder: (_) => const FractionallySizedBox(
         heightFactor: .75,
-        child: _BlockedUsersSheet(),
+        child: BlockedUsersSheet(),
       ),
     );
   }
@@ -416,129 +392,6 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-class _BlockedUsersSheet extends StatefulWidget {
-  const _BlockedUsersSheet();
-
-  @override
-  State<_BlockedUsersSheet> createState() => _BlockedUsersSheetState();
-}
-
-class _BlockedUsersSheetState extends State<_BlockedUsersSheet> {
-  late Future<List<BlockedUser>> _users = SafetyService.blockedUsers();
-  final Set<String> _unblocking = {};
-  String? _error;
-
-  Future<void> _unblock(BlockedUser user) async {
-    if (!_unblocking.add(user.id)) return;
-    setState(() {
-      _error = null;
-    });
-    try {
-      await SafetyService.unblock(user.id);
-      if (!mounted) return;
-      final users = SafetyService.blockedUsers(refresh: true);
-      setState(() {
-        _users = users;
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _error = 'Could not unblock this user. Please try again.';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _unblocking.remove(user.id);
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-          child: Text(
-            'Blocked Users',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: Text(
-            'Blocked users cannot contact or interact with you.',
-            style: TextStyle(color: context.colors.medium),
-          ),
-        ),
-        Expanded(
-          child: FutureBuilder<List<BlockedUser>>(
-            future: _users,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return Center(
-                    child: TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _users = SafetyService.blockedUsers(refresh: true);
-                    });
-                  },
-                  child: const Text('Could not load blocked users. Retry'),
-                ));
-              }
-              final users = snapshot.data ?? const [];
-              if (users.isEmpty) {
-                return Center(
-                  child: Text(
-                    'You have not blocked anyone.',
-                    style: TextStyle(color: context.colors.medium),
-                  ),
-                );
-              }
-              return ListView.separated(
-                itemCount: users.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final user = users[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      child: Text(user.username[0].toUpperCase()),
-                    ),
-                    title: Text('@${user.username}'),
-                    subtitle: user.firstName?.isNotEmpty == true
-                        ? Text(user.firstName!)
-                        : null,
-                    trailing: TextButton(
-                      onPressed: _unblocking.contains(user.id)
-                          ? null
-                          : () => _unblock(user),
-                      child: Text(_unblocking.contains(user.id)
-                          ? 'Unblocking…'
-                          : 'Unblock'),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child:
-                Text(_error!, style: TextStyle(color: context.colors.danger)),
-          ),
-      ],
-    );
-  }
-}
-
 /// Groups settings tiles into a rounded card container.
 class _SettingsGroup extends StatelessWidget {
   const _SettingsGroup({required this.children});
@@ -594,541 +447,4 @@ class _LogOutButton extends StatelessWidget {
       ),
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// Edit profile (username & bio) bottom sheet
-// ---------------------------------------------------------------------------
-
-class _SettingsEditProfileSheet extends StatefulWidget {
-  const _SettingsEditProfileSheet({required this.user});
-  final user_model.User user;
-
-  @override
-  State<_SettingsEditProfileSheet> createState() =>
-      _SettingsEditProfileSheetState();
-}
-
-class _SettingsEditProfileSheetState extends State<_SettingsEditProfileSheet> {
-  final SettingsController _settingsController = SettingsController.instance;
-  late final TextEditingController _usernameCtrl;
-  late final TextEditingController _bioCtrl;
-
-  bool _saving = false;
-  bool _checkingUsername = false;
-  String? _usernameError;
-  DateTime? _lastCheck;
-
-  List<Country> _countries = [];
-  Country? _selectedCountry;
-  bool _loadingCountries = true;
-  bool _countryLoadFailed = false;
-  bool _countryChanged = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _usernameCtrl = TextEditingController(text: widget.user.username);
-    _bioCtrl = TextEditingController(text: widget.user.bio ?? '');
-    _loadCountries();
-  }
-
-  Future<void> _loadCountries() async {
-    setState(() {
-      _loadingCountries = true;
-      _countryLoadFailed = false;
-    });
-    try {
-      final countries = await ReferenceDataService.getCountries();
-      if (!mounted) return;
-      Country? current;
-      if (widget.user.countryId != null) {
-        try {
-          current = countries.firstWhere((c) => c.id == widget.user.countryId);
-        } catch (_) {}
-      }
-      setState(() {
-        _countries = countries;
-        _selectedCountry = current;
-        _loadingCountries = false;
-        _countryLoadFailed = countries.isEmpty;
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _loadingCountries = false;
-          _countryLoadFailed = true;
-        });
-      }
-    }
-  }
-
-  Future<void> _pickCountry() async {
-    final country = await showModalBottomSheet<Country>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.colors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      clipBehavior: Clip.antiAlias,
-      useRootNavigator: true,
-      useSafeArea: true,
-      builder: (context) => ConstrainedBox(
-        constraints:
-            BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .85),
-        child: SingleChildScrollView(
-            child: _SettingsCountryPickerSheet(
-          countries: _countries,
-          selected: _selectedCountry,
-        )),
-      ),
-    );
-    if (!mounted || country == null) return;
-    setState(() {
-      _selectedCountry = country;
-      _countryChanged = country.id != widget.user.countryId;
-    });
-  }
-
-  @override
-  void dispose() {
-    _usernameCtrl.dispose();
-    _bioCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onUsernameChanged(String value) async {
-    setState(() => _usernameError = null);
-    final trimmed = value.trim();
-    if (trimmed == widget.user.username) return;
-    if (trimmed.length < 3) {
-      setState(() => _usernameError = 'At least 3 characters required');
-      return;
-    }
-    final stamp = DateTime.now();
-    _lastCheck = stamp;
-    setState(() => _checkingUsername = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (_lastCheck != stamp || !mounted) return;
-    try {
-      final exists = await _settingsController.usernameExists(trimmed);
-      if (!mounted) return;
-      setState(() {
-        _checkingUsername = false;
-        _usernameError = exists ? 'Username already taken' : null;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _checkingUsername = false);
-    }
-  }
-
-  Future<void> _save() async {
-    final username = _usernameCtrl.text.trim();
-    final bio = _bioCtrl.text.trim();
-    if (_usernameError != null || _checkingUsername) return;
-    if (username.isEmpty) {
-      setState(() => _usernameError = 'Username cannot be empty');
-      return;
-    }
-    final auth = context.read<AuthProvider>();
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _saving = true);
-
-    try {
-      final userId = widget.user.id;
-      user_model.User updated = widget.user;
-
-      // Only send changed fields - API takes one field at a time
-      if (username != widget.user.username) {
-        updated = await _settingsController.updateUserField(
-            userId, 'username', username);
-      }
-      if (bio != (widget.user.bio ?? '')) {
-        updated = await _settingsController.updateUserField(userId, 'bio', bio);
-      }
-      if (_countryChanged && _selectedCountry != null) {
-        updated = await _settingsController.updateUserField(
-            userId, 'countryId', _selectedCountry!.id);
-        updated = updated.copyWith(
-            countryId: _selectedCountry!.id,
-            country: _selectedCountry!.toJson());
-      }
-
-      if (!mounted) return;
-      auth.updateCachedUser(updated);
-      Navigator.pop(context);
-      messenger.showFlixieToast(FlixieToast(
-        type: FlixieToastType.success,
-        content: const Text('Profile updated'),
-        backgroundColor: context.colors.surfaceElevated,
-      ));
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      messenger.showFlixieToast(FlixieToast(
-        type: FlixieToastType.error,
-        content: Text(error.code == 'USERNAME_NOT_AVAILABLE'
-            ? error.message
-            : 'Failed to update profile. Please try again.'),
-        backgroundColor: context.colors.danger,
-      ));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      messenger.showFlixieToast(FlixieToast(
-          type: FlixieToastType.error,
-          content: const Text('Failed to update profile. Please try again.'),
-          backgroundColor: context.colors.danger));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    final unchanged = _usernameCtrl.text.trim() == widget.user.username &&
-        _bioCtrl.text.trim() == (widget.user.bio ?? '') &&
-        !_countryChanged;
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.colors.medium,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Edit details',
-              style: TextStyle(
-                  color: context.colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            // Username
-            TextField(
-              controller: _usernameCtrl,
-              style: TextStyle(color: context.colors.white),
-              textInputAction: TextInputAction.next,
-              autocorrect: false,
-              onChanged: (v) {
-                setState(() {});
-                _onUsernameChanged(v);
-              },
-              decoration: InputDecoration(
-                labelText: 'Username',
-                labelStyle: TextStyle(color: context.colors.medium),
-                filled: true,
-                fillColor: context.colors.tabBarBackgroundFocused,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                errorText: _usernameError,
-                suffixIcon: _checkingUsername
-                    ? Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: context.colors.medium),
-                        ),
-                      )
-                    : (_usernameError == null &&
-                            _usernameCtrl.text.trim() != widget.user.username &&
-                            _usernameCtrl.text.trim().length >= 3)
-                        ? Icon(Icons.check_circle_outline,
-                            color: context.colors.success)
-                        : null,
-              ),
-            ),
-            const SizedBox(height: 14),
-            // Bio
-            TextField(
-              controller: _bioCtrl,
-              style: TextStyle(color: context.colors.white),
-              maxLines: 3,
-              maxLength: 200,
-              textInputAction: TextInputAction.done,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: 'Bio',
-                labelStyle: TextStyle(color: context.colors.medium),
-                filled: true,
-                fillColor: context.colors.tabBarBackgroundFocused,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                counterStyle: TextStyle(color: context.colors.medium),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Material(
-              color: Colors.transparent,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                tileColor: context.colors.tabBarBackgroundFocused,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                leading: Icon(Icons.location_on_outlined,
-                    color: context.colors.light),
-                title: Text('Country',
-                    style: TextStyle(color: context.colors.white)),
-                subtitle: Text(
-                  _loadingCountries
-                      ? (_selectedCountry?.name ??
-                          widget.user.country?['name']?.toString() ??
-                          'Select your country')
-                      : _countryLoadFailed
-                          ? 'Couldn’t load countries. Tap to retry.'
-                          : _selectedCountry?.name ??
-                              widget.user.country?['name']?.toString() ??
-                              'Select your country',
-                  style: TextStyle(color: context.colors.light),
-                ),
-                trailing: _loadingCountries
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(
-                        _countryLoadFailed ? Icons.refresh : Icons.expand_more,
-                        color: context.colors.light),
-                onTap: _loadingCountries || _saving
-                    ? null
-                    : _countryLoadFailed
-                        ? _loadCountries
-                        : _pickCountry,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8, left: 12, right: 12),
-              child: Text('Used to find where you can watch movies and shows.',
-                  style: TextStyle(color: context.colors.light, fontSize: 12)),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: (unchanged ||
-                        _saving ||
-                        _checkingUsername ||
-                        _usernameError != null)
-                    ? null
-                    : _save,
-                style: FilledButton.styleFrom(
-                    backgroundColor: FlixieColors.primary),
-                child: _saving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text('Save Changes'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Country picker bottom sheet (used from Edit Profile in Settings)
-// ---------------------------------------------------------------------------
-
-class _SettingsCountryPickerSheet extends StatefulWidget {
-  const _SettingsCountryPickerSheet({required this.countries, this.selected});
-
-  final List<Country> countries;
-  final Country? selected;
-
-  @override
-  State<_SettingsCountryPickerSheet> createState() =>
-      _SettingsCountryPickerSheetState();
-}
-
-class _SettingsCountryPickerSheetState
-    extends State<_SettingsCountryPickerSheet> {
-  final _searchController = TextEditingController();
-  late List<Country> _filtered;
-
-  @override
-  void initState() {
-    super.initState();
-    _filtered = widget.countries;
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onSearch(String query) {
-    final q = query.trim().toLowerCase();
-    setState(() {
-      _filtered = q.isEmpty
-          ? widget.countries
-          : widget.countries
-              .where((c) => c.name.toLowerCase().contains(q))
-              .toList();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.colors.medium,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Select Country',
-              style: TextStyle(
-                color: context.colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _searchController,
-              onChanged: _onSearch,
-              autofocus: true,
-              style: TextStyle(color: context.colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search countries...',
-                hintStyle: TextStyle(color: context.colors.medium),
-                prefixIcon: Icon(Icons.search, color: context.colors.medium),
-                filled: true,
-                fillColor: context.colors.tabBarBackgroundFocused,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 320,
-              child: ListView.builder(
-                itemCount: _filtered.length,
-                itemBuilder: (context, index) {
-                  final country = _filtered[index];
-                  final isSelected = country.id == widget.selected?.id;
-                  return Material(
-                    color: Colors.transparent,
-                    child: ListTile(
-                      title: Text(
-                        country.name,
-                        style: TextStyle(
-                          color: isSelected
-                              ? context.colors.primaryTint
-                              : context.colors.textPrimary,
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.normal,
-                        ),
-                      ),
-                      trailing: isSelected
-                          ? Icon(Icons.check_rounded,
-                              color: context.colors.primaryTint)
-                          : null,
-                      onTap: () => Navigator.of(context).pop(country),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EpisodeSpoilerSetting extends StatefulWidget {
-  const _EpisodeSpoilerSetting();
-
-  @override
-  State<_EpisodeSpoilerSetting> createState() => _EpisodeSpoilerSettingState();
-}
-
-class _EpisodeSpoilerSettingState extends State<_EpisodeSpoilerSetting> {
-  final preference = EpisodeSpoilerPreference.instance;
-
-  @override
-  void initState() {
-    super.initState();
-    preference.load().catchError((Object _) {});
-  }
-
-  Future<void> _change(bool value) async {
-    try {
-      await preference.setHidden(value);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
-            type: FlixieToastType.error,
-            content: const Text(
-                'Couldn’t save your spoiler preference. Please try again.')));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: preference,
-        builder: (context, _) => SettingsTile(
-          icon: Icons.visibility_off_outlined,
-          label: 'Hide episode spoilers',
-          description:
-              'Hide titles, images and descriptions for episodes you haven’t watched.',
-          onTap: () {
-            if (!preference.saving) _change(!preference.hide);
-          },
-          trailing: Switch.adaptive(
-            value: preference.hide,
-            onChanged: preference.saving ? null : _change,
-          ),
-        ),
-      );
 }

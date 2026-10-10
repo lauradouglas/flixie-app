@@ -744,28 +744,30 @@ class UserService {
   }
 
   static Future<List<MovieList>> getMyListsContainingMovie(
+          String userId, int movieId,
+          {List<MovieList>? lists}) =>
+      getMyListsContainingMedia(userId, movieId, lists: lists);
+
+  static Future<List<MovieList>> getMyListsContainingMedia(
     String userId,
-    int movieId, {
+    int mediaId, {
     List<MovieList>? lists,
+    bool isShow = false,
   }) async {
     final availableLists = lists ?? await getMovieLists(userId);
     if (availableLists.isEmpty) return const <MovieList>[];
 
-    final contents = await Future.wait(
-      availableLists.map(
-        (list) => getMovieListMovies(userId, list.id)
-            .catchError((_) => const <MovieListMovie>[]),
-      ),
-    );
-    final result = <MovieList>[];
-    for (var index = 0; index < availableLists.length; index++) {
-      if (contents[index].any((entry) =>
-          !entry.removed &&
-          (entry.movieId == movieId || entry.movie?.id == movieId))) {
-        result.add(availableLists[index]);
-      }
+    final data = await ApiClient.get(
+        '/users/$userId/lists/containing/${isShow ? 'show' : 'movie'}/$mediaId');
+    if (data is! Map<String, dynamic> ||
+        data['listIds'] is! List ||
+        (data['listIds'] as List).any((id) => id is! String)) {
+      throw const FormatException('Invalid list membership response');
     }
-    return result;
+    final ids = (data['listIds'] as List).cast<String>().toSet();
+    return availableLists
+        .where((list) => !list.removed && ids.contains(list.id))
+        .toList(growable: false);
   }
 
   // ---- Show list compatibility over mixed lists -----------------------------

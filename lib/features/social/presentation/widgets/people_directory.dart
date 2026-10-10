@@ -15,10 +15,13 @@ class PeopleDirectory extends StatefulWidget {
       {super.key,
       required this.userId,
       required this.friends,
-      this.service = const CommunityService()});
+      this.service = const CommunityService(),
+      this.active = true});
   final String userId;
   final List<FriendshipUser> friends;
   final CommunityService service;
+  final bool active;
+
   @override
   State<PeopleDirectory> createState() => _PeopleDirectoryState();
 }
@@ -32,7 +35,7 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
       _loading = false,
       _failed = false,
       _saving = false;
-  bool _starsFailed = false;
+  bool _starsFailed = false, _needsStarsRefresh = false;
   final Set<String> _busy = {};
   @override
   void initState() {
@@ -49,12 +52,50 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
   @override
   void didUpdateWidget(covariant PeopleDirectory oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.friends, widget.friends)) _readStars();
+    if (oldWidget.userId != widget.userId) {
+      PeopleCache.instance.selectAccount(widget.userId);
+      _following = [];
+      _query = '';
+      _failed = _saving = _starsFailed = false;
+      _busy.clear();
+      _loadFollowing();
+      _needsStarsRefresh = true;
+    }
+    if (!identical(oldWidget.friends, widget.friends)) {
+      _needsStarsRefresh = true;
+    }
+    if (_canSyncStars && _needsStarsRefresh) {
+      _needsStarsRefresh = false;
+      _readStars();
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _readStars();
+    if (state != AppLifecycleState.resumed) return;
+    if (_canSyncStars) {
+      _needsStarsRefresh = false;
+      _readStars();
+    } else {
+      _needsStarsRefresh = true;
+    }
+  }
+
+  bool get _canSyncStars =>
+      widget.active &&
+      TickerMode.valuesOf(context).enabled &&
+      (ModalRoute.of(context)?.isCurrent ?? true);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_canSyncStars || !_needsStarsRefresh) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _canSyncStars && _needsStarsRefresh) {
+        _needsStarsRefresh = false;
+        _readStars();
+      }
+    });
   }
 
   void _starsChanged() {
@@ -82,19 +123,22 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
   void _message(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   Future<void> _star(String id) async {
+    final userId = widget.userId;
     if (_saving) return;
     setState(() => _saving = true);
     try {
       await StarredPeople.instance.setStar(id, !_stars.contains(id));
     } catch (_) {
-      if (mounted) _message('Couldn’t save starred friends. Try again.');
+      if (mounted && widget.userId == userId) {
+        _message('Couldn’t save starred friends. Try again.');
+      }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted && widget.userId == userId) setState(() => _saving = false);
     }
   }
 
   void _cacheChanged() {
-    if (!mounted) return;
+    if (!mounted || PeopleCache.instance.userId != widget.userId) return;
     setState(() {
       _following = List.of(PeopleCache.instance.following ?? []);
       _loading = false;
@@ -123,17 +167,22 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
   }
 
   Future<void> _unfollow(FriendshipUser person) async {
+    final userId = widget.userId;
     if (_busy.contains(person.id)) return;
     setState(() => _busy.add(person.id));
     try {
       await widget.service.follow('profiles/${person.id}', false);
-      if (mounted) {
+      if (mounted && widget.userId == userId) {
         setState(() => _following.removeWhere((u) => u.id == person.id));
       }
     } catch (_) {
-      if (mounted) _message('Couldn’t unfollow. Try again.');
+      if (mounted && widget.userId == userId) {
+        _message('Couldn’t unfollow. Try again.');
+      }
     } finally {
-      if (mounted) setState(() => _busy.remove(person.id));
+      if (mounted && widget.userId == userId) {
+        setState(() => _busy.remove(person.id));
+      }
     }
   }
 

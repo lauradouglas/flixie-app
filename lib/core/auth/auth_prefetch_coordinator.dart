@@ -28,11 +28,12 @@ class AuthPrefetchCoordinator {
     // Watchlist and favourites are already in the authenticated User snapshot.
     // Warm only the notification inbox here. Home owns its own sections; history,
     // reviews, ratings and streaming availability load at their point of use.
-    final notifications = await NotificationService.getNotifications(userId);
+    final page = await NotificationService.getPage(userId);
+    final notifications = page.items;
     final visible = visibleNotificationsForUser(notifications, userId);
     return AuthPrefetchSnapshot(
       notifications: visible,
-      unreadNotificationCount: visible.where((item) => !item.isRead).length,
+      unreadNotificationCount: page.unreadCount,
     );
   }
 
@@ -85,6 +86,15 @@ class AuthPrefetchCoordinator {
     );
   }
 
+  Future<NotificationPage?> fetchNotificationPage(String userId) async {
+    try {
+      return await NotificationService.getPage(userId);
+    } catch (error) {
+      logger.w('[AuthPrefetchCoordinator] inbox refresh failed: $error');
+      return null;
+    }
+  }
+
   Future<List<FlixieNotification>?> fetchNotifications(String userId) async {
     try {
       return await NotificationService.getNotifications(userId);
@@ -96,8 +106,7 @@ class AuthPrefetchCoordinator {
 
   Future<int?> fetchUnreadCount(String userId) async {
     try {
-      final notifications = await NotificationService.getNotifications(userId);
-      return visibleUnreadNotificationCount(notifications, userId);
+      return (await NotificationService.getPage(userId)).unreadCount;
     } catch (e) {
       logger
           .w('[AuthPrefetchCoordinator] notification count refresh error: $e');

@@ -7,7 +7,6 @@ import 'package:flixie_app/features/profile/data/milestone_cache.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
-import 'dart:convert';
 import 'package:flixie_app/core/auth/startup_trace.dart';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -41,7 +40,8 @@ import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/utils/app_icon_badge_service.dart';
-import 'package:flixie_app/core/utils/notification_visibility.dart';
+import 'package:flixie_app/core/auth/auth_account_cache.dart';
+import 'package:flixie_app/core/auth/auth_session_recovery.dart';
 
 /// Auth states that the UI can observe.
 enum AuthStatus { unknown, authenticated, unauthenticated }
@@ -64,9 +64,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     super.notifyListeners();
   }
 
-  // Prefetched friends activity for home screen
-  List<ActivityListItem>? _cachedFriendsActivity;
-  List<ActivityListItem>? get cachedFriendsActivity => _cachedFriendsActivity;
+  late final AuthAccountCache _accountCache;
+  List<ActivityListItem>? get cachedFriendsActivity =>
+      _accountCache.cachedFriendsActivity;
   AuthProvider(
     this._authService,
     MovieService movieService, {
@@ -79,6 +79,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   })  : _prefetchCoordinator = prefetchCoordinator ??
             AuthPrefetchCoordinator(movieService: movieService),
         _profileCreator = profileCreator ?? UserService.createUser {
+    _accountCache = AuthAccountCache(_prefetchCoordinator);
     _profileLoader = profileLoader ?? UserService.getUserByExternalId;
     _termsStatusLoader = termsStatusLoader ??
         () async {
@@ -89,12 +90,21 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     _avatarSelector = avatarSelector ?? AvatarService.selectAvatar;
     WidgetsBinding.instance.addObserver(this);
     ApiClient.setAuthTokenRefresher(_authService.refreshIdToken);
-    _authBootstrapTimer = Timer(_initialTokenTimeout, () {
-      if (_disposed || _status != AuthStatus.unknown) return;
-      _recoveryError =
-          'Couldn’t restore your session. Check your connection and retry.';
-      notifyListeners();
-    });
+    _recovery = AuthSessionRecovery(
+      user: () => _firebaseUser,
+      loadProfile: _profileLoader,
+      applyProfile: (profile) {
+        _dbUser = profile;
+        notifyListeners();
+      },
+      onExpired: () => _onAuthStateChanged(null),
+      onChanged: notifyListeners,
+      canResume: () => _status == AuthStatus.authenticated,
+      onResumeSuccess: _onResumeRecovered,
+      onThrottledResume: _startNotificationPoller,
+      onRetry: _retrySessionRecovery,
+    );
+    _recovery.startBootstrap(() => _status == AuthStatus.unknown);
     _authStateSubscription = _authService.authStateChanges.listen(
       (user) {
         unawaited(
@@ -115,7 +125,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
           stackTrace: stack,
         );
         if (!_disposed) {
-          _recoveryError = 'Couldn’t check your session. Please retry.';
+          _recovery.setError('Couldn’t check your session. Please retry.');
           notifyListeners();
         }
       },
@@ -131,7 +141,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
   final _authStatusNotifier = _AuthStatusNotifier();
   StreamSubscription<firebase_auth.User?>? _authStateSubscription;
-  Timer? _authBootstrapTimer;
+  late final AuthSessionRecovery _recovery;
 
   AuthStatus _status = AuthStatus.unknown;
   firebase_auth.User? _firebaseUser;
@@ -140,29 +150,11 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   String? _errorMessage;
   String? _errorCode;
   int _activityVersion = 0;
-  int _friendDataVersion = 0;
-  int get friendDataVersion => _friendDataVersion;
+  int? _profileRefreshedActivityVersion;
+  int get friendDataVersion => _accountCache.friendDataVersion;
   bool _pendingReferralQualification = false;
 
-  // Prefetched at login - screens use these to skip spinners
-  List<ActivityListItem>? _cachedActivity;
-  FriendsData? _cachedFriends;
-  List<Group>? _cachedGroups;
-  List<MovieRating>? _cachedRatings;
-  List<Review>? _cachedReviews;
-  List<MovieShort>? _cachedTrending;
-  List<MovieShort>? _cachedNowPlaying;
-  List<MovieList>? _cachedMovieLists;
-  List<FlixieNotification>? _cachedNotifications;
-  final Set<String> _dismissedNotificationIds = <String>{};
-  List<WatchRequest>? _cachedWatchRequests;
   bool _isPrefetching = false;
-  final Map<int, List<WatchProvider>> _cachedWatchProvidersByMovieId = {};
-  Set<int>? _cachedUserWatchProviderIds;
-  String? _cachedWatchProviderRegion;
-  Future<void>? _watchProviderCacheFuture;
-
-  int _unreadNotificationCount = 0;
   bool _hasResetAppBadgeThisSession = false;
 
   /// Navigator key set by the app root so push notifications can navigate.
@@ -186,141 +178,115 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   int get activityVersion => _activityVersion;
 
-  List<ActivityListItem>? get cachedActivity => _cachedActivity;
-  FriendsData? get cachedFriends => _cachedFriends;
-  List<Group>? get cachedGroups => _cachedGroups;
-  List<MovieRating>? get cachedRatings => _cachedRatings;
-  List<Review>? get cachedReviews => _cachedReviews;
-  List<MovieShort>? get cachedTrending => _cachedTrending;
-  List<MovieShort>? get cachedNowPlaying => _cachedNowPlaying;
-  List<MovieList>? get cachedMovieLists => _cachedMovieLists;
-  List<FlixieNotification>? get cachedNotifications => _cachedNotifications;
-  List<WatchRequest>? get cachedWatchRequests => _cachedWatchRequests;
+  /// Whether this activity notification already includes a refreshed profile.
+  /// Action notifications still require screens to fetch updated profile data.
+  bool get activityIncludesRefreshedProfile =>
+      _profileRefreshedActivityVersion == _activityVersion;
+
+  /// Screen-facing data is owned and reset by the account cache.
+  List<ActivityListItem>? get cachedActivity => _accountCache.cachedActivity;
+  FriendsData? get cachedFriends => _accountCache.cachedFriends;
+  List<Group>? get cachedGroups => _accountCache.cachedGroups;
+  List<MovieRating>? get cachedRatings => _accountCache.cachedRatings;
+  List<Review>? get cachedReviews => _accountCache.cachedReviews;
+  List<MovieShort>? get cachedTrending => _accountCache.cachedTrending;
+  List<MovieShort>? get cachedNowPlaying => _accountCache.cachedNowPlaying;
+  List<MovieList>? get cachedMovieLists => _accountCache.cachedMovieLists;
+  List<FlixieNotification>? get cachedNotifications =>
+      _accountCache.cachedNotifications;
+  List<WatchRequest>? get cachedWatchRequests =>
+      _accountCache.cachedWatchRequests;
   bool get isPrefetching => _isPrefetching;
   Map<int, List<WatchProvider>> get cachedWatchProvidersByMovieId =>
-      Map.unmodifiable(_cachedWatchProvidersByMovieId);
+      _accountCache.cachedWatchProvidersByMovieId;
   Set<int>? get cachedUserWatchProviderIds =>
-      _cachedUserWatchProviderIds == null
-          ? null
-          : Set.unmodifiable(_cachedUserWatchProviderIds!);
+      _accountCache.cachedUserWatchProviderIds;
 
-  /// Updates provider preference cache after the user saves their selection,
-  /// so watchlist availability styling updates immediately.
   void updateCachedUserWatchProviderIds(Iterable<int> providerIds) {
-    _cachedUserWatchProviderIds = providerIds.toSet();
+    _accountCache.updateCachedUserWatchProviderIds(providerIds);
     notifyListeners();
   }
 
-  int get unreadNotificationCount => _unreadNotificationCount;
+  int get unreadNotificationCount => _accountCache.unreadNotificationCount;
 
   void _syncUnreadNotificationCount(int count) {
-    _unreadNotificationCount = count < 0 ? 0 : count;
-    unawaited(AppIconBadgeService.setCount(_unreadNotificationCount));
+    _accountCache.setUnreadNotificationCount(count);
+    unawaited(AppIconBadgeService.setCount(unreadNotificationCount));
   }
 
-  /// Update the reviews cache, e.g. after writing a new review.
   void updateCachedReviews(List<Review> reviews) {
-    _cachedReviews = reviews;
+    _accountCache.updateCachedReviews(reviews);
     notifyListeners();
   }
 
-  void updateCachedNotifications(List<FlixieNotification> notifications) {
-    final userId = _dbUser?.id;
-    final visible = userId == null
-        ? List<FlixieNotification>.of(notifications)
-        : visibleNotificationsForUser(notifications, userId);
-    final active = visible
-        .where((item) =>
-            item.id == null || !_dismissedNotificationIds.contains(item.id))
-        .toList(growable: false);
-    _cachedNotifications = List.unmodifiable(active);
-    _syncUnreadNotificationCount(active.where((item) => !item.isRead).length);
+  void updateCachedNotifications(List<FlixieNotification> notifications,
+      {int? unreadCount}) {
+    _accountCache.updateCachedNotifications(notifications,
+        userId: _dbUser?.id, unreadCount: unreadCount);
+    _syncUnreadNotificationCount(unreadNotificationCount);
     notifyListeners();
   }
 
-  /// Prevents an in-flight prefetch from restoring a card the user has just
-  /// dismissed. The server remains the durable source of truth; this only
-  /// protects the current app session from stale responses.
   void removeCachedNotification(String notificationId) {
-    _dismissedNotificationIds.add(notificationId);
-    updateCachedNotifications(_cachedNotifications ?? const []);
+    _accountCache.removeCachedNotification(notificationId, userId: _dbUser?.id);
+    _syncUnreadNotificationCount(unreadNotificationCount);
+    notifyListeners();
   }
 
-  /// Dismisses every notification card belonging to a direct Watch Plan.
-  /// Watch Plans deliberately have a small lifecycle feed, not independent
-  /// alerts, so an older status must not surface after the latest is closed.
   void removeCachedWatchPlanNotifications(String requestId) {
-    for (final notification
-        in _cachedNotifications ?? const <FlixieNotification>[]) {
-      final isWatchPlan =
-          notification.type == FlixieNotification.movieWatchRequest ||
-              notification.type == FlixieNotification.showWatchRequest;
-      if (isWatchPlan && notification.linkedRequestId == requestId) {
-        final id = notification.id;
-        if (id != null) _dismissedNotificationIds.add(id);
-      }
-    }
-    updateCachedNotifications(_cachedNotifications ?? const []);
+    _accountCache.removeCachedWatchPlanNotifications(requestId,
+        userId: _dbUser?.id);
+    _syncUnreadNotificationCount(unreadNotificationCount);
+    notifyListeners();
   }
 
   void updateCachedWatchRequests(List<WatchRequest> requests) {
-    _cachedWatchRequests = List.unmodifiable(requests);
+    _accountCache.updateCachedWatchRequests(requests);
     notifyListeners();
   }
 
-  /// Clears the reviews cache so the next reviews screen visit fetches fresh data.
   void invalidateCachedReviews() {
-    _cachedReviews = null;
+    _accountCache.invalidateCachedReviews();
     notifyListeners();
   }
 
-  /// Update the friends cache, e.g. after accepting/declining a request.
   void updateCachedFriends(FriendsData friends) {
-    _friendDataVersion++;
-    _cachedFriends = friends;
+    _accountCache.updateCachedFriends(friends);
     notifyListeners();
   }
 
-  /// Keeps the Social tab's stale-while-refresh snapshot current.
-  void updateCachedSocialData({
-    required FriendsData friends,
-    required List<ActivityListItem> activity,
-    required List<Group> groups,
-  }) {
-    _cachedFriends = friends;
-    _friendDataVersion++;
-    _cachedFriendsActivity = activity;
-    _cachedGroups = groups;
+  void updateCachedSocialData(
+      {required FriendsData friends,
+      required List<ActivityListItem> activity,
+      required List<Group> groups}) {
+    _accountCache.updateCachedSocialData(
+        friends: friends, activity: activity, groups: groups);
     notifyListeners();
   }
 
   void updateCachedGroups(List<Group> groups) {
-    _cachedGroups = groups;
+    _accountCache.updateCachedGroups(groups);
     notifyListeners();
   }
 
   void updateCachedMovieLists(List<MovieList> lists) {
-    _cachedMovieLists = List.unmodifiable(lists);
+    _accountCache.updateCachedMovieLists(lists);
     notifyListeners();
   }
 
   void invalidateCachedMovieLists() {
-    _cachedMovieLists = null;
+    _accountCache.invalidateCachedMovieLists();
     notifyListeners();
   }
 
   void invalidateCachedFriends() {
-    _friendDataVersion++;
-    _cachedFriends = null;
+    _accountCache.invalidateCachedFriends();
     notifyListeners();
   }
 
-  /// Call after adding an item to any list so activity-watching screens can refresh.
   void markActivityChanged() {
     MilestoneCache.instance.invalidate();
-    _cachedActivity = null;
-    _cachedFriendsActivity = null;
-    _cachedRatings = null;
+    _accountCache.invalidateActivity();
     _activityVersion++;
     notifyListeners();
   }
@@ -350,21 +316,13 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   String? _pendingSignupEmail;
   int? _pendingAvatarId;
   Future<void>? _authStateChangeFuture;
+  // Inactive can be a permission sheet or the initial foreground transition.
+  // Only hidden/paused marks a genuine return that needs session recovery.
+  bool _hasBackgrounded = false;
   int _sessionGeneration = 0;
   int _prefetchGeneration = 0;
-  int _profileGeneration = 0;
-  Future<bool>? _profileRefreshFuture;
   bool _disposed = false;
-  bool _foreground = true;
-  Timer? _recoveryTimer;
-  int _recoveryAttempts = 0;
-  String? _recoveryError;
-  String? get recoveryError => _recoveryError;
-  DateTime? _lastResumeRefreshAt;
-  Future<void>? _resumeRefreshFuture;
-  static const Duration _resumeRefreshThrottle = Duration(minutes: 2);
-  static const Duration _initialTokenTimeout = Duration(seconds: 8);
-  static const Duration _initialProfileTimeout = Duration(seconds: 10);
+  String? get recoveryError => _recovery.error;
 
   Future<void> _onAuthStateChanged(firebase_auth.User? user,
       {bool retry = false}) async {
@@ -376,7 +334,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         _dbUser != null) {
       return;
     }
-    _authBootstrapTimer?.cancel();
+    _recovery.authStateReceived();
     final sameUser = _firebaseUser?.uid == user?.uid;
     if (sameUser && _authStateChangeFuture != null) {
       return _authStateChangeFuture;
@@ -389,38 +347,20 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _sessionGeneration++;
       _prefetchGeneration++;
       ShowService.clearSummaryCache();
-      _resumeRefreshFuture = null;
-      _profileRefreshFuture = null;
-      _lastResumeRefreshAt = null;
-      _recoveryTimer?.cancel();
-      _recoveryAttempts = 0;
+      _recovery.reset();
+      _profileRefreshedActivityVersion = null;
       _isPrefetching = false;
-      _dismissedNotificationIds.clear();
-      _cachedWatchProviderRegion = null;
-      _watchProviderCacheFuture = null;
+      _accountCache.clear();
       ApiClient.setToken(null);
       if (user != null) {
         _dbUser = null;
         PeopleCache.instance.selectAccount(null);
-        _cachedFriendsActivity = null;
-        _cachedActivity = null;
-        _cachedFriends = null;
-        _cachedGroups = null;
-        _cachedRatings = null;
-        _cachedReviews = null;
-        _cachedTrending = null;
-        _cachedNowPlaying = null;
-        _cachedMovieLists = null;
-        _cachedNotifications = null;
-        _cachedWatchRequests = null;
-        _cachedWatchProvidersByMovieId.clear();
-        _cachedUserWatchProviderIds = null;
         _notificationPoller.stop();
         _status = AuthStatus.unknown;
       }
     }
     _firebaseUser = user;
-    _recoveryError = null;
+    _recovery.setError(null);
     _errorMessage = null;
     notifyListeners();
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -440,11 +380,13 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> retrySession() async {
-    _recoveryTimer?.cancel();
-    _recoveryAttempts = 0;
     if (_dbUser != null) {
       unawaited(StarredPeople.instance.refresh().catchError((_) {}));
     }
+    await _recovery.retry();
+  }
+
+  Future<void> _retrySessionRecovery() async {
     if (_dbUser == null) {
       await _onAuthStateChanged(_authService.currentUser, retry: true);
     } else {
@@ -452,34 +394,25 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void _scheduleRecovery() {
-    if (_disposed ||
-        !_foreground ||
-        _recoveryAttempts >= 3 ||
-        _recoveryTimer?.isActive == true) {
-      return;
-    }
-    final generation = _sessionGeneration;
-    final delay = [5, 15, 30][_recoveryAttempts++];
-    _recoveryTimer = Timer(Duration(seconds: delay), () {
-      if (_disposed || generation != _sessionGeneration || !_foreground) return;
-      if (_dbUser == null) {
-        unawaited(_onAuthStateChanged(_authService.currentUser, retry: true));
-      } else {
-        unawaited(handleAppResumed(force: true));
-      }
-    });
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _foreground = state == AppLifecycleState.resumed;
-    if (!_foreground) {
+    if (state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      _hasBackgrounded = true;
+    }
+    _recovery.setForeground(state == AppLifecycleState.resumed);
+    if (!_recovery.foreground) {
       _notificationPoller.stop();
-      _recoveryTimer?.cancel();
       return;
     }
-    _recoveryAttempts = 0;
+    final returningFromBackground = _hasBackgrounded;
+    _hasBackgrounded = false;
+    if (!returningFromBackground && recoveryError == null) {
+      // Startup owns restoration. Reuse its profile and avoid invalidating Home
+      // again when iOS first becomes active or a native sheet closes.
+      if (_status == AuthStatus.authenticated) _startNotificationPoller();
+      return;
+    }
     if (_dbUser == null && _firebaseUser != null) {
       unawaited(_onAuthStateChanged(_firebaseUser, retry: true));
     } else {
@@ -500,20 +433,14 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (user != null) {
       _hasResetAppBadgeThisSession = false;
       try {
-        // Firebase reuses a valid token and refreshes expired tokens itself.
-        // API 401 responses still use the shared forced-refresh path.
-        final tokenRevision = ApiClient.tokenRevision;
-        final token = await StartupTrace.run('session-token',
-            () => user.getIdToken(false).timeout(_initialTokenTimeout));
+        await _recovery.refreshToken(user, isCurrent: current);
         if (!current()) return;
-        if (token == null) {
-          throw StateError('No authentication token available');
-        }
-        if (tokenRevision == ApiClient.tokenRevision) ApiClient.setToken(token);
         models.User? profile;
         try {
-          profile = await StartupTrace.run('profile',
-              () => _profileLoader(user.uid).timeout(_initialProfileTimeout));
+          profile = await StartupTrace.run(
+              'profile',
+              () => _profileLoader(user.uid)
+                  .timeout(AuthSessionRecovery.profileTimeout));
         } on ApiException catch (error) {
           if (error.statusCode != 404) rethrow;
         }
@@ -524,8 +451,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
                 info.providerId == 'google.com')) {
           _needsSocialProfile = true;
           _status = AuthStatus.unauthenticated;
-          _recoveryError = null;
-          _recoveryTimer?.cancel();
+          _recovery.succeeded();
           SchedulerBinding.instance.addPostFrameCallback((_) {
             if (!_disposed) _authStatusNotifier.notify();
           });
@@ -535,30 +461,23 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         if (profile == null) throw StateError('Profile unavailable');
         _needsSocialProfile = false;
         _dbUser = profile;
+        _profileRefreshedActivityVersion = _activityVersion;
         // Resolve account consent before the router sees an authenticated
         // session. An unknown value must not briefly open the agreement page.
         try {
-          await verifyTerms().timeout(_initialProfileTimeout);
+          await verifyTerms().timeout(AuthSessionRecovery.profileTimeout);
         } catch (_) {
           // Keep deletion and the existing retry UI available on lookup failure.
           // A failed check must never grant access.
         }
         if (!current()) return;
         _status = AuthStatus.authenticated;
-        _recoveryError = null;
-        _recoveryAttempts = 0;
-        _recoveryTimer?.cancel();
+        _recovery.succeeded();
         MilestoneCache.instance.useOwner(profile.id);
         if (_prefetchAfterAuth) _prefetch(profile.id);
       } catch (error) {
         if (!current()) return;
-        final invalid = error is firebase_auth.FirebaseAuthException &&
-            [
-              'user-disabled',
-              'user-not-found',
-              'user-token-expired',
-              'invalid-user-token'
-            ].contains(error.code);
+        final invalid = AuthSessionRecovery.isExpired(error);
         if (invalid) {
           ApiClient.setToken(null);
           _dbUser = null;
@@ -568,10 +487,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         } else {
           _status =
               _dbUser == null ? AuthStatus.unknown : AuthStatus.authenticated;
-          _recoveryError =
-              'Couldn’t connect to Flixie. Check your connection and retry.';
-          _errorMessage = _recoveryError;
-          _scheduleRecovery();
+          _recovery.setError(
+              'Couldn’t connect to Flixie. Check your connection and retry.');
+          _errorMessage = recoveryError;
+          _recovery.scheduleRetry();
         }
       }
     } else {
@@ -590,22 +509,6 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       PeopleCache.instance.selectAccount(null);
       _status = AuthStatus.unauthenticated;
       _isPrefetching = false;
-      _cachedActivity = null;
-      _cachedFriendsActivity = null;
-      _cachedFriends = null;
-      _cachedGroups = null;
-      _cachedRatings = null;
-      _cachedReviews = null;
-      _cachedTrending = null;
-      _cachedNowPlaying = null;
-      _cachedMovieLists = null;
-      _cachedNotifications = null;
-      _dismissedNotificationIds.clear();
-      _cachedWatchRequests = null;
-      _cachedWatchProvidersByMovieId.clear();
-      _cachedUserWatchProviderIds = null;
-      _cachedWatchProviderRegion = null;
-      _watchProviderCacheFuture = null;
       _notificationPoller.stop();
       _syncUnreadNotificationCount(0);
       _hasResetAppBadgeThisSession = false;
@@ -670,12 +573,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         generation == _prefetchGeneration &&
         _dbUser?.id == userId;
     final providerRegion = region ?? _dbUser?.watchProviderRegion ?? 'GB';
-    if (_cachedWatchProviderRegion != null &&
-        _cachedWatchProviderRegion != providerRegion) {
-      _cachedWatchProvidersByMovieId.clear();
-      _cachedUserWatchProviderIds = null;
-    }
-    _cachedWatchProviderRegion = providerRegion;
+    _accountCache.selectWatchProviderRegion(providerRegion,
+        preserveUnspecified: true);
     _isPrefetching = true;
     if (!_hasResetAppBadgeThisSession) {
       _hasResetAppBadgeThisSession = true;
@@ -742,123 +641,33 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     });
   }
 
-  String _friendIdentitySnapshot(FriendsData? data) =>
-      jsonEncode(data?.friendships
-          .map((friendship) => [
-                friendship.id,
-                friendship.friendId,
-                for (final user in [
-                  friendship.friend,
-                  friendship.recipient,
-                  friendship.requester
-                ])
-                  [
-                    user?.id,
-                    user?.username,
-                    user?.avatar?.toJson(),
-                    user?.profileBadges
-                  ],
-              ])
-          .toList());
-
   void _applyPrefetchSnapshot(AuthPrefetchSnapshot snapshot) {
-    _cachedActivity = snapshot.activity ?? _cachedActivity;
-    if (snapshot.friends != null &&
-        _friendIdentitySnapshot(snapshot.friends) !=
-            _friendIdentitySnapshot(_cachedFriends)) {
-      _friendDataVersion++;
+    _accountCache.applyPrefetchSnapshot(snapshot);
+    final userId = _dbUser?.id;
+    if (snapshot.notifications != null && userId != null) {
+      PushNotificationService.observeInbox(userId, cachedNotifications!,
+          announce: false);
     }
-    _cachedFriends = snapshot.friends ?? _cachedFriends;
-    _cachedFriendsActivity = snapshot.friendsActivity ?? _cachedFriendsActivity;
-    _cachedGroups = snapshot.groups ?? _cachedGroups;
-    _cachedRatings = snapshot.ratings ?? _cachedRatings;
-    _cachedReviews = snapshot.reviews ?? _cachedReviews;
-    _cachedTrending = snapshot.trending ?? _cachedTrending;
-    _cachedNowPlaying = snapshot.nowPlaying ?? _cachedNowPlaying;
-    _cachedMovieLists = snapshot.movieLists ?? _cachedMovieLists;
-    if (snapshot.notifications != null) {
-      final notifications = snapshot.notifications!
-          .where((item) =>
-              item.id == null || !_dismissedNotificationIds.contains(item.id))
-          .toList(growable: false);
-      _cachedNotifications = List.unmodifiable(notifications);
-      final userId = _dbUser?.id;
-      if (userId != null) {
-        PushNotificationService.observeInbox(userId, notifications,
-            announce: false);
-      }
-    }
-    _cachedWatchRequests = snapshot.watchRequests ?? _cachedWatchRequests;
-    _syncUnreadNotificationCount(
-      _cachedNotifications?.where((item) => !item.isRead).length ??
-          snapshot.unreadNotificationCount ??
-          _unreadNotificationCount,
-    );
-    if (snapshot.watchProvidersByMovieId != null) {
-      _cachedWatchProvidersByMovieId.addAll(snapshot.watchProvidersByMovieId!);
-    }
-    _cachedUserWatchProviderIds =
-        snapshot.userWatchProviderIds ?? _cachedUserWatchProviderIds;
+    _syncUnreadNotificationCount(unreadNotificationCount);
   }
 
-  /// Loads only provider entries that are not already in the shared cache.
-  /// Concurrent callers share the same request and re-check afterwards.
+  /// Loads missing provider entries through the account cache's shared request.
   Future<void> ensureWatchProviderCache({Iterable<int>? movieIds}) async {
     final user = _dbUser;
     if (user == null) return;
-    final providerRegion = user.watchProviderRegion;
-    if (_cachedWatchProviderRegion != providerRegion) {
-      _cachedWatchProvidersByMovieId.clear();
-      _cachedUserWatchProviderIds = null;
-      _cachedWatchProviderRegion = providerRegion;
-    }
-    final requestedIds = (movieIds ??
-            user.movieWatchlist
-                ?.where((item) => item.removed != true)
-                .map((item) => item.movieId) ??
-            const <int>[])
-        .toSet();
-    final missing = requestedIds
-        .where((id) => !_cachedWatchProvidersByMovieId.containsKey(id))
-        .toSet();
-    if (missing.isEmpty && _cachedUserWatchProviderIds != null) return;
-
-    if (_watchProviderCacheFuture != null) {
-      await _watchProviderCacheFuture;
-      return ensureWatchProviderCache(movieIds: requestedIds);
-    }
-
     final session = _sessionGeneration;
-    bool current() =>
-        !_disposed &&
-        session == _sessionGeneration &&
-        _dbUser?.id == user.id &&
-        _cachedWatchProviderRegion == providerRegion;
-    final future = _prefetchCoordinator.fetchWatchProviders(
-      user.id,
-      missing,
-      region: providerRegion,
-      isCurrent: current,
-      onProgress: (providers, userProviderIds) {
-        if (!current()) return;
-        _cachedWatchProvidersByMovieId.addAll(providers);
-        _cachedUserWatchProviderIds = userProviderIds;
-        notifyListeners();
-      },
-    ).then((value) {
-      if (!current()) return;
-      _cachedWatchProvidersByMovieId.addAll(value.providersByMovieId);
-      _cachedUserWatchProviderIds = value.userProviderIds;
-      notifyListeners();
-    });
-    _watchProviderCacheFuture = future;
-    try {
-      await future;
-    } finally {
-      if (identical(_watchProviderCacheFuture, future)) {
-        _watchProviderCacheFuture = null;
-      }
-    }
+    await _accountCache.ensureWatchProviders(
+      userId: user.id,
+      region: user.watchProviderRegion,
+      movieIds: movieIds ??
+          user.movieWatchlist
+              ?.where((item) => item.removed != true)
+              .map((item) => item.movieId) ??
+          const <int>[],
+      isCurrent: () =>
+          !_disposed && session == _sessionGeneration && _dbUser?.id == user.id,
+      onChanged: notifyListeners,
+    );
   }
 
   /// Directly updates the unread count from already-fetched notification data.
@@ -873,14 +682,14 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     final userId = _dbUser?.id;
     if (userId == null) return;
     final session = _sessionGeneration;
-    final notifications = await _prefetchCoordinator.fetchNotifications(userId);
+    final page = await _prefetchCoordinator.fetchNotificationPage(userId);
     if (!_disposed &&
         session == _sessionGeneration &&
         _dbUser?.id == userId &&
-        notifications != null) {
-      PushNotificationService.observeInbox(userId, notifications,
-          announce: announce && _foreground);
-      updateCachedNotifications(notifications);
+        page != null) {
+      PushNotificationService.observeInbox(userId, page.items,
+          announce: announce && _recovery.foreground);
+      updateCachedNotifications(page.items, unreadCount: page.unreadCount);
     }
   }
 
@@ -890,129 +699,34 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     await _refreshProfile();
   }
 
-  Future<bool> _refreshProfile() async {
-    final existing = _profileRefreshFuture;
-    if (existing != null) return existing;
-    final future = _loadProfileRefresh();
-    _profileRefreshFuture = future;
-    try {
-      return await future;
-    } finally {
-      if (identical(_profileRefreshFuture, future)) {
-        _profileRefreshFuture = null;
-      }
-    }
-  }
-
-  Future<bool> _loadProfileRefresh() async {
-    final user = _firebaseUser;
-    if (user == null) return false;
-    final session = _sessionGeneration;
-    final request = ++_profileGeneration;
-    try {
-      final profile = await StartupTrace.run('profile',
-          () => _profileLoader(user.uid).timeout(_initialProfileTimeout));
-      if (_disposed ||
-          session != _sessionGeneration ||
-          request != _profileGeneration) {
-        return false;
-      }
-      if (profile == null) throw StateError('Profile unavailable');
-      _dbUser = profile;
-      _recoveryError = null;
-      notifyListeners();
-      return true;
-    } catch (error) {
-      if (!_disposed &&
-          session == _sessionGeneration &&
-          request == _profileGeneration) {
-        if (error is firebase_auth.FirebaseAuthException &&
-            [
-              'user-disabled',
-              'user-not-found',
-              'user-token-expired',
-              'invalid-user-token'
-            ].contains(error.code)) {
-          await _onAuthStateChanged(null);
-          return false;
-        }
-        _recoveryError =
-            'Couldn’t refresh. Your saved content is still available.';
-        notifyListeners();
-      }
-      return false;
-    }
-  }
+  Future<bool> _refreshProfile() => _recovery.refreshProfile();
 
   Future<void> handleAppResumed({bool force = false}) async {
-    if (_disposed ||
-        _status != AuthStatus.authenticated ||
-        _firebaseUser == null) {
+    final restoring = _authStateChangeFuture;
+    if (!force && restoring != null) {
+      // A return during startup shares the same account restoration, including
+      // its error handling, rather than racing another token/profile request.
+      await restoring;
       return;
     }
-    if (_resumeRefreshFuture != null) return _resumeRefreshFuture;
-    if (!force &&
-        _lastResumeRefreshAt != null &&
-        DateTime.now().difference(_lastResumeRefreshAt!) <
-            _resumeRefreshThrottle) {
-      _startNotificationPoller();
-      return;
-    }
-    final future = StartupTrace.run('resume-recovery', _refreshAfterResume);
-    _resumeRefreshFuture = future;
-    try {
-      await future;
-    } finally {
-      if (identical(_resumeRefreshFuture, future)) _resumeRefreshFuture = null;
-    }
+    await _recovery.resume(force: force);
   }
 
   void _startNotificationPoller() {
-    if (_foreground && !_disposed && _dbUser != null) {
+    if (_recovery.foreground && !_disposed && _dbUser != null) {
       _notificationPoller.start(
           interval: const Duration(seconds: 5),
           onTick: refreshNotificationCount);
     }
   }
 
-  Future<void> _refreshAfterResume() async {
-    final session = _sessionGeneration;
-    final user = _firebaseUser!;
-    bool current() => !_disposed && session == _sessionGeneration;
-    try {
-      final tokenRevision = ApiClient.tokenRevision;
-      final token = await StartupTrace.run('session-token',
-          () => user.getIdToken(false).timeout(_initialTokenTimeout));
-      if (!current()) return;
-      if (token == null) throw StateError('No authentication token available');
-      if (tokenRevision == ApiClient.tokenRevision) ApiClient.setToken(token);
-      if (!await _refreshProfile()) throw StateError('Profile refresh failed');
-      if (!current()) return;
-      _lastResumeRefreshAt = DateTime.now();
-      _activityVersion++;
-      _cachedFriendsActivity = null;
-      _recoveryError = null;
-      _recoveryAttempts = 0;
-      _recoveryTimer?.cancel();
-      _startNotificationPoller();
-      unawaited(refreshNotificationCount(announce: false));
-      notifyListeners();
-    } catch (error) {
-      if (!current()) return;
-      if (error is firebase_auth.FirebaseAuthException &&
-          [
-            'user-disabled',
-            'user-not-found',
-            'user-token-expired',
-            'invalid-user-token'
-          ].contains(error.code)) {
-        await _onAuthStateChanged(null);
-        return;
-      }
-      _recoveryError = 'Couldn’t refresh. Check your connection and retry.';
-      notifyListeners();
-      _scheduleRecovery();
-    }
+  void _onResumeRecovered() {
+    _activityVersion++;
+    _profileRefreshedActivityVersion = _activityVersion;
+    _accountCache.invalidateFriendsActivity();
+    _startNotificationPoller();
+    unawaited(refreshNotificationCount(announce: false));
+    notifyListeners();
   }
 
   /// Applies a profile update without discarding omitted collections.
@@ -1496,7 +1210,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         await PushNotificationService.removeToken(userId);
       }
       await _onAuthStateChanged(null);
-      await _authService.signOut().timeout(_initialTokenTimeout);
+      await _authService.signOut().timeout(AuthSessionRecovery.tokenTimeout);
     } finally {
       _setLoading(false);
     }
@@ -1625,8 +1339,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
           .where((item) => item.removed != true)
           .map((item) => item.movieId)
           .toSet();
-      _cachedWatchProvidersByMovieId
-          .removeWhere((movieId, _) => !activeIds.contains(movieId));
+      _accountCache.retainWatchProviderMovies(activeIds);
       // The watchlist screen requests visible pages. Editing one entry must not
       // restart provider lookups for every saved title in a large library.
     }
@@ -1643,8 +1356,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     _disposed = true;
     _sessionGeneration++;
     _prefetchGeneration++;
-    _recoveryTimer?.cancel();
-    _authBootstrapTimer?.cancel();
+    _accountCache.clear();
+    _isPrefetching = false;
+    _recovery.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _notificationPoller.stop();
     ApiClient.setAuthTokenRefresher(null);

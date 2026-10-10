@@ -27,20 +27,25 @@ class GroupActivityTab extends StatefulWidget {
     required this.group,
     required this.memberCount,
     required this.groupId,
-    this.conversationId,
     required this.initialRequests,
     required this.initialActivity,
     required this.groupLists,
+    this.listsLoading = false,
+    this.listsFailed = false,
     required this.onRefresh,
+    this.active = true,
+    this.now = DateTime.now,
   });
 
+  final bool active;
+  final DateTime Function() now;
   final Group? group;
   final int memberCount;
   final String groupId;
-  final String? conversationId;
   final List<GroupWatchRequest> initialRequests;
   final List<ActivityListItem> initialActivity;
   final List<MovieList> groupLists;
+  final bool listsLoading, listsFailed;
   final Future<void> Function() onRefresh;
 
   @override
@@ -48,7 +53,16 @@ class GroupActivityTab extends StatefulWidget {
 }
 
 class GroupActivityTabState extends State<GroupActivityTab>
-    with WidgetsBindingObserver {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+  // Only Activity is retained, and only within the account/group page lifetime.
+  @override
+  bool get wantKeepAlive => true;
+  late AuthProvider _auth;
+  String? _accountId;
+  int _activityVersion = 0;
+  DateTime? _lastFeedAt;
+  bool _feedDirty = false, _hasLoaded = false;
+  static const _maxFeedAge = Duration(minutes: 1);
   final _searchController = TextEditingController();
   bool _searchOpen = false, _loading = false, _creating = false;
   String? _reactionError;
@@ -68,39 +82,91 @@ class GroupActivityTabState extends State<GroupActivityTab>
     WidgetsBinding.instance.addObserver(this);
     SafetyService.changes.addListener(_onSafetyChanged);
     _activity = widget.initialActivity;
-    _loadFeed();
+    _auth = context.read<AuthProvider>();
+    _accountId = _auth.dbUser?.id;
+    _activityVersion = _auth.activityVersion;
+    _auth.addListener(_onAuthChanged);
+    if (widget.active) _loadFeed();
+  }
+
+  void _onAuthChanged() {
+    if (!mounted) return;
+    if (_accountId != _auth.dbUser?.id) {
+      _accountId = _auth.dbUser?.id;
+      _activityVersion = _auth.activityVersion;
+      _invalidateFeed(clear: true);
+    } else if (_activityVersion != _auth.activityVersion) {
+      _activityVersion = _auth.activityVersion;
+      _invalidateFeed();
+    }
+  }
+
+  void _invalidateFeed({bool clear = false}) {
+    ++_feedGeneration;
+    _feedDirty = true;
+    setState(() {
+      if (clear) {
+        _feedRequest = null;
+        _activity = [];
+        _reactions = {};
+        _saving.clear();
+        _hasLoaded = false;
+        _reactionError = null;
+        _lastFeedAt = null;
+        _filter = ActivityFeedFilter.all;
+        _searchOpen = false;
+        _searchController.clear();
+      }
+    });
+    if (widget.active) {
+      if (clear) {
+        // Let the parent replace an old account/group owner before fetching.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && widget.active && _feedDirty) _loadFeed();
+        });
+      } else {
+        _loadFeed();
+      }
+    }
   }
 
   void _onSafetyChanged() {
-    if (!mounted) return;
-    // Hide cached content immediately, even while a refresh is in flight.
-    setState(() {});
-    _loadFeed();
+    if (mounted) _invalidateFeed();
   }
 
   @override
   void didUpdateWidget(covariant GroupActivityTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.groupId != widget.groupId) {
-      _reactions = {};
-      _activity = widget.initialActivity;
-      _saving.clear();
-    }
-    if (oldWidget.groupId != widget.groupId ||
-        oldWidget.initialActivity != widget.initialActivity) {
+      _invalidateFeed(clear: true);
+    } else if (oldWidget.initialActivity != widget.initialActivity) {
+      _invalidateFeed();
+    } else if (widget.active &&
+        !oldWidget.active &&
+        (_feedDirty ||
+            _reactionError != null ||
+            _lastFeedAt == null ||
+            widget.now().difference(_lastFeedAt!) >= _maxFeedAge)) {
       _loadFeed();
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _loadFeed();
+    if (state != AppLifecycleState.resumed) return;
+    if (widget.active) {
+      _loadFeed();
+    } else {
+      _invalidateFeed();
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     SafetyService.changes.removeListener(_onSafetyChanged);
+    _auth.removeListener(_onAuthChanged);
+    ++_feedGeneration;
     _searchController.dispose();
     super.dispose();
   }
@@ -109,19 +175,28 @@ class GroupActivityTabState extends State<GroupActivityTab>
     if (_feedRequest != null && _feedGroupId == widget.groupId) {
       return _feedRequest!;
     }
+    _feedDirty = false;
     _feedGroupId = widget.groupId;
     final request = _fetchFeed();
     _feedRequest = request;
     return request.whenComplete(() {
-      if (identical(_feedRequest, request)) _feedRequest = null;
+      if (identical(_feedRequest, request)) {
+        _feedRequest = null;
+        if (mounted && widget.active && _feedDirty) _loadFeed();
+      }
     });
   }
 
   Future<void> _fetchFeed() async {
     final generation = ++_feedGeneration;
+    final account = _auth.dbUser?.id;
     try {
       final result = await GroupService.getGroupActivityFeed(widget.groupId);
-      if (!mounted || generation != _feedGeneration) return;
+      if (!mounted ||
+          generation != _feedGeneration ||
+          account != _auth.dbUser?.id) {
+        return;
+      }
       setState(() {
         _reactions = {
           ...result.reactions,
@@ -129,17 +204,22 @@ class GroupActivityTabState extends State<GroupActivityTab>
             key: _reactions[key] ?? const ActivityReactionSummary()
         };
         _activity = result.items;
+        _hasLoaded = true;
+        _lastFeedAt = widget.now();
         _reactionError =
             result.reactionsUnavailable ? 'Couldn’t load reactions' : null;
       });
     } catch (error) {
       logger.w('[Group activity] Feed failed: $error');
-      if (mounted && generation == _feedGeneration) {
+      if (mounted &&
+          generation == _feedGeneration &&
+          account == _auth.dbUser?.id) {
         setState(() {
           if (error is ApiException &&
               (error.statusCode == 401 || error.statusCode == 403)) {
             _activity = [];
             _reactions = {};
+            _lastFeedAt = null;
           }
           _reactionError = 'Couldn’t refresh activity';
         });
@@ -188,6 +268,7 @@ class GroupActivityTabState extends State<GroupActivityTab>
 
   Future<void> _saveReaction(ActivityListItem item, String? emoji) async {
     final groupId = widget.groupId;
+    final account = _auth.dbUser?.id;
     final key = _key(item);
     if (_saving.contains(key)) return;
     final previous = _reactions[key] ?? const ActivityReactionSummary();
@@ -199,18 +280,22 @@ class GroupActivityTabState extends State<GroupActivityTab>
     try {
       final result =
           await GroupService.setActivityReaction(groupId, item, emoji);
-      if (mounted && widget.groupId == groupId) {
+      if (mounted && widget.groupId == groupId && account == _auth.dbUser?.id) {
         setState(() => _reactions[key] = result);
       }
     } catch (_) {
-      if (mounted && widget.groupId == groupId) {
+      if (mounted && widget.groupId == groupId && account == _auth.dbUser?.id) {
         setState(() => _reactions[key] = previous);
         _error('Couldn’t save your reaction', () {
-          if (mounted && widget.groupId == groupId) _saveReaction(item, emoji);
+          if (mounted &&
+              widget.groupId == groupId &&
+              account == _auth.dbUser?.id) {
+            _saveReaction(item, emoji);
+          }
         });
       }
     } finally {
-      if (mounted && widget.groupId == groupId) {
+      if (mounted && widget.groupId == groupId && account == _auth.dbUser?.id) {
         setState(() => _saving.remove(key));
       }
     }
@@ -295,6 +380,7 @@ class GroupActivityTabState extends State<GroupActivityTab>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final query = _searchController.text.trim().toLowerCase();
     final items = _activity
         .where((item) =>
@@ -331,12 +417,20 @@ class GroupActivityTabState extends State<GroupActivityTab>
                   ])),
               const SizedBox(width: 10),
               FilledButton(
-                  onPressed: _creating
+                  onPressed: _creating || widget.listsLoading
                       ? null
-                      : widget.groupLists.isEmpty
-                          ? _createList
-                          : () => _openList(widget.groupLists.first),
-                  child: Text(widget.groupLists.isEmpty ? 'Create' : 'Open')),
+                      : widget.listsFailed
+                          ? widget.onRefresh
+                          : widget.groupLists.isEmpty
+                              ? _createList
+                              : () => _openList(widget.groupLists.first),
+                  child: Text(widget.listsLoading
+                      ? 'Loading…'
+                      : widget.listsFailed
+                          ? 'Retry'
+                          : widget.groupLists.isEmpty
+                              ? 'Create'
+                              : 'Open')),
             ])),
             if (widget.groupLists.isNotEmpty)
               Padding(
@@ -396,7 +490,7 @@ class GroupActivityTabState extends State<GroupActivityTab>
                   icon: const Icon(Icons.refresh),
                   label: Text('$_reactionError · Retry')),
             const SizedBox(height: 16),
-            if (items.isEmpty)
+            if (items.isEmpty && _hasLoaded && _reactionError == null)
               Padding(
                   padding: const EdgeInsets.symmetric(vertical: 36),
                   child: Text('No activity to show yet.',

@@ -23,6 +23,10 @@ void main() {
     final credits = Completer<http.Response>();
     final client = MockClient((request) async {
       if (request.url.path == '/shows/id/101') {
+        if (request.url.queryParameters['summary'] != 'true') {
+          expect(request.url.queryParameters['includeFriendSummary'], 'false');
+          expect(request.url.queryParameters['includeTrailers'], 'false');
+        }
         return request.url.queryParameters['summary'] == 'true'
             ? summary.future
             : full.future;

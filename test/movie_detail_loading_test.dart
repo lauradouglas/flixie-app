@@ -25,13 +25,16 @@ class DelayedMovies extends MovieService {
   final core = <int, Completer<Movie>>{};
   var reviews = Completer<List<Review>>();
   var providers = Completer<List<WatchProvider>>();
-  int creditCalls = 0;
+  int creditCalls = 0, reviewCalls = 0, imageCalls = 0;
   @override
   Future<Movie> getMovieById(int id, {String? userId}) =>
       (core[id] ??= Completer<Movie>()).future;
   @override
-  Future<List<Review>> getMovieReviews(int id, {String? userId}) =>
-      reviews.future;
+  Future<List<Review>> getMovieReviews(int id, {String? userId}) {
+    reviewCalls++;
+    return reviews.future;
+  }
+
   @override
   Future<List<WatchProvider>> getMovieWatchProviders(int id, String region) =>
       providers.future;
@@ -45,7 +48,10 @@ class DelayedMovies extends MovieService {
   }
 
   @override
-  Future<MovieImages> getMovieImages(int id) async => const MovieImages();
+  Future<MovieImages> getMovieImages(int id) async {
+    imageCalls++;
+    return const MovieImages();
+  }
 }
 
 Widget app(GuestAuth auth, DelayedMovies movies, String id,
@@ -92,11 +98,15 @@ void main() {
     await tester.pumpWidget(app(auth, movies, '1'));
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Useful movie'), findsNothing);
+    expect(movies.reviewCalls, 0);
+    expect(movies.imageCalls, 0);
     movies.core[1]!.complete(
         const Movie(id: 1, title: 'Useful movie', overview: 'Useful synopsis'));
     await tester.pump();
     await tester.pump();
     expect(find.text('Useful movie'), findsWidgets);
+    expect(movies.reviewCalls, 1);
+    expect(movies.imageCalls, 1);
     expect(movies.reviews.isCompleted, false);
     expect(movies.providers.isCompleted, false);
     expect(find.byType(ContentPlaceholder), findsOneWidget);
@@ -220,6 +230,7 @@ void main() {
     movies.core[1]!.complete(const Movie(id: 1, title: 'Alien refreshed'));
     movies.providers.complete([]);
     movies.reviews.complete([]);
+    await tester.pump();
     await refresh;
     await tester.pump();
     expect(find.text('Alien refreshed'), findsWidgets);

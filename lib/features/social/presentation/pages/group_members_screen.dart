@@ -1,3 +1,7 @@
+import '../widgets/group_members/group_member_actions.dart';
+import '../controllers/group_members_controller.dart';
+import '../widgets/group_members/group_member_tile.dart';
+import '../widgets/group_members/invite_members_sheet.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -6,16 +10,13 @@ import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 
-class GroupMembersScreen extends StatefulWidget {
+class GroupMembersScreen extends StatelessWidget {
   const GroupMembersScreen({
     super.key,
     required this.groupId,
@@ -26,12 +27,36 @@ class GroupMembersScreen extends StatefulWidget {
   final String groupName;
 
   @override
-  State<GroupMembersScreen> createState() => _GroupMembersScreenState();
+  Widget build(BuildContext context) {
+    final accountId =
+        context.select<AuthProvider, String?>((a) => a.dbUser?.id);
+    return _GroupMembersPage(
+        key: ValueKey('$accountId:$groupId'),
+        groupId: groupId,
+        groupName: groupName,
+        accountId: accountId);
+  }
 }
 
-class _GroupMembersScreenState extends State<GroupMembersScreen> {
-  List<GroupMember> _members = [];
-  bool _loading = true;
+class _GroupMembersPage extends StatefulWidget {
+  const _GroupMembersPage(
+      {super.key,
+      required this.groupId,
+      required this.groupName,
+      required this.accountId});
+  final String groupId;
+  final String groupName;
+  final String? accountId;
+  @override
+  State<_GroupMembersPage> createState() => _GroupMembersScreenState();
+}
+
+class _GroupMembersScreenState extends State<_GroupMembersPage> {
+  late final GroupMembersController _controller;
+  List<GroupMember> get _members => _controller.members;
+  bool get _loading => _controller.loading;
+  bool get _isCurrent =>
+      mounted && context.read<AuthProvider>().dbUser?.id == widget.accountId;
   String? _currentUserId;
   GroupMember? _myMembership;
   final TextEditingController _searchController = TextEditingController();
@@ -47,55 +72,39 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       setState(
           () => _searchQuery = _searchController.text.trim().toLowerCase());
     });
+    _controller = GroupMembersController(
+        groupId: widget.groupId, accountId: widget.accountId);
+    _controller.addListener(_changed);
     _load();
+  }
+
+  void _changed() {
+    if (_isCurrent) setState(() {});
   }
 
   @override
   void dispose() {
+    _controller.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  int _roleOrder(GroupMember m) {
-    if (m.isOwner) return 0;
-    if (m.isAdmin) return 1;
-    if (m.isPending) return 3;
-    return 2;
-  }
-
-  List<GroupMember> get _filtered {
-    final sorted = [..._members]
-      ..sort((a, b) => _roleOrder(a).compareTo(_roleOrder(b)));
-    return sorted.where((m) {
-      if (_filterRole == 'PENDING' && !m.isPending) return false;
-      if (_searchQuery.isEmpty) return true;
-      return m.displayName.toLowerCase().contains(_searchQuery) ||
-          (m.username?.toLowerCase().contains(_searchQuery) ?? false);
-    }).toList();
-  }
+  List<GroupMember> get _filtered =>
+      _controller.filter(_searchQuery, pendingOnly: _filterRole == 'PENDING');
 
   Future<void> _load() async {
-    try {
-      final members = await GroupService.getGroupMembers(widget.groupId);
-      logger.d('[GroupMembersScreen] loaded ${members.length} members:');
-      for (final m in members) {
-        logger.d(
-            '  memberId=${m.memberId} username=${m.username} firstName=${m.firstName} displayName=${m.displayName}');
-      }
-      if (mounted) {
-        setState(() {
-          _members = members;
-          _myMembership = members.cast<GroupMember?>().firstWhere(
-                (m) => m?.memberId == _currentUserId,
-                orElse: () => null,
-              );
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      logger.e('Members load error: $e');
-      if (mounted) setState(() => _loading = false);
-    }
+    if (!_isCurrent) return;
+    await _controller.load();
+    if (!_isCurrent) return;
+    await _updateMembership();
+  }
+
+  Future<void> _updateMembership() async {
+    if (!_isCurrent) return;
+    setState(() {
+      _myMembership =
+          _members.where((m) => m.memberId == _currentUserId).firstOrNull;
+    });
   }
 
   bool get _isOwner => _myMembership?.isOwner ?? false;
@@ -103,13 +112,16 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   bool get _canManage => _isOwner || _isAdmin;
 
   Future<void> _changeRole(GroupMember member, String newRole) async {
+    if (!_isCurrent) return;
     try {
       await GroupService.updateRoleOfMemberInGroup(
           widget.groupId, member.memberId, newRole);
-      await _load();
+      if (!_isCurrent) return;
+      await _controller.reloadAfterMutation();
+      await _updateMembership();
     } catch (e) {
       logger.e('Change role error: $e');
-      if (mounted) {
+      if (mounted && _isCurrent) {
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(
               type: FlixieToastType.error,
@@ -120,6 +132,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   }
 
   Future<void> _transferOwnership(GroupMember member) async {
+    if (!_isCurrent) return;
     final confirm = await showFlixiePromptSheet<bool>(
       context: context,
       builder: (dialogContext) => FlixiePromptSheetContent(
@@ -144,14 +157,16 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         ],
       ),
     );
-    if (confirm != true || !mounted) return;
+    if (confirm != true || !_isCurrent) return;
     try {
       await GroupService.updateRoleOfMemberInGroup(
           widget.groupId, member.memberId, 'OWNER');
-      await _load();
+      if (!_isCurrent) return;
+      await _controller.reloadAfterMutation();
+      await _updateMembership();
     } catch (e) {
       logger.e('Transfer ownership error: $e');
-      if (mounted) {
+      if (mounted && _isCurrent) {
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(
               type: FlixieToastType.error,
@@ -162,6 +177,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   }
 
   Future<void> _removeMember(GroupMember member) async {
+    if (!_isCurrent) return;
     final confirm = await showFlixiePromptSheet<bool>(
       context: context,
       builder: (dialogContext) => FlixiePromptSheetContent(
@@ -186,13 +202,15 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         ],
       ),
     );
-    if (confirm != true || !mounted) return;
+    if (confirm != true || !_isCurrent) return;
     try {
       await GroupService.removeMember(widget.groupId, member.memberId);
-      await _load();
+      if (!_isCurrent) return;
+      await _controller.reloadAfterMutation();
+      await _updateMembership();
     } catch (e) {
       logger.e('Remove member error: $e');
-      if (mounted) {
+      if (mounted && _isCurrent) {
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(
               type: FlixieToastType.error,
@@ -211,111 +229,22 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _InviteMembersSheet(
+      builder: (_) => InviteMembersSheet(
         groupId: widget.groupId,
         currentMemberIds: _members.map((m) => m.memberId).toList(),
-        onInvited: _load,
+        onInvited: () async {
+          if (!_isCurrent) return;
+          await _controller.reloadAfterMutation();
+          await _updateMembership();
+        },
+        isCurrent: () => _isCurrent,
       ),
-    );
-  }
-
-  void _showMemberActions(GroupMember member) {
-    if (member.memberId == _currentUserId) return;
-    final canPromote = _canManage && member.role == 'MEMBER';
-    final canDemote = _canManage && member.role == 'ADMIN' && !member.isOwner;
-    final canTransfer = _isOwner && member.isAdmin;
-    // Owner can remove anyone non-owner; admin can remove plain members
-    final canRemove = _isOwner || (_isAdmin && member.role == 'MEMBER');
-
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-          child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.colors.medium.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Text(
-                member.displayName,
-                style: TextStyle(
-                  color: context.colors.light,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-            if (canPromote)
-              ListTile(
-                leading:
-                    const Icon(Icons.arrow_upward, color: FlixieColors.primary),
-                title: Text('Promote to Admin',
-                    style: TextStyle(color: context.colors.light)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _changeRole(member, 'ADMIN');
-                },
-              ),
-            if (canDemote)
-              ListTile(
-                leading:
-                    Icon(Icons.arrow_downward, color: context.colors.warning),
-                title: Text('Demote to Member',
-                    style: TextStyle(color: context.colors.light)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _changeRole(member, 'MEMBER');
-                },
-              ),
-            if (canTransfer)
-              ListTile(
-                leading:
-                    Icon(Icons.swap_horiz, color: context.colors.secondary),
-                title: Text('Transfer Ownership',
-                    style: TextStyle(color: context.colors.light)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _transferOwnership(member);
-                },
-              ),
-            if (canRemove)
-              ListTile(
-                leading: Icon(Icons.person_remove_outlined,
-                    color: context.colors.danger),
-                title: Text('Remove from Group',
-                    style: TextStyle(color: context.colors.danger)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _removeMember(member);
-                },
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      )),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _filtered;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -351,110 +280,127 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       ),
       body: _loading
           ? const ContentListSkeleton()
-          : Column(
-              children: [
-                // Search bar
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(color: context.colors.light),
-                    decoration: InputDecoration(
-                      hintText: 'Search members…',
-                      hintStyle: TextStyle(color: context.colors.medium),
-                      prefixIcon:
-                          Icon(Icons.search, color: context.colors.medium),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.clear,
-                                  color: context.colors.medium, size: 18),
-                              onPressed: () => _searchController.clear(),
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: context.colors.tabBarBackgroundFocused,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+          : _controller.error != null && _members.isEmpty
+              ? LoadFailureNotice(
+                  message: 'Couldn’t load group members.', onRetry: _load)
+              : Column(
+                  children: [
+                    // Search bar
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: context.colors.light),
+                        decoration: InputDecoration(
+                          hintText: 'Search members…',
+                          hintStyle: TextStyle(color: context.colors.medium),
+                          prefixIcon:
+                              Icon(Icons.search, color: context.colors.medium),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.clear,
+                                      color: context.colors.medium, size: 18),
+                                  onPressed: () => _searchController.clear(),
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: context.colors.tabBarBackgroundFocused,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 0),
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     ),
-                  ),
-                ),
-                // Filter chips
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'All',
-                        selected: _filterRole == null,
-                        onTap: () => setState(() => _filterRole = null),
+                    // Filter chips
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Row(
+                        children: [
+                          _FilterChip(
+                            label: 'All',
+                            selected: _filterRole == null,
+                            onTap: () => setState(() => _filterRole = null),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterChip(
+                            label: 'Pending',
+                            selected: _filterRole == 'PENDING',
+                            onTap: () => setState(() => _filterRole =
+                                _filterRole == 'PENDING' ? null : 'PENDING'),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'Pending',
-                        selected: _filterRole == 'PENDING',
-                        onTap: () => setState(() => _filterRole =
-                            _filterRole == 'PENDING' ? null : 'PENDING'),
-                      ),
-                    ],
-                  ),
-                ),
-                // Member count
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '${_filtered.length} member${_filtered.length == 1 ? '' : 's'}',
-                      style:
-                          TextStyle(color: context.colors.medium, fontSize: 12),
                     ),
-                  ),
-                ),
-                Expanded(
-                  child: _members.isEmpty
-                      ? Center(
-                          child: Text('No members found',
-                              style: TextStyle(color: context.colors.medium)),
-                        )
-                      : _filtered.isEmpty
+                    // Member count
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${filtered.length} member${filtered.length == 1 ? '' : 's'}',
+                          style: TextStyle(
+                              color: context.colors.medium, fontSize: 12),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: _members.isEmpty
                           ? Center(
-                              child: Text('No members match your search',
+                              child: Text('No members found',
                                   style:
                                       TextStyle(color: context.colors.medium)),
                             )
-                          : RefreshIndicator(
-                              onRefresh: _load,
-                              color: FlixieColors.primary,
-                              child: ListView.separated(
-                                itemCount: _filtered.length,
-                                separatorBuilder: (_, __) => Divider(
-                                  height: 1,
-                                  color: context.colors.tabBarBorder,
-                                  indent: 72,
+                          : filtered.isEmpty
+                              ? Center(
+                                  child: Text('No members match your search',
+                                      style: TextStyle(
+                                          color: context.colors.medium)),
+                                )
+                              : RefreshIndicator(
+                                  onRefresh: _load,
+                                  color: FlixieColors.primary,
+                                  child: ListView.separated(
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, __) => Divider(
+                                      height: 1,
+                                      color: context.colors.tabBarBorder,
+                                      indent: 72,
+                                    ),
+                                    itemBuilder: (_, i) {
+                                      final member = filtered[i];
+                                      final isMe =
+                                          member.memberId == _currentUserId;
+                                      final canTap = _canManage &&
+                                          !isMe &&
+                                          !member.isOwner;
+                                      return GroupMemberTile(
+                                        member: member,
+                                        isMe: isMe,
+                                        showChevron: canTap,
+                                        onTap: canTap
+                                            ? () => showGroupMemberActions(
+                                                context,
+                                                member: member,
+                                                currentUserId: _currentUserId,
+                                                isOwner: _isOwner,
+                                                isAdmin: _isAdmin,
+                                                changeRole: (role) =>
+                                                    _changeRole(member, role),
+                                                transfer: () =>
+                                                    _transferOwnership(member),
+                                                remove: () =>
+                                                    _removeMember(member))
+                                            : null,
+                                      );
+                                    },
+                                  ),
                                 ),
-                                itemBuilder: (_, i) {
-                                  final member = _filtered[i];
-                                  final isMe =
-                                      member.memberId == _currentUserId;
-                                  final canTap =
-                                      _canManage && !isMe && !member.isOwner;
-                                  return _MemberTile(
-                                    member: member,
-                                    isMe: isMe,
-                                    showChevron: canTap,
-                                    onTap: canTap
-                                        ? () => _showMemberActions(member)
-                                        : null,
-                                  );
-                                },
-                              ),
-                            ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
     );
   }
 }
@@ -478,335 +424,5 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return FlixiePill.choice(
         label: Text(label), selected: selected, onSelected: (_) => onTap());
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Member tile
-// ---------------------------------------------------------------------------
-
-class _MemberTile extends StatelessWidget {
-  const _MemberTile({
-    required this.member,
-    required this.isMe,
-    required this.showChevron,
-    this.onTap,
-  });
-
-  final GroupMember member;
-  final bool isMe;
-  final bool showChevron;
-  final VoidCallback? onTap;
-
-  String _roleLabel() {
-    if (member.isOwner) return 'OWNER';
-    if (member.isAdmin) return 'ADMIN';
-    return 'MEMBER';
-  }
-
-  Color _avatarColor() {
-    final hex = member.iconColor?['hexCode'] as String?;
-    if (hex != null) {
-      try {
-        return Color(int.parse(hex.replaceFirst('#', 'FF'), radix: 16));
-      } catch (_) {}
-    }
-    return FlixieColors.primary;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _avatarColor();
-    final initials = member.initials ??
-        (member.username?.isNotEmpty == true
-            ? member.username![0].toUpperCase()
-            : '?');
-    return ListTile(
-      onTap: onTap,
-      leading: ProfileAvatarView(
-        avatar: member.avatar,
-        fallbackText: initials,
-        fallbackColor: color,
-        size: 44,
-        profileBadges: member.profileBadges,
-      ),
-      title: Row(
-        children: [
-          Text(
-            member.displayName,
-            style: TextStyle(
-              color: isMe ? FlixieColors.primary : context.colors.light,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          if (isMe) ...[
-            const SizedBox(width: 6),
-            Text('(you)',
-                style: TextStyle(color: context.colors.medium, fontSize: 12)),
-          ],
-        ],
-      ),
-      subtitle: member.isPending
-          ? Text('Invite pending',
-              style: TextStyle(color: context.colors.warning, fontSize: 12))
-          : null,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FlixiePill.label(label: Text(_roleLabel())),
-          if (showChevron) ...[
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_right, color: context.colors.medium, size: 16),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Invite members sheet
-// ---------------------------------------------------------------------------
-
-class _InviteMembersSheet extends StatefulWidget {
-  const _InviteMembersSheet({
-    required this.groupId,
-    required this.currentMemberIds,
-    required this.onInvited,
-  });
-
-  final String groupId;
-  final List<String> currentMemberIds;
-  final VoidCallback onInvited;
-
-  @override
-  State<_InviteMembersSheet> createState() => _InviteMembersSheetState();
-}
-
-class _InviteMembersSheetState extends State<_InviteMembersSheet> {
-  List<FriendshipUser> _friends = [];
-  final List<String> _selected = [];
-  final TextEditingController _search = TextEditingController();
-  bool _loading = true;
-  bool _inviting = false;
-  String? _loadError;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFriends();
-    _search.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadFriends() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) {
-      if (mounted) setState(() => _loading = false);
-      return;
-    }
-    setState(() {
-      _loading = true;
-      _loadError = null;
-    });
-    try {
-      final data = await FriendService.getFriends(userId);
-      if (mounted) {
-        setState(() {
-          _friends = data.friendships
-              .map((f) => f.friendUser)
-              .whereType<FriendshipUser>()
-              .where((u) => !widget.currentMemberIds.contains(u.id))
-              .toList();
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _loadError = 'Couldn’t load your friends.';
-        });
-      }
-    }
-  }
-
-  Future<void> _invite() async {
-    if (_selected.isEmpty) return;
-    setState(() => _inviting = true);
-    logger.d(
-        'Inviting ${_selected.length} members to group ${widget.groupId}: ${_selected.join(', ')}');
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    try {
-      await GroupService.addMembersToGroup(
-        widget.groupId,
-        _selected
-            .map((id) => {
-                  'memberId': id,
-                  'role': 'MEMBER',
-                  'inviteStatus': 'PENDING',
-                })
-            .toList(),
-        inviterId: userId,
-      );
-      widget.onInvited();
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      logger.e('Invite members error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-              type: FlixieToastType.error,
-              content: const Text('Failed to send invitations')),
-        );
-        setState(() => _inviting = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final query = _search.text.toLowerCase();
-    final filtered = _friends.where((f) {
-      return f.username.toLowerCase().contains(query);
-    }).toList();
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scrollController) => Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.colors.medium.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Text(
-                  'Invite Friends',
-                  style: TextStyle(
-                    color: context.colors.light,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                const Spacer(),
-                if (_selected.isNotEmpty)
-                  ElevatedButton(
-                    onPressed: _inviting ? null : _invite,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: FlixieColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      minimumSize: Size.zero,
-                    ),
-                    child: _inviting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text('Invite (${_selected.length})'),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: TextField(
-              controller: _search,
-              style: TextStyle(color: context.colors.light),
-              decoration: InputDecoration(
-                hintText: 'Search friends…',
-                hintStyle: TextStyle(color: context.colors.medium),
-                prefixIcon: Icon(Icons.search, color: context.colors.medium),
-                filled: true,
-                fillColor: context.colors.tabBarBackground,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _loading
-                ? const ContentListSkeleton()
-                : _loadError != null
-                    ? Center(
-                        child: SingleChildScrollView(
-                            child: LoadFailureNotice(
-                                message: _loadError!, onRetry: _loadFriends)))
-                    : filtered.isEmpty
-                        ? Center(
-                            child: Text(
-                              _friends.isEmpty
-                                  ? 'All your friends are already in the group'
-                                  : 'No friends match your search',
-                              style: TextStyle(color: context.colors.medium),
-                              textAlign: TextAlign.center,
-                            ),
-                          )
-                        : ListView.builder(
-                            controller: scrollController,
-                            itemCount: filtered.length,
-                            itemBuilder: (_, i) {
-                              final friend = filtered[i];
-                              final selected = _selected.contains(friend.id);
-                              return CheckboxListTile(
-                                value: selected,
-                                onChanged: (val) {
-                                  setState(() {
-                                    if (val == true) {
-                                      _selected.add(friend.id);
-                                    } else {
-                                      _selected.remove(friend.id);
-                                    }
-                                  });
-                                },
-                                title: Text(
-                                  friend.username,
-                                  style: TextStyle(color: context.colors.light),
-                                ),
-                                activeColor: FlixieColors.primary,
-                                checkColor: Colors.white,
-                                secondary: ProfileAvatarView(
-                                  avatar: friend.avatar,
-                                  profileBadges: friend.profileBadges,
-                                  fallbackText: friend.username.isEmpty
-                                      ? '?'
-                                      : friend.username[0].toUpperCase(),
-                                  fallbackColor: FlixieColors.primary,
-                                  size: 36,
-                                ),
-                              );
-                            },
-                          ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
   }
 }

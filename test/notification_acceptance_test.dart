@@ -15,6 +15,8 @@ import 'package:flixie_app/features/profile/presentation/pages/notification_scre
 class _Auth extends ChangeNotifier implements AuthProvider {
   List<FlixieNotification>? saved;
   @override
+  int get unreadNotificationCount => saved?.where((n) => !n.isRead).length ?? 0;
+  @override
   User get dbUser => const User(
       id: 'me',
       username: 'Me',
@@ -25,7 +27,8 @@ class _Auth extends ChangeNotifier implements AuthProvider {
   @override
   List<FlixieNotification>? get cachedNotifications => saved;
   @override
-  void updateCachedNotifications(List<FlixieNotification> value) {
+  void updateCachedNotifications(List<FlixieNotification> value,
+      {int? unreadCount}) {
     saved = List.of(value);
   }
 

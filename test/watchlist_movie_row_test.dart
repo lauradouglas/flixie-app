@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/watchlist/presentation/widgets/watchlist_movie_row.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -6,7 +7,6 @@ import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 import 'package:flixie_app/models/friend_recommendation.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
-import 'package:flixie_app/features/watchlist/presentation/pages/watchlist_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';

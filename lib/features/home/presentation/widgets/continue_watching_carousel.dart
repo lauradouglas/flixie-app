@@ -1,3 +1,4 @@
+import '../models/home_image_urls.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -90,9 +91,7 @@ class ContinueWatchingCard extends StatelessWidget {
         ? '${show.watchedEpisodes} episodes watched'
         : 'Last watched · S${episode.seasonNumber} E${episode.episodeNumber}';
     final progress = (show.completionPercent / 100).clamp(0.0, 1.0);
-    final imagePath = show.backdropPath ?? show.posterPath;
-    final posterUrl =
-        imagePath == null ? null : 'https://image.tmdb.org/t/p/w780$imagePath';
+    final posterUrl = homeContinueWatchingImageUrl(show);
 
     return SizedBox(
       width: cardWidth,

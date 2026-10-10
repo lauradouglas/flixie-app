@@ -1,53 +1,32 @@
-import 'package:flixie_app/core/utils/skeleton.dart';
-import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
-import 'package:flixie_app/features/watchlist/domain/release_status.dart';
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:flixie_app/core/api/api_client.dart';
-import 'dart:math';
-import 'package:flixie_app/features/watchlist/domain/tonight_filters.dart';
-import 'package:flixie_app/features/watchlist/presentation/widgets/tonight_filters_panel.dart';
-import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
-import 'package:flixie_app/models/show.dart';
-import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart'
-    show showSettingsEditDetailsSheet;
-import 'package:flixie_app/core/utils/app_logger.dart';
-import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flixie_app/models/movie_short.dart';
+import 'package:provider/provider.dart';
+
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/app/theme/flixie_typography.dart';
+import 'package:flixie_app/core/analytics/detail_source.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/features/movies/data/search_service.dart';
-import 'package:flixie_app/features/profile/data/user_service.dart';
-import 'package:flixie_app/models/favorite_movie.dart';
-import 'package:flixie_app/core/utils/favourite_limits.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/favourite_limit_sheet.dart';
-import 'package:flixie_app/models/watched_movie.dart';
-import 'package:flixie_app/models/watchlist_movie.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/add_to_list_sheet.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/features/settings/presentation/pages/settings_screen.dart'
+    show showSettingsEditDetailsSheet;
+import 'package:flixie_app/features/watchlist/domain/release_status.dart';
+import 'package:flixie_app/features/watchlist/domain/tonight_filters.dart';
 import 'package:flixie_app/features/watchlist/presentation/widgets/filter_sheet.dart';
+import 'package:flixie_app/features/watchlist/presentation/widgets/tonight_filters_panel.dart';
 import 'package:flixie_app/features/watchlist/presentation/widgets/watchlist_navigation_button.dart';
 import 'package:flixie_app/models/watch_provider.dart';
-import 'package:flixie_app/models/movie_watch_entry.dart';
-import 'package:flixie_app/features/watchlist/presentation/controllers/watchlist_actions_controller.dart';
-import 'package:flixie_app/features/movies/presentation/widgets/rewatch_log_sheet.dart';
-import 'package:flixie_app/core/analytics/flixie_analytics.dart';
-import 'package:flixie_app/core/analytics/detail_source.dart';
-import 'package:flixie_app/features/movies/data/movie_service.dart';
-import 'package:flixie_app/features/movies/data/show_service.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
-import 'package:flixie_app/models/friend_recommendation.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:flixie_app/models/profile_avatar.dart';
+import 'package:flixie_app/models/watchlist_movie.dart';
+
+import '../../models/watchlist_show_entry.dart';
+import '../controllers/watchlist_controller.dart';
+import '../watchlist_action_flow.dart';
+import '../widgets/watchlist_movie_row.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -58,1003 +37,69 @@ class WatchlistScreen extends StatefulWidget {
 
 class _WatchlistScreenState extends State<WatchlistScreen>
     with WidgetsBindingObserver {
+  final _tonightPanelKey = GlobalKey();
+  void _clearFilters() {
+    _searchController.clear();
+    _watchlist.clearFilters();
+  }
+
   final TextEditingController _searchController = TextEditingController();
 
-  List<WatchlistMovie> _allWatchlist = [];
-  List<WatchlistMovie> _filteredWatchlist = [];
-  List<_WatchlistShowEntry> _allShowWatchlist = [];
-  List<_WatchlistShowEntry> _filteredShowWatchlist = [];
-  int _mediaFilter = 0; // 0 = all, 1 = movies, 2 = shows
-  bool _loading = true;
-  String? _loadError;
-  String _sortBy =
-      'recent'; // recent, titleAsc, titleDesc, ratingDesc, yearAsc, yearDesc
-  int _selectedTab = 0; // 0 = All, 1 = Watch now, 2 = Upcoming, 3 = Watched
+  WatchlistActionFlow get _actions =>
+      WatchlistActionFlow(context: context, watchlist: _watchlist);
 
-  final _tonightPanelKey = GlobalKey();
-  WatchlistMood _mood = WatchlistMood.any;
-  Set<String> _avoid = {};
-  String _watchRequest = '';
-  bool _findingToday = false;
-  String? _experienceMessage;
-  bool _hasUncheckedExclusions = false;
-  bool _experienceLoading = false;
-  String? _experienceError, _experienceRequestKey;
-  int _experienceGeneration = 0;
-  final Map<String, ExperienceFit> _experienceFits = {};
-  bool get _usesExperience =>
-      _findingToday ||
-      _mood != WatchlistMood.any ||
-      _avoid.isNotEmpty ||
-      _watchRequest.isNotEmpty;
-  String _experienceKey(Object item) => item is WatchlistMovie
-      ? 'movie:${item.movieId}'
-      : 'show:${(item as _WatchlistShowEntry).showId}';
-  bool _fitsExperience(String key) =>
-      !_usesExperience || (_experienceFits[key]?.eligible ?? false);
-
-  Future<void> _loadExperience(String requestKey) async {
-    if (!mounted || !_usesExperience || requestKey != _experienceRequestKey) {
-      return;
-    }
-    final generation = ++_experienceGeneration;
-    setState(() {
-      _experienceLoading = true;
-      _experienceError = null;
-      _experienceFits.clear();
-    });
-    final titles = <Map<String, dynamic>>[
-      for (final item in _allWatchlist)
-        {'id': item.movieId, 'mediaType': 'movie'},
-      for (final item in _allShowWatchlist)
-        {'id': item.showId, 'mediaType': 'show'},
-    ];
-    final preferences = {
-      'mood': _mood.id,
-      'avoid': _avoid.toList(),
-      'request': _watchRequest,
-      'includePossible': true,
-      'includeUnknownContent': false
-    };
-    final fits = <String, ExperienceFit>{};
-    String? message;
-    var unchecked = false;
-    try {
-      for (var i = 0; i < titles.length; i += 25) {
-        final data = await ApiClient.post('/recommendations/watchlist-fit',
-            body: {
-              ...preferences,
-              'titles': titles.sublist(i, min(i + 25, titles.length))
-            });
-        if (!mounted ||
-            generation != _experienceGeneration ||
-            requestKey != _experienceRequestKey) {
-          return;
-        }
-        message = data['message'] as String?;
-        for (final row in data['results'] as List) {
-          unchecked |= (row['unknownAvoids'] as List? ?? []).isNotEmpty;
-          fits['${row['mediaType']}:${row['id']}'] =
-              ExperienceFit.fromJson(Map<String, dynamic>.from(row));
-        }
-      }
-      if (!mounted || generation != _experienceGeneration) return;
-      setState(() {
-        _experienceMessage = message;
-        _hasUncheckedExclusions = unchecked;
-        _experienceFits.addAll(fits);
-        _experienceLoading = false;
-      });
-    } catch (_) {
-      if (!mounted || generation != _experienceGeneration) return;
-      setState(() {
-        _experienceLoading = false;
-        _experienceError =
-            'Couldn’t find your picks right now. Your choices are saved.';
-      });
-    }
-    _filterWatchlist();
-  }
-
-  bool _tonightServices = false, _includeRentals = false;
-  Set<int>? _selectedProviderIds;
-  List<WatchProvider> _savedProviders = [];
-  List<WatchProvider> _searchProviders = [];
-
-  bool _matchesTonightServices(List<WatchProvider> offers) {
-    if (!_tonightServices) return true;
-    final ids = _selectedProviderIds ?? _userWatchProviderIds;
-    return matchesWatchServices(offers,
-        selectedIds: ids,
-        selectedNames: [..._savedProviders, ..._searchProviders]
-            .where((p) => ids.contains(p.id))
-            .map((p) => p.matchKey)
-            .toSet(),
-        includeRentals: _includeRentals);
-  }
-
-  // Active filters
-  ReleaseStatus? _releaseFilter;
-  String? _filterGenre; // null = all genres
-  double? _filterMinRating; // null = no min
-  int? _filterYear; // null = all years
-  int? _filterMaxRuntime; // null = any length, value in minutes
-
-  final Map<int, List<WatchProvider>> _movieWatchProviders = {};
-  final Map<int, List<WatchProvider>> _showWatchProviders = {};
-  final Map<int, bool> _canWatchNowByMovieId = {};
-  Set<int> _userWatchProviderIds = {};
-  Set<String> _userWatchProviderMatchKeys = {};
-  bool _loadingWatchProviderAvailability = false;
-  bool _loadingShowWatchProviderAvailability = false;
-  int _watchProviderAvailabilityRequest = 0;
-  final Map<int, List<FriendRecommendationItem>> _recommendationsByMovieId = {};
-  int _recommendationsRequest = 0;
-  int _showProvidersRequest = 0;
-  int _showDetailsRequest = 0;
-  final Map<int, TvShow> _showDetails = {};
-  bool _loadingFriends = false;
-  bool _friendsOnly = false;
-  final Map<int, List<FriendRecommendationItem>> _friendsByShowId = {};
-
+  late final WatchlistController _watchlist;
   AuthProvider? _authProvider;
-  String? _watchlistSnapshot;
-  String? _recommendationSnapshot;
-  String? _subscriptionSnapshot;
-  bool _refreshing = false;
-  final Map<String, Object> _pendingEnrichment = {};
-  final Set<String> _scheduledEnrichment = {};
-  final Set<String> _completedEnrichment = {};
-  final Set<String> _inFlightEnrichment = {};
-  bool get _hasPendingEnrichment =>
-      _scheduledEnrichment.any((key) => !_completedEnrichment.contains(key));
-  bool _enrichmentRunning = false;
-  int _enrichmentGeneration = 0;
-  String? _enrichmentView;
-  String? _enrichmentOwner;
-
-  void _resetEnrichment() {
-    _enrichmentGeneration++;
-    _pendingEnrichment.clear();
-    _scheduledEnrichment.clear();
-    _completedEnrichment.clear();
-    ++_recommendationsRequest;
-    ++_watchProviderAvailabilityRequest;
-    ++_showProvidersRequest;
-  }
-
-  void _scheduleEnrichment(Iterable<Object> items) {
-    final fresh = items
-        .where((item) => _scheduledEnrichment.add(_experienceKey(item)))
-        .toList();
-    if (fresh.isEmpty) return;
-    final generation = _enrichmentGeneration;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || generation != _enrichmentGeneration) return;
-      final previouslyQueued = Map<String, Object>.of(_pendingEnrichment);
-      _pendingEnrichment.clear();
-      for (final item in fresh) {
-        _pendingEnrichment[_experienceKey(item)] = item;
-      }
-      _pendingEnrichment.addAll(previouslyQueued);
-      _drainEnrichment();
-    });
-  }
-
-  Future<void> _drainEnrichment() async {
-    if (_enrichmentRunning) return;
-    _enrichmentRunning = true;
-    try {
-      while (mounted && _pendingEnrichment.isNotEmpty) {
-        final generation = _enrichmentGeneration;
-        final batch = _pendingEnrichment.values.take(20).toList();
-        for (final item in batch) {
-          _pendingEnrichment.remove(_experienceKey(item));
-        }
-        _inFlightEnrichment.addAll(batch.map(_experienceKey));
-        final movies = batch.whereType<WatchlistMovie>().toList();
-        final shows = batch.whereType<_WatchlistShowEntry>().toList();
-        await Future.wait([
-          if (movies.isNotEmpty) _loadWatchProviderAvailability(movies),
-          if (shows.isNotEmpty) _loadShowWatchProviderAvailability(shows),
-          _loadFriendRecommendations(movies, shows: shows),
-        ]);
-        _inFlightEnrichment.removeAll(batch.map(_experienceKey));
-        if (mounted && generation == _enrichmentGeneration) {
-          setState(
-              () => _completedEnrichment.addAll(batch.map(_experienceKey)));
-        }
-      }
-    } finally {
-      _enrichmentRunning = false;
-    }
-  }
-
-  void _retryEnrichment(Object item) {
-    final key = _experienceKey(item);
-    _scheduledEnrichment.remove(key);
-    _completedEnrichment.remove(key);
-    _scheduleEnrichment([item]);
-    setState(() {});
-  }
 
   @override
   void initState() {
     super.initState();
+    _authProvider = context.read<AuthProvider>();
+    _watchlist = WatchlistController(
+      auth: _authProvider!,
+      scheduleAfterFrame: (callback) =>
+          WidgetsBinding.instance.addPostFrameCallback((_) => callback()),
+    );
+    _watchlist.addListener(_onWatchlistChanged);
+    _authProvider!.addListener(_watchlist.onUserChanged);
     WidgetsBinding.instance.addObserver(this);
-    TabRefreshController.watchlist.addListener(_refreshWatchlist);
-    _loadWatchlist();
-    _searchController.addListener(_filterWatchlist);
+    TabRefreshController.watchlist.addListener(_watchlist.refreshWatchlist);
+    _watchlist.loadWatchlist();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onWatchlistChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final newProvider = context.read<AuthProvider>();
-    if (_authProvider != newProvider) {
-      _authProvider?.removeListener(_onUserChanged);
-      _authProvider = newProvider;
-      _authProvider!.addListener(_onUserChanged);
-    }
-  }
-
-  void _onUserChanged() {
-    if (!mounted || _refreshing) return;
     final auth = context.read<AuthProvider>();
-    final ids = auth.cachedUserWatchProviderIds;
-    final subscriptionSnapshot =
-        jsonEncode(ids == null ? null : (ids.toList()..sort()));
-    if (subscriptionSnapshot != _subscriptionSnapshot) {
-      _subscriptionSnapshot = subscriptionSnapshot;
-      if (ids != null) {
-        // A membership change must immediately stop matching a removed service,
-        // including any previous name fallback. Availability itself is unchanged.
-        _userWatchProviderIds = {...ids};
-        _userWatchProviderMatchKeys = {};
-        _canWatchNowByMovieId.clear();
-        _filterWatchlist();
-      }
-    }
-    // Shared availability is published in bounded batches. Paint completed
-    // cards immediately instead of waiting for the entire library.
-    final cachedProviders = auth.cachedWatchProvidersByMovieId;
-    var providersChanged = false;
-    for (final item in _allWatchlist) {
-      final providers = cachedProviders[item.movieId];
-      if (providers != null &&
-          !identical(_movieWatchProviders[item.movieId], providers)) {
-        _movieWatchProviders[item.movieId] = providers;
-        _canWatchNowByMovieId.remove(item.movieId);
-        providersChanged = true;
-      }
-    }
-    if (providersChanged) _filterWatchlist();
-    if (_listSnapshot(auth) != _watchlistSnapshot) {
-      _loadWatchlist();
-    } else if (_friendSnapshot(auth) != _recommendationSnapshot) {
-      _recommendationSnapshot = _friendSnapshot(auth);
-      _recommendationsByMovieId.clear();
-      _friendsByShowId.clear();
-      _resetEnrichment();
-      _filterWatchlist();
+    if (!identical(auth, _authProvider)) {
+      _authProvider?.removeListener(_watchlist.onUserChanged);
+      _authProvider = auth;
+      _authProvider!.addListener(_watchlist.onUserChanged);
+      _watchlist.bindAuth(auth);
     }
   }
 
-  String _listSnapshot(AuthProvider auth) => jsonEncode([
-        auth.dbUser?.id,
-        auth.dbUser?.movieWatchlist?.map((item) => item.toJson()).toList(),
-        auth.dbUser?.showWatchlist,
-        auth.dbUser?.watchedMovies?.map((item) => item.toJson()).toList(),
-        auth.dbUser?.watchedShows,
-        auth.dbUser?.watchProviderRegion,
-      ]);
-
-  String _friendSnapshot(AuthProvider auth) =>
-      '${auth.dbUser?.id}:${auth.activityVersion}:${auth.friendDataVersion}';
+  void _onSearchChanged() => _watchlist.setSearchQuery(_searchController.text);
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _refreshWatchlist();
-  }
-
-  Future<void> _refreshWatchlist() async {
-    if (_refreshing) return;
-    _refreshing = true;
-    try {
-      await context.read<AuthProvider>().refreshUserData();
-      if (mounted) {
-        _experienceRequestKey = null;
-        _loadWatchlist();
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _loadError = 'Couldn’t refresh your watchlist');
-      }
-    } finally {
-      _refreshing = false;
-    }
+    if (state == AppLifecycleState.resumed) _watchlist.refreshWatchlist();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    TabRefreshController.watchlist.removeListener(_refreshWatchlist);
-    _authProvider?.removeListener(_onUserChanged);
+    TabRefreshController.watchlist.removeListener(_watchlist.refreshWatchlist);
+    _authProvider?.removeListener(_watchlist.onUserChanged);
+    _watchlist.removeListener(_onWatchlistChanged);
+    _watchlist.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _loadWatchlist() {
-    final detailsRequest = ++_showDetailsRequest;
-    _resetEnrichment();
-    final authProvider = context.read<AuthProvider>();
-    _loadError = null;
-    final owner =
-        '${authProvider.dbUser?.id}:${authProvider.dbUser?.watchProviderRegion}';
-    if (_enrichmentOwner != owner) {
-      _enrichmentOwner = owner;
-      _movieWatchProviders.clear();
-      _showWatchProviders.clear();
-      _canWatchNowByMovieId.clear();
-      _userWatchProviderIds = {};
-      _userWatchProviderMatchKeys = {};
-      _savedProviders = [];
-    }
-    if (_recommendationSnapshot != _friendSnapshot(authProvider)) {
-      _recommendationSnapshot = _friendSnapshot(authProvider);
-      _recommendationsByMovieId.clear();
-      _friendsByShowId.clear();
-    }
-    _watchlistSnapshot = _listSnapshot(authProvider);
-    final userWatchlist = authProvider.dbUser?.movieWatchlist;
-    final userShowWatchlist = authProvider.dbUser?.showWatchlist;
-
-    if (userWatchlist == null && userShowWatchlist == null) {
-      ++_recommendationsRequest;
-      setState(() {
-        _allWatchlist = [];
-        _allShowWatchlist = [];
-        _recommendationsByMovieId.clear();
-        _friendsByShowId.clear();
-        _movieWatchProviders.clear();
-        _showWatchProviders.clear();
-        ++_showProvidersRequest;
-        ++_watchProviderAvailabilityRequest;
-        _filterWatchlist();
-        _loading = false;
-      });
-      return;
-    }
-
-    try {
-      // The list is already typed - just filter out removed entries
-      final watchlist = (userWatchlist ?? const <WatchlistMovie>[])
-          .where((item) => item.removed != true)
-          .toList();
-      for (final entry in (userShowWatchlist ?? const []).whereType<Map>()) {
-        final id = int.tryParse('${entry['showId']}');
-        final summary = id == null ? null : ShowService.cachedSummary(id);
-        if (summary != null) _showDetails[id!] = summary;
-      }
-      final showWatchlist = (userShowWatchlist ?? const [])
-          .whereType<Map>()
-          .map((item) => _WatchlistShowEntry.fromJson(
-                Map<String, dynamic>.from(item),
-              ))
-          .where((item) => !item.removed && item.showId > 0)
-          .map((item) =>
-              item.needsDetails && _showDetails.containsKey(item.showId)
-                  ? item.withShow(_showDetails[item.showId]!)
-                  : item)
-          .toList(growable: false);
-
-      setState(() {
-        _allWatchlist = watchlist;
-        _allShowWatchlist = showWatchlist;
-        if (watchlist.isEmpty) {
-          _movieWatchProviders.clear();
-          _canWatchNowByMovieId.clear();
-        } else {
-          final currentMovieIds = watchlist.map((item) => item.movieId).toSet();
-          _movieWatchProviders
-              .removeWhere((movieId, _) => !currentMovieIds.contains(movieId));
-          _canWatchNowByMovieId
-              .removeWhere((movieId, _) => !currentMovieIds.contains(movieId));
-        }
-        _filterWatchlist();
-        _loading = false;
-      });
-
-      _loadMissingShowDetails(showWatchlist, detailsRequest);
-    } catch (e) {
-      debugPrint('Error loading watchlist: $e');
-      setState(() {
-        _loading = false;
-        _loadError = 'Couldn’t load your watchlist';
-      });
-    }
-  }
-
-  Future<void> _loadFriendRecommendations(List<WatchlistMovie> watchlist,
-      {List<_WatchlistShowEntry>? shows}) async {
-    final request = ++_recommendationsRequest;
-    final snapshot = _friendSnapshot(context.read<AuthProvider>());
-    if (snapshot != _recommendationSnapshot) {
-      // Do not display a previous viewer's or former friend's recommendation.
-      _recommendationsByMovieId.clear();
-      _friendsByShowId.clear();
-    }
-    _recommendationSnapshot = snapshot;
-    // Drop removed films immediately, including while another batch is in flight.
-    final ids = watchlist.map((item) => item.movieId).toSet();
-    setState(() => _recommendationsByMovieId.removeWhere(
-        (id, _) => !_allWatchlist.any((item) => item.movieId == id)));
-    final showIds =
-        (shows ?? _allShowWatchlist).map((item) => item.showId).toSet();
-    setState(() {
-      _loadingFriends = true;
-      _friendsByShowId.removeWhere(
-          (id, _) => !_allShowWatchlist.any((item) => item.showId == id));
-    });
-    bool current() => mounted && request == _recommendationsRequest;
-    Future<Map<int, FriendRecommendationResponse>> safe(
-        Future<Map<int, FriendRecommendationResponse>> future) async {
-      try {
-        return await future;
-      } catch (_) {
-        return {};
-      }
-    }
-
-    void publish(Map<int, FriendRecommendationResponse> results,
-        Map<int, List<FriendRecommendationItem>> target) {
-      if (!current()) return;
-      setState(() {
-        target.addEntries(
-            results.entries.map((e) => MapEntry(e.key, e.value.friends)));
-      });
-      _filterWatchlist();
-    }
-
-    await Future.wait([
-      safe(MovieService().getFriendRecommendations(ids,
-          isCurrent: current,
-          onProgress: (results) =>
-              publish(results, _recommendationsByMovieId))),
-      safe(ShowService.getFriendRecommendations(showIds,
-          isCurrent: current,
-          onProgress: (results) => publish(results, _friendsByShowId))),
-    ]);
-    if (!current()) return;
-    setState(() => _loadingFriends = false);
-    _filterWatchlist();
-  }
-
-  Future<void> _loadWatchProviderAvailability(
-      List<WatchlistMovie> watchlist) async {
-    final requestId = ++_watchProviderAvailabilityRequest;
-    final authProvider = context.read<AuthProvider>();
-    final user = authProvider.dbUser;
-    if (user == null) {
-      if (mounted) {
-        setState(() {
-          _userWatchProviderIds = {};
-          _userWatchProviderMatchKeys = {};
-          _movieWatchProviders.clear();
-          _canWatchNowByMovieId.clear();
-          _loadingWatchProviderAvailability = false;
-        });
-      }
-      return;
-    }
-
-    try {
-      final movieIds = watchlist.map((w) => w.movieId).toSet();
-      final availability =
-          authProvider.ensureWatchProviderCache(movieIds: movieIds);
-      final cachedProviders = authProvider.cachedWatchProvidersByMovieId;
-      final hasMissingProviders = movieIds.any(
-        (movieId) => !cachedProviders.containsKey(movieId),
-      );
-      final needsUserProviders =
-          authProvider.cachedUserWatchProviderIds == null;
-      setState(() {
-        _movieWatchProviders.addEntries(movieIds
-            .where(cachedProviders.containsKey)
-            .map((id) => MapEntry(id, cachedProviders[id]!)));
-        _userWatchProviderIds =
-            authProvider.cachedUserWatchProviderIds ?? const {};
-        _loadingWatchProviderAvailability =
-            hasMissingProviders || needsUserProviders;
-      });
-
-      await availability;
-
-      // The availability feed can occasionally use a newer provider record
-      // than the saved-provider catalogue. Keep names as a fallback for that
-      // case (for example, an updated HBO Max record/logo).
-      final savedProviders = await UserService.getUserWatchProviders(user.id)
-          .catchError((_) => _savedProviders);
-
-      if (!mounted || requestId != _watchProviderAvailabilityRequest) return;
-
-      final providers = authProvider.cachedWatchProvidersByMovieId;
-      final userProviderIds =
-          authProvider.cachedUserWatchProviderIds ?? const <int>{};
-      setState(() {
-        _userWatchProviderIds = {
-          ...userProviderIds,
-        };
-        _savedProviders = savedProviders;
-        _userWatchProviderMatchKeys = savedProviders
-            .where((provider) => _userWatchProviderIds.contains(provider.id))
-            .map((provider) => provider.matchKey)
-            .toSet();
-        _movieWatchProviders.addEntries(movieIds
-            .where(providers.containsKey)
-            .map((id) => MapEntry(id, providers[id]!)));
-        _canWatchNowByMovieId
-            .addEntries(_movieWatchProviders.entries.map((entry) => MapEntry(
-                  entry.key,
-                  entry.value.any((provider) =>
-                      provider.isIncludedOffer && _isUserProvider(provider)),
-                )));
-        _loadingWatchProviderAvailability = false;
-      });
-
-      _filterWatchlist();
-    } catch (e) {
-      debugPrint('Error loading watch provider availability: $e');
-      if (!mounted || requestId != _watchProviderAvailabilityRequest) return;
-      setState(() => _loadingWatchProviderAvailability = false);
-    }
-  }
-
-  Future<void> _loadMissingShowDetails(
-      List<_WatchlistShowEntry> entries, int request) async {
-    final ids = entries
-        .where((entry) =>
-            entry.needsDetails && !_showDetails.containsKey(entry.showId))
-        .map((entry) => entry.showId)
-        .toSet()
-        .toList();
-    for (var start = 0; start < ids.length; start += 25) {
-      if (!mounted || request != _showDetailsRequest) return;
-      final chunk = ids.skip(start).take(25).toList();
-      var shows = <TvShow>[];
-      try {
-        shows = await ShowService.getShowsByIds(chunk);
-      } catch (error) {
-        apiLogger.w('Show detail batch unavailable: $error');
-      }
-      // Recover omitted entries and older servers without the batch endpoint.
-      final received = shows.map((show) => show.id).toSet();
-      final missing = chunk.where((id) => !received.contains(id)).toList();
-      for (var offset = 0; offset < missing.length; offset += 5) {
-        if (!mounted || request != _showDetailsRequest) return;
-        final recovered =
-            await Future.wait(missing.skip(offset).take(5).map((id) async {
-          try {
-            return await ShowService.getShowById(id);
-          } catch (error) {
-            apiLogger.w('Could not load watchlist show $id: $error');
-            return null;
-          }
-        }));
-        shows.addAll(recovered.whereType<TvShow>());
-      }
-      if (!mounted || request != _showDetailsRequest) return;
-      setState(() {
-        for (final show in shows) {
-          if (chunk.contains(show.id) && show.name != 'Unknown Show') {
-            _showDetails[show.id] = show;
-          }
-        }
-        _allShowWatchlist = _allShowWatchlist
-            .map((entry) =>
-                entry.needsDetails && _showDetails.containsKey(entry.showId)
-                    ? entry.withShow(_showDetails[entry.showId]!)
-                    : entry)
-            .toList();
-        _filterWatchlist();
-      });
-    }
-  }
-
-  Future<void> _loadShowWatchProviderAvailability(
-    List<_WatchlistShowEntry> watchlist,
-  ) async {
-    final request = ++_showProvidersRequest;
-    if (watchlist.isEmpty) {
-      if (mounted && request == _showProvidersRequest) {
-        setState(() {
-          _showWatchProviders.clear();
-          _loadingShowWatchProviderAvailability = false;
-        });
-      }
-      return;
-    }
-    final authProvider = context.read<AuthProvider>();
-    final user = authProvider.dbUser;
-    if (user == null) return;
-    setState(() {
-      _loadingShowWatchProviderAvailability = true;
-    });
-    try {
-      await authProvider.ensureWatchProviderCache(movieIds: const []);
-      final region = user.watchProviderRegion;
-      final entries = <MapEntry<int, List<WatchProvider>>>[];
-      // Bound network work; never launch an unbounded request per saved show.
-      for (var start = 0; start < watchlist.length; start += 6) {
-        if (!mounted || request != _showProvidersRequest) return;
-        final chunk =
-            await Future.wait(watchlist.skip(start).take(6).map((item) async {
-          try {
-            return MapEntry(item.showId,
-                await ShowService.getShowWatchProviders(item.showId, region));
-          } catch (_) {
-            return null;
-          }
-        }));
-        if (!mounted || request != _showProvidersRequest) return;
-        entries.addAll(chunk.whereType<MapEntry<int, List<WatchProvider>>>());
-        setState(() => _showWatchProviders
-            .addEntries(chunk.whereType<MapEntry<int, List<WatchProvider>>>()));
-        _filterWatchlist();
-      }
-      final savedProviders = await UserService.getUserWatchProviders(user.id)
-          .catchError((_) => _savedProviders);
-      if (!mounted || request != _showProvidersRequest) return;
-      setState(() {
-        _userWatchProviderIds = {
-          ...?authProvider.cachedUserWatchProviderIds,
-        };
-        _savedProviders = savedProviders;
-        _userWatchProviderMatchKeys = savedProviders
-            .where((provider) => _userWatchProviderIds.contains(provider.id))
-            .map((provider) => provider.matchKey)
-            .toSet();
-        _showWatchProviders.addEntries(entries);
-        _loadingShowWatchProviderAvailability = false;
-      });
-      _filterWatchlist();
-    } catch (_) {
-      if (mounted && request == _showProvidersRequest) {
-        setState(() => _loadingShowWatchProviderAvailability = false);
-      }
-    }
-  }
-
-  bool _isAvailableOnUserProviders(int movieId) {
-    final cached = _canWatchNowByMovieId[movieId];
-    if (cached != null) return cached;
-
-    final providers = _movieWatchProviders[movieId] ?? const <WatchProvider>[];
-    return providers.any(
-        (provider) => provider.isIncludedOffer && _isUserProvider(provider));
-  }
-
-  void _filterWatchlist() {
-    if (!_usesExperience && _experienceRequestKey != null) {
-      _experienceGeneration++;
-      _experienceRequestKey = null;
-      _experienceLoading = false;
-      _experienceError = null;
-      _experienceFits.clear();
-    }
-    final key = jsonEncode([
-      _mood.id,
-      _avoid.toList()..sort(),
-      _watchRequest,
-      context.read<AuthProvider>().dbUser?.id,
-      _allWatchlist.map((e) => e.movieId).toList(),
-      _allShowWatchlist.map((e) => e.showId).toList()
-    ]);
-    if (_usesExperience && key != _experienceRequestKey) {
-      _experienceRequestKey = key;
-      _experienceFits.clear();
-      Future.microtask(() => _loadExperience(key));
-    }
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredWatchlist = _allWatchlist.where((item) {
-        final m = item.movie;
-        if (m == null) return false;
-        if (_releaseFilter != null &&
-            releaseStatus(m.releaseDate) != _releaseFilter) {
-          return false;
-        }
-        if (!_fitsExperience('movie:${item.movieId}') ||
-            !_matchesTonightServices(
-                _movieWatchProviders[item.movieId] ?? [])) {
-          return false;
-        }
-        if (_friendsOnly &&
-            !(_recommendationsByMovieId[item.movieId]?.any((f) => f.watched) ??
-                false)) {
-          return false;
-        }
-        // Text search
-        if (!m.title.toLowerCase().contains(query)) return false;
-        // Genre filter
-        if (!_matchesGenre(m.genres)) {
-          return false;
-        }
-        // Min rating filter
-        if (_filterMinRating != null &&
-            (m.voteAverage ?? 0) < _filterMinRating!) {
-          return false;
-        }
-        // Year filter
-        if (_filterYear != null) {
-          final year = int.tryParse(m.releaseDate?.split('-').first ?? '');
-          if (year != _filterYear) return false;
-        }
-        // Max runtime filter
-        if (!fitsWatchTime(m.runtime, _filterMaxRuntime)) {
-          return false;
-        }
-        return true;
-      }).toList();
-      _filteredShowWatchlist = _allShowWatchlist.where((item) {
-        if (!item.title.toLowerCase().contains(query)) return false;
-        if (_releaseFilter != null &&
-            releaseStatus(item.firstAirDate) != _releaseFilter) {
-          return false;
-        }
-        if (!_fitsExperience('show:${item.showId}') ||
-            !_matchesTonightServices(_showWatchProviders[item.showId] ?? [])) {
-          return false;
-        }
-        if (_friendsOnly &&
-            !(_friendsByShowId[item.showId]?.any((f) => f.watched) ?? false)) {
-          return false;
-        }
-        if (!_matchesGenre(item.genres)) {
-          return false;
-        }
-        if (_filterYear != null &&
-            int.tryParse(item.firstAirDate?.split('-').first ?? '') !=
-                _filterYear) {
-          return false;
-        }
-        if (_filterMinRating != null &&
-            (item.voteAverage == null ||
-                item.voteAverage! < _filterMinRating!)) {
-          return false;
-        }
-        if (!fitsWatchTime(item.runtime, _filterMaxRuntime)) {
-          return false;
-        }
-        return true;
-      }).toList()
-        ..sort(_compareWatchlistItems);
-
-      // Apply sorting
-      switch (_sortBy) {
-        case 'runtimeAsc':
-          _filteredWatchlist.sort(_compareWatchlistItems);
-          break;
-        case 'recent':
-          _filteredWatchlist.sort((a, b) {
-            final dateA = DateTime.tryParse(a.createdAt ?? '') ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-            final dateB = DateTime.tryParse(b.createdAt ?? '') ??
-                DateTime.fromMillisecondsSinceEpoch(0);
-            return dateB.compareTo(dateA);
-          });
-          break;
-        case 'titleAsc':
-          _filteredWatchlist.sort(
-              (a, b) => (a.movie?.title ?? '').compareTo(b.movie?.title ?? ''));
-          break;
-        case 'titleDesc':
-          _filteredWatchlist.sort(
-              (a, b) => (b.movie?.title ?? '').compareTo(a.movie?.title ?? ''));
-          break;
-        case 'ratingDesc':
-          _filteredWatchlist.sort((a, b) =>
-              (b.movie?.voteAverage ?? 0).compareTo(a.movie?.voteAverage ?? 0));
-          break;
-        case 'yearDesc':
-          _filteredWatchlist.sort((a, b) {
-            final yA =
-                int.tryParse(a.movie?.releaseDate?.split('-').first ?? '') ?? 0;
-            final yB =
-                int.tryParse(b.movie?.releaseDate?.split('-').first ?? '') ?? 0;
-            return yB.compareTo(yA);
-          });
-          break;
-        case 'yearAsc':
-          _filteredWatchlist.sort((a, b) {
-            final yA =
-                int.tryParse(a.movie?.releaseDate?.split('-').first ?? '') ?? 0;
-            final yB =
-                int.tryParse(b.movie?.releaseDate?.split('-').first ?? '') ?? 0;
-            return yA.compareTo(yB);
-          });
-          break;
-      }
-    });
-  }
-
-  bool _matchesGenre(List<String> genres) =>
-      _filterGenre == null ||
-      (_filterGenre == 'Rom com'
-          ? genres.contains('Comedy') && genres.contains('Romance')
-          : genres.contains(_filterGenre));
-
-  List<String> _allGenres() {
-    final genres = <String>{'Rom com'};
-    for (final item in _allWatchlist) {
-      genres.addAll(item.movie?.genres ?? []);
-    }
-    for (final show in _allShowWatchlist) {
-      genres.addAll(show.genres);
-    }
-    return genres.toList()..sort();
-  }
-
-  List<int> _allYears() {
-    final years = <int>{};
-    for (final item in _allWatchlist) {
-      final y = int.tryParse(item.movie?.releaseDate?.split('-').first ?? '');
-      if (y != null) years.add(y);
-    }
-    for (final show in _allShowWatchlist) {
-      final year = int.tryParse(show.firstAirDate?.split('-').first ?? '');
-      if (year != null) years.add(year);
-    }
-    return years.toList()..sort((a, b) => b.compareTo(a));
-  }
-
-  bool get _hasActiveFilters =>
-      _usesExperience ||
-      _tonightServices ||
-      _releaseFilter != null ||
-      _filterGenre != null ||
-      _filterMinRating != null ||
-      _filterYear != null ||
-      _filterMaxRuntime != null;
-
-  Future<void> _openAddMovieSheet() async {
-    final authProvider = context.read<AuthProvider>();
-    final analytics = context.read<AnalyticsController>();
-    final user = authProvider.dbUser;
-    if (user == null) return;
-
-    final existingMovieIds = _allWatchlist.map((item) => item.movieId).toSet();
-    final selected = await showModalBottomSheet<MovieShort>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _WatchlistMovieSearchSheet(
-        existingMovieIds: existingMovieIds,
-      ),
-    );
-    if (!mounted || selected == null) return;
-
-    if (existingMovieIds.contains(selected.id)) {
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-            type: FlixieToastType.info,
-            content: Text('${selected.name} is already in your watchlist')),
-      );
-      return;
-    }
-
-    try {
-      final addedResponse =
-          await UserService.addToWatchlist(user.id, selected.id);
-      await analytics.watchlistAdded(
-        contentType: 'movie',
-        contentId: selected.id,
-        source: 'watchlist',
-      );
-      final added = _entryWithMovieFallback(addedResponse, selected);
-      final currentWatchlist =
-          List<WatchlistMovie>.from(user.movieWatchlist ?? []);
-      currentWatchlist.removeWhere((item) => item.movieId == selected.id);
-      currentWatchlist.add(added);
-
-      authProvider.updateUserList(movieWatchlist: currentWatchlist);
-      authProvider.markActivityChanged();
-      _allWatchlist
-        ..removeWhere((item) => item.movieId == selected.id)
-        ..add(added);
-      _filterWatchlist();
-      _retryEnrichment(added);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.success,
-            content: Text('${selected.name} added to watchlist'),
-            backgroundColor: context.colors.surfaceElevated,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error adding movie to watchlist: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.error,
-          content: const Text('Failed to add movie to watchlist'),
-          backgroundColor: context.colors.danger,
-        ),
-      );
-    }
-  }
-
-  Future<bool> _confirmWatchEntry(
-    WatchlistMovie item,
-    String userId,
-  ) async {
-    var didSubmit = false;
-    final analytics = context.read<AnalyticsController>();
-    await showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => RewatchLogSheet(
-        onSubmit: ({
-          required String? watchedAt,
-          required double? rating,
-          required bool? recommended,
-          required String? notes,
-        }) async {
-          await WatchlistActionsController.instance.logMovieWatch(
-            userId,
-            LogMovieWatchRequest(
-              movieId: item.movieId,
-              watchedAt: watchedAt,
-              rating: rating,
-              recommended: recommended,
-              notes: notes,
-            ),
-          );
-          if (rating != null) {
-            await analytics.ratingSaved(source: 'watchlist');
-          }
-          didSubmit = true;
-          if (mounted) {
-            context.read<AuthProvider>().markActivityChanged();
-          }
-        },
-      ),
-    );
-    return didSubmit;
-  }
-
-  WatchlistMovie _entryWithMovieFallback(
-    WatchlistMovie entry,
-    MovieShort movie,
-  ) {
-    if (entry.movie != null) return entry;
-    return WatchlistMovie(
-      id: entry.id,
-      userId: entry.userId,
-      movieId: entry.movieId,
-      removed: entry.removed,
-      createdAt: entry.createdAt,
-      updatedAt: entry.updatedAt,
-      movie: WatchlistMovieDetails(
-        id: movie.id,
-        title: movie.name,
-        posterPath: movie.poster,
-        releaseDate: movie.releaseDate,
-        voteAverage: movie.voteAverage,
-      ),
-    );
   }
 
   void _openFilterSheet() {
@@ -1067,431 +112,24 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => WatchlistFilterSheet(
-        genres: _allGenres(),
-        years: _allYears(),
-        currentGenre: _filterGenre,
-        currentMinRating: _filterMinRating,
-        currentYear: _filterYear,
-        currentMaxRuntime: _filterMaxRuntime,
-        currentSort: _sortBy,
+        genres: _watchlist.allGenres(),
+        years: _watchlist.allYears(),
+        currentGenre: _watchlist.filters.genre,
+        currentMinRating: _watchlist.filters.minRating,
+        currentYear: _watchlist.filters.year,
+        currentMaxRuntime: _watchlist.filters.maxRuntime,
+        currentSort: _watchlist.filters.sort,
         onApply: (genre, minRating, year, maxRuntime, sort) {
-          setState(() {
-            _filterGenre = genre;
-            _filterMinRating = minRating;
-            _filterYear = year;
-            _filterMaxRuntime = maxRuntime;
-            _sortBy = sort;
+          _watchlist.updateFilters((filters) {
+            filters.genre = genre;
+            filters.minRating = minRating;
+            filters.year = year;
+            filters.maxRuntime = maxRuntime;
+            filters.sort = sort;
           });
-          _filterWatchlist();
         },
       ),
     );
-  }
-
-  Future<void> _markAsWatched(WatchlistMovie item) async {
-    final authProvider = context.read<AuthProvider>();
-    final analytics = context.read<AnalyticsController>();
-    final user = authProvider.dbUser;
-    if (user == null) return;
-    final committed = await _confirmWatchEntry(item, user.id);
-    if (!committed || !mounted) return;
-
-    try {
-      // The submitted watch entry marks the movie as watched. Only now remove
-      // it from the watchlist and update local state.
-      await UserService.removeFromWatchlist(user.id, item.movieId);
-      await analytics.watchlistItemRemoved(source: 'watchlist');
-      await analytics.movieRemovedFromWatchlist();
-      final watchedMovie =
-          await UserService.addToWatched(user.id, item.movieId);
-
-      // Update the local user lists
-      final currentWatchlist =
-          List<WatchlistMovie>.from(user.movieWatchlist ?? []);
-      currentWatchlist.removeWhere((w) => w.movieId == item.movieId);
-
-      final currentWatched = List<WatchedMovie>.from(user.watchedMovies ?? []);
-      // Add the watched movie (prefer the API response, fallback to minimal object)
-      currentWatched.add(watchedMovie ??
-          WatchedMovie(
-            id: '',
-            userId: user.id,
-            movieId: item.movieId,
-            watchedAt: DateTime.now().toIso8601String(),
-          ));
-
-      // Update provider with both lists
-      authProvider.updateUserList(
-        movieWatchlist: currentWatchlist,
-        watchedMovies: currentWatched,
-      );
-      authProvider.markActivityChanged();
-
-      // Update local state
-      setState(() {
-        _allWatchlist.removeWhere((w) => w.id == item.id);
-        _filterWatchlist();
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.success,
-            content: Text('${item.movie?.title ?? "Movie"} marked as watched'),
-            backgroundColor: context.colors.surfaceElevated,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error marking as watched: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.error,
-            content: const Text('Failed to mark as watched'),
-            backgroundColor: context.colors.danger,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _removeFromWatchlist(WatchlistMovie item) async {
-    final authProvider = context.read<AuthProvider>();
-    final analytics = context.read<AnalyticsController>();
-    final user = authProvider.dbUser;
-    if (user == null) return;
-
-    // Check if already in watched list before removing
-    final alreadyWatched = user.isMovieWatched(item.movieId);
-
-    try {
-      await UserService.removeFromWatchlist(user.id, item.movieId);
-      await analytics.watchlistItemRemoved(source: 'watchlist');
-      await analytics.movieRemovedFromWatchlist();
-
-      // Update the local user list
-      final currentWatchlist =
-          List<WatchlistMovie>.from(user.movieWatchlist ?? []);
-      currentWatchlist.removeWhere((w) => w.movieId == item.movieId);
-
-      // Update provider
-      authProvider.updateUserList(movieWatchlist: currentWatchlist);
-
-      setState(() {
-        _allWatchlist.removeWhere((w) => w.id == item.id);
-        _filterWatchlist();
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.success,
-            content:
-                Text('${item.movie?.title ?? "Movie"} removed from watchlist'),
-          ),
-        );
-      }
-
-      // If not already in watched list, offer to add it
-      if (!alreadyWatched && mounted) {
-        final markWatched = await showFlixiePromptSheet<bool>(
-          context: context,
-          builder: (ctx) => FlixiePromptSheetContent(
-            title: Text('Did you watch it?',
-                style: TextStyle(color: context.colors.light)),
-            content: Text(
-                'Want to add ${item.movie?.title ?? "this movie"} to your watched list?',
-                style: TextStyle(color: context.colors.medium)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child:
-                    Text('No', style: TextStyle(color: context.colors.medium)),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Yes!',
-                    style: TextStyle(color: FlixieColors.primary)),
-              ),
-            ],
-          ),
-        );
-        if (markWatched == true && mounted) {
-          final committed = await _confirmWatchEntry(item, user.id);
-          if (!committed || !mounted) return;
-          final watchedResult =
-              await UserService.addToWatched(user.id, item.movieId);
-          final currentWatched =
-              List<WatchedMovie>.from(user.watchedMovies ?? []);
-          currentWatched.add(watchedResult ??
-              WatchedMovie(
-                id: '',
-                userId: user.id,
-                movieId: item.movieId,
-                watchedAt: DateTime.now().toIso8601String(),
-              ));
-          authProvider.updateUserList(watchedMovies: currentWatched);
-          authProvider.markActivityChanged();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showFlixieToast(
-              FlixieToast(
-                type: FlixieToastType.success,
-                content: Text(
-                    '${item.movie?.title ?? "Movie"} added to watched list'),
-                backgroundColor: context.colors.surfaceElevated,
-              ),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error removing from watchlist: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.error,
-            content: const Text('Failed to remove from watchlist'),
-            backgroundColor: context.colors.danger,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _clearWatchedFromWatchlist() async {
-    final authProvider = context.read<AuthProvider>();
-    final analytics = context.read<AnalyticsController>();
-    final user = authProvider.dbUser;
-    if (user == null) return;
-    final watchedIds =
-        user.watchedMovies?.map((item) => item.movieId).toSet() ?? <int>{};
-    final watchedItems = _allWatchlist
-        .where((item) => watchedIds.contains(item.movieId))
-        .toList();
-    if (watchedItems.isEmpty) return;
-
-    final confirmed = await showFlixiePromptSheet<bool>(
-          context: context,
-          builder: (dialogContext) => FlixiePromptSheetContent(
-            title: const Text('Clear watched movies?'),
-            content: Text(
-              'Remove ${watchedItems.length} watched ${watchedItems.length == 1 ? 'movie' : 'movies'} from your watchlist? Your watch history will not be affected.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: context.colors.danger,
-                ),
-                child: const Text('Clear watched'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!confirmed) return;
-
-    try {
-      await Future.wait(watchedItems.map(
-        (item) => UserService.removeFromWatchlist(user.id, item.movieId),
-      ));
-      await analytics.watchlistItemRemoved(source: 'watchlist');
-      await analytics.movieRemovedFromWatchlist();
-      final idsToRemove = watchedItems.map((item) => item.movieId).toSet();
-      final updatedWatchlist = (user.movieWatchlist ?? [])
-          .where((item) => !idsToRemove.contains(item.movieId))
-          .toList();
-      authProvider.updateUserList(movieWatchlist: updatedWatchlist);
-      if (!mounted) return;
-      setState(() {
-        _allWatchlist.removeWhere((item) => idsToRemove.contains(item.movieId));
-        _filterWatchlist();
-      });
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.success,
-          content: Text(
-            '${watchedItems.length} watched ${watchedItems.length == 1 ? 'movie' : 'movies'} removed from your watchlist',
-          ),
-          backgroundColor: context.colors.surfaceElevated,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-          type: FlixieToastType.error,
-          content: const Text('Failed to clear watched movies'),
-          backgroundColor: context.colors.danger,
-        ),
-      );
-    }
-  }
-
-  Future<void> _addToFavorites(WatchlistMovie item) async {
-    final authProvider = context.read<AuthProvider>();
-    final analytics = context.read<AnalyticsController>();
-    final user = authProvider.dbUser;
-    if (user == null) return;
-
-    final movieId = item.movieId;
-    if (user.isMovieFavorite(movieId)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.info,
-            content: Text(
-              '${item.movie?.title ?? "Movie"} is already in favourites',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    final activeFavouriteCount =
-        (user.favoriteMovies ?? const <FavoriteMovie>[])
-            .where((favorite) => favorite.removed != true)
-            .length;
-    if (activeFavouriteCount >= maxFavouriteMovies) {
-      if (mounted) {
-        showFavouriteLimitPrompt(
-          context,
-          type: FavouriteLimitType.movie,
-          onSpaceMade: () => _addToFavorites(item),
-        );
-      }
-      return;
-    }
-
-    try {
-      final addedFavorite = await UserService.addToFavorites(user.id, movieId);
-      await analytics.movieFavourited();
-      final updatedFavorites =
-          List<FavoriteMovie>.from(user.favoriteMovies ?? []);
-      if (!updatedFavorites.any((f) => f.movieId == movieId)) {
-        updatedFavorites.add(addedFavorite);
-      }
-
-      authProvider.updateUserList(favoriteMovies: updatedFavorites);
-      authProvider.markActivityChanged();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.success,
-            content:
-                Text('${item.movie?.title ?? "Movie"} added to favourites'),
-            backgroundColor: context.colors.surfaceElevated,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error adding to favorites: $e');
-      if (mounted) {
-        if (isFavouriteLimitError(e)) {
-          showFavouriteLimitPrompt(
-            context,
-            type: FavouriteLimitType.movie,
-            onSpaceMade: () => _addToFavorites(item),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showFlixieToast(
-            FlixieToast(
-              type: FlixieToastType.error,
-              content: const Text('Failed to add to favourites'),
-              backgroundColor: context.colors.danger,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _showAddToListSheet(WatchlistMovie item) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => AddToListSheet(movieId: item.movieId),
-    );
-  }
-
-  void _showWatchRequestSheet(WatchlistMovie item) {
-    final auth = context.read<AuthProvider>();
-    final friends = auth.cachedFriends?.friendships ?? [];
-    final userId = auth.dbUser?.id;
-    if (userId == null) return;
-
-    showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => MovieWatchRequestSheet(
-        movieId: item.movieId,
-        movieTitle: item.movie?.title,
-        requesterId: userId,
-        friends: friends,
-        onSuccess: () {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showFlixieToast(
-              FlixieToast(
-                  type: FlixieToastType.success,
-                  content: const Text('Watch Plan sent!')),
-            );
-          }
-        },
-        onError: () {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showFlixieToast(
-              FlixieToast(
-                  type: FlixieToastType.error,
-                  content: const Text('Failed to send Watch Plan')),
-            );
-          }
-        },
-      ),
-    );
-  }
-
-  bool get _comingSoonOnly =>
-      _releaseFilter == ReleaseStatus.comingSoon || _selectedTab == 2;
-
-  String _sortByLabel() {
-    if (_comingSoonOnly) return 'Soonest first';
-    switch (_sortBy) {
-      case 'runtimeAsc':
-        return 'Shortest first';
-      case 'recent':
-        return 'Date added';
-      case 'titleAsc':
-        return 'Title A–Z';
-      case 'titleDesc':
-        return 'Title Z–A';
-      case 'ratingDesc':
-        return 'Rating';
-      case 'yearDesc':
-        return 'Year (Newest)';
-      case 'yearAsc':
-        return 'Year (Oldest)';
-      default:
-        return 'Date added';
-    }
   }
 
   Widget _buildStatsRow() => Padding(
@@ -1501,7 +139,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             spacing: 12,
             children: [
               Text(
-                  '${_allWatchlist.length + _allShowWatchlist.length} saved titles',
+                  '${_watchlist.allWatchlist.length + _watchlist.allShowWatchlist.length} saved titles',
                   style: TextStyle(color: context.colors.light)),
               TextButton(
                   onPressed: () => context.push('/watch-history'),
@@ -1512,37 +150,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   Future<void> _editPreferences() async {
     Navigator.of(context, rootNavigator: true).pop();
     await showSettingsEditDetailsSheet(context);
-    if (mounted) _loadWatchlist();
-  }
-
-  void _clearFilters() {
-    _searchController.clear();
-    setState(() {
-      _friendsOnly = false;
-      _selectedTab = 0;
-      _mediaFilter = 0;
-      _releaseFilter = null;
-      _filterGenre = null;
-      _filterMinRating = null;
-      _filterYear = null;
-      _filterMaxRuntime = null;
-      _mood = WatchlistMood.any;
-      _avoid = {};
-      _watchRequest = '';
-      _findingToday = false;
-      _experienceMessage = null;
-      _hasUncheckedExclusions = false;
-      _experienceGeneration++;
-      _experienceRequestKey = null;
-      _experienceLoading = false;
-      _experienceError = null;
-      _experienceFits.clear();
-      _tonightServices = false;
-      _includeRentals = false;
-      _selectedProviderIds = null;
-      _searchProviders = [];
-    });
-    _filterWatchlist();
+    if (mounted) _watchlist.loadWatchlist();
   }
 
   Widget _buildSortFilterRow({VoidCallback? onChange}) => Padding(
@@ -1553,25 +161,24 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             children: [
               _buildCheckboxFilter(
                 label: 'Friends watched',
-                selected: _friendsOnly,
+                selected: _watchlist.filters.friendsOnly,
                 onChanged: (value) {
-                  setState(() => _friendsOnly = value);
-                  _filterWatchlist();
+                  _watchlist
+                      .updateFilters((filters) => filters.friendsOnly = value);
                   onChange?.call();
                 },
               ),
               TextButton.icon(
                   onPressed: _openFilterSheet,
                   icon: const Icon(Icons.tune),
-                  label: Text(_sortByLabel())),
+                  label: Text(_watchlist.sortByLabel())),
               PopupMenuButton<int>(
                   tooltip: 'Viewing status',
                   onSelected: (value) {
-                    setState(() {
-                      _selectedTab = value;
-                      if (value == 2) _releaseFilter = null;
+                    _watchlist.updateFilters((filters) {
+                      filters.tab = value;
+                      if (value == 2) filters.release = null;
                     });
-                    _filterWatchlist();
                   },
                   itemBuilder: (_) => const [
                         PopupMenuItem(
@@ -1586,13 +193,15 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                           color: context.colors.light))),
               IconButton(
                   tooltip: 'Refresh watchlist',
-                  onPressed: _refreshWatchlist,
+                  onPressed: _watchlist.refreshWatchlist,
                   icon: const Icon(Icons.refresh_rounded)),
-              if (_selectedTab == 3)
+              if (_watchlist.filters.tab == 3)
                 TextButton(
-                    onPressed: _clearWatchedFromWatchlist,
+                    onPressed: _actions.clearWatchedMovies,
                     child: const Text('Clear watched movies')),
-              if (_hasActiveFilters || _friendsOnly || _selectedTab != 0)
+              if (_watchlist.hasActiveFilters ||
+                  _watchlist.filters.friendsOnly ||
+                  _watchlist.filters.tab != 0)
                 TextButton(
                     onPressed: _clearFilters,
                     child: const Text('Clear filters')),
@@ -1609,16 +218,15 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           ])
             FlixiePill.choice(
               label: Text(label),
-              selected: (_selectedTab == 2
+              selected: (_watchlist.filters.tab == 2
                       ? ReleaseStatus.comingSoon
-                      : _releaseFilter) ==
+                      : _watchlist.filters.release) ==
                   status,
               onSelected: (_) {
-                setState(() {
-                  _releaseFilter = status;
-                  if (_selectedTab == 2) _selectedTab = 0;
+                _watchlist.updateFilters((filters) {
+                  filters.release = status;
+                  if (filters.tab == 2) filters.tab = 0;
                 });
-                _filterWatchlist();
               },
             ),
         ]),
@@ -1682,149 +290,32 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           IconButton(
             icon: Icon(Icons.add_rounded, color: context.colors.white),
             tooltip: 'Add movie',
-            onPressed: _openAddMovieSheet,
+            onPressed: _actions.addMovie,
           ),
         ],
       ),
-      body: _loading
+      body: _watchlist.loading
           ? const ContentListSkeleton(label: 'Loading watchlist')
           : _buildContent(),
     );
   }
 
-  List<WatchlistMovie> _visibleWatchlist() {
-    if (_mediaFilter == 2) return const [];
-    if (_selectedTab == 3) {
-      // Watched: watchlist items also in watchedMovies
-      final user = context.read<AuthProvider>().dbUser;
-      final watchedIds =
-          user?.watchedMovies?.map((w) => w.movieId).toSet() ?? <int>{};
-      return _filteredWatchlist
-          .where((item) => watchedIds.contains(item.movieId))
-          .toList();
-    }
-    if (_selectedTab == 2) {
-      final upcoming = _filteredWatchlist.where((item) {
-        return releaseStatus(item.movie?.releaseDate) ==
-            ReleaseStatus.comingSoon;
-      }).toList();
-      upcoming.sort((a, b) {
-        final dateA = DateTime.tryParse(a.movie?.releaseDate ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final dateB = DateTime.tryParse(b.movie?.releaseDate ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return dateA.compareTo(dateB);
-      });
-      return upcoming;
-    }
-    if (_selectedTab == 1) {
-      return _filteredWatchlist
-          .where((item) => _isAvailableOnUserProviders(item.movieId))
-          .toList();
-    }
-    return _filteredWatchlist;
-  }
-
-  List<_WatchlistShowEntry> _visibleShowWatchlist() {
-    if (_mediaFilter == 1) return const [];
-    if (_selectedTab == 3) {
-      final watched =
-          context.read<AuthProvider>().dbUser?.watchedShows ?? const [];
-      final ids = watched
-          .whereType<Map>()
-          .where((w) => w['removed'] != true)
-          .map((w) => _watchlistInt(w['showId']))
-          .toSet();
-      return _filteredShowWatchlist
-          .where((item) => item.watched || ids.contains(item.showId))
-          .toList();
-    }
-    if (_selectedTab == 1) {
-      return _filteredShowWatchlist.where((item) {
-        final providers = _showWatchProviders[item.showId] ?? const [];
-        return providers.any(
-          (provider) => provider.isIncludedOffer && _isUserProvider(provider),
-        );
-      }).toList();
-    }
-    if (_selectedTab == 2) {
-      final upcoming = _filteredShowWatchlist.where((item) {
-        return releaseStatus(item.firstAirDate) == ReleaseStatus.comingSoon;
-      }).toList();
-      upcoming.sort((a, b) {
-        final dateA = DateTime.tryParse(a.firstAirDate ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        final dateB = DateTime.tryParse(b.firstAirDate ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0);
-        return dateA.compareTo(dateB);
-      });
-      return upcoming;
-    }
-    return _filteredShowWatchlist;
-  }
-
   Widget _buildContent() {
-    final movieItems = _visibleWatchlist();
-    final showItems = _visibleShowWatchlist();
-    final items = <Object>[...movieItems, ...showItems];
-    if (_mediaFilter == 0) items.sort(_compareWatchlistItems);
-    if (_usesExperience) {
-      items.sort((a, b) => _experienceFits[_experienceKey(a)]!
-          .compareTo(_experienceFits[_experienceKey(b)]!));
-    }
-    if (_comingSoonOnly) {
-      DateTime releaseDate(Object item) =>
-          DateTime.parse((item is WatchlistMovie
-                  ? item.movie!.releaseDate!
-                  : (item as _WatchlistShowEntry).firstAirDate!)
-              .substring(0, 10));
-      items.sort((a, b) {
-        final byDate = releaseDate(a).compareTo(releaseDate(b));
-        return byDate != 0 ? byDate : _compareWatchlistItems(a, b);
-      });
-    }
-    final enrichmentView = jsonEncode([
-      _mediaFilter,
-      _selectedTab,
-      _friendsOnly,
-      _tonightServices,
-      _searchController.text,
-      _sortBy,
-      _filterGenre,
-      _filterMinRating,
-      _filterYear,
-      _filterMaxRuntime,
-      _releaseFilter?.name,
-      _mood.id,
-      _watchRequest,
-    ]);
-    if (_enrichmentView != enrichmentView) {
-      _enrichmentView = enrichmentView;
-      // Cancel queued offscreen work from the previous search/filter.
-      _pendingEnrichment.clear();
-      _scheduledEnrichment.removeWhere((key) =>
-          !_completedEnrichment.contains(key) &&
-          !_inFlightEnrichment.contains(key));
-    }
-    if (_friendsOnly || _selectedTab == 1 || _tonightServices) {
-      _scheduleEnrichment([..._allWatchlist, ..._allShowWatchlist]);
-    } else {
-      _scheduleEnrichment(items.take(20));
-    }
+    final items = _watchlist.visibleItems;
+    _watchlist.prepareEnrichment(items);
     final user = context.read<AuthProvider>().dbUser;
-    final hasItems = _allWatchlist.isNotEmpty || _allShowWatchlist.isNotEmpty;
+    final hasItems = _watchlist.allWatchlist.isNotEmpty ||
+        _watchlist.allShowWatchlist.isNotEmpty;
 
     final header = <Widget>[
-      if (_loadError != null)
+      if (_watchlist.loadError != null)
         TextButton(
-            onPressed: _refreshWatchlist, child: Text('$_loadError · Retry')),
-      if (_experienceError != null)
+            onPressed: _watchlist.refreshWatchlist,
+            child: Text('${_watchlist.loadError} · Retry')),
+      if (_watchlist.experienceError != null)
         TextButton(
-            onPressed: () {
-              _experienceRequestKey = null;
-              _filterWatchlist();
-            },
-            child: Text('$_experienceError Retry')),
+            onPressed: _watchlist.retryExperience,
+            child: Text('${_watchlist.experienceError} Retry')),
       _buildStatsRow(),
       _buildSearchBar(),
       _buildMediaFilter(),
@@ -1832,51 +323,47 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       if (hasItems)
         TonightFiltersPanel(
           key: _tonightPanelKey,
-          minutes: _filterMaxRuntime,
-          mood: _mood,
-          avoid: _avoid,
-          genre: _filterGenre,
-          genres: _allGenres(),
-          onGenre: (genre) {
-            _filterGenre = genre;
-            _findingToday = false;
-            _watchRequest = '';
-            _mood = WatchlistMood.any;
-            _avoid = {};
-            _filterWatchlist();
-          },
+          minutes: _watchlist.filters.maxRuntime,
+          mood: _watchlist.filters.mood,
+          avoid: _watchlist.filters.avoid,
+          genre: _watchlist.filters.genre,
+          genres: _watchlist.allGenres(),
+          onGenre: (genre) => _watchlist.updateFilters((filters) {
+            filters.genre = genre;
+            filters.findingToday = false;
+            filters.request = '';
+            filters.mood = WatchlistMood.any;
+            filters.avoid = {};
+          }),
           providers: {
-            for (final p in [..._savedProviders, ..._searchProviders]) p.id: p
+            for (final p in [
+              ..._watchlist.savedProviders,
+              ..._watchlist.searchProviders
+            ])
+              p.id: p
           }.values.toList(),
-          selectedProviders: _selectedProviderIds ?? _userWatchProviderIds,
-          savedProviderIds: _userWatchProviderIds,
-          servicesOnly: _tonightServices,
-          rentals: _includeRentals,
+          selectedProviders:
+              _watchlist.filters.providerIds ?? _watchlist.userWatchProviderIds,
+          savedProviderIds: _watchlist.userWatchProviderIds,
+          servicesOnly: _watchlist.filters.servicesOnly,
+          rentals: _watchlist.filters.includeRentals,
           count: items.length,
           region: user?.watchProviderRegion ?? 'GB',
-          loading: _experienceLoading ||
-              _tonightServices &&
-                  (_loadingWatchProviderAvailability ||
-                      _loadingShowWatchProviderAvailability),
-          onTime: (value) {
-            _filterMaxRuntime = value;
-            _filterWatchlist();
-          },
-          onMood: (value) {
-            _mood = value;
-            _filterWatchlist();
-          },
-          onServices: (catalog, ids, enabled, rentals) {
-            _searchProviders = catalog;
-            _selectedProviderIds = {...ids};
-            _tonightServices = enabled;
-            _includeRentals = rentals;
-            if (_selectedTab == 1) _selectedTab = 0;
-            _filterWatchlist();
-          },
+          loading: _watchlist.experienceLoading ||
+              _watchlist.filters.servicesOnly &&
+                  (_watchlist.loadingWatchProviderAvailability ||
+                      _watchlist.loadingShowWatchProviderAvailability),
+          onTime: (value) => _watchlist.updateFilters((filters) {
+            filters.maxRuntime = value;
+          }),
+          onMood: (value) => _watchlist.updateFilters((filters) {
+            filters.mood = value;
+          }),
+          onServices: _watchlist.setProviders,
           onSort: _openFilterSheet,
-          sortLabel:
-              _usesExperience && !_comingSoonOnly ? 'Best fit' : _sortByLabel(),
+          sortLabel: _watchlist.usesExperience && !_watchlist.comingSoonOnly
+              ? 'Best fit'
+              : _watchlist.sortByLabel(),
           onMore: () => showModalBottomSheet<void>(
               context: context,
               useRootNavigator: true,
@@ -1897,54 +384,62 @@ class _WatchlistScreenState extends State<WatchlistScreen>
           onClear: _clearFilters,
           onPick: () => _pickFromTonight(items),
         ),
-      if (_usesExperience && !_experienceLoading && _experienceMessage != null)
+      if (_watchlist.usesExperience &&
+          !_watchlist.experienceLoading &&
+          _watchlist.experienceMessage != null)
         Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(_experienceMessage!)),
-      if (_usesExperience &&
-          !_experienceLoading &&
+            child: Text(_watchlist.experienceMessage!)),
+      if (_watchlist.usesExperience &&
+          !_watchlist.experienceLoading &&
           items.isEmpty &&
-          (_avoid.isNotEmpty || _hasUncheckedExclusions))
+          (_watchlist.filters.avoid.isNotEmpty ||
+              _watchlist.hasUncheckedExclusions))
         const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
                 'Some titles were left out because we couldn’t check the content you want to avoid.')),
-      if (_friendsOnly && (_loadingFriends || _hasPendingEnrichment))
+      if (_watchlist.filters.friendsOnly &&
+          (_watchlist.loadingFriends || _watchlist.hasPendingEnrichment))
         const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: ContentPlaceholder(
                 label: 'Loading friends',
                 style: ContentPlaceholderStyle.compact)),
-      if (_friendsOnly &&
-          !_loadingFriends &&
-          !_hasPendingEnrichment &&
-          (_recommendationsByMovieId.length < _allWatchlist.length ||
-              _friendsByShowId.length < _allShowWatchlist.length))
+      if (_watchlist.filters.friendsOnly &&
+          !_watchlist.loadingFriends &&
+          !_watchlist.hasPendingEnrichment &&
+          (_watchlist.recommendationsByMovieId.length <
+                  _watchlist.allWatchlist.length ||
+              _watchlist.friendsByShowId.length <
+                  _watchlist.allShowWatchlist.length))
         TextButton(
             onPressed: () {
-              _resetEnrichment();
-              _filterWatchlist();
+              _watchlist.resetEnrichment();
+              _watchlist.filterWatchlist();
             },
             child: const Text('Some friends couldn’t load · Retry')),
-      if ((_selectedTab == 1 || _tonightServices) &&
-          !_loadingWatchProviderAvailability &&
-          !_loadingShowWatchProviderAvailability &&
-          !_hasPendingEnrichment &&
-          (_movieWatchProviders.length < _allWatchlist.length ||
-              _showWatchProviders.length < _allShowWatchlist.length))
+      if ((_watchlist.filters.tab == 1 || _watchlist.filters.servicesOnly) &&
+          !_watchlist.loadingWatchProviderAvailability &&
+          !_watchlist.loadingShowWatchProviderAvailability &&
+          !_watchlist.hasPendingEnrichment &&
+          (_watchlist.movieWatchProviders.length <
+                  _watchlist.allWatchlist.length ||
+              _watchlist.showWatchProviders.length <
+                  _watchlist.allShowWatchlist.length))
         TextButton(
             onPressed: () {
-              _resetEnrichment();
-              _filterWatchlist();
+              _watchlist.resetEnrichment();
+              _watchlist.filterWatchlist();
             },
             child: const Text('Some availability couldn’t load · Retry')),
     ];
 
     if (items.isEmpty) {
-      if (_experienceLoading ||
-          (_selectedTab == 1 &&
-              (_loadingWatchProviderAvailability ||
-                  _loadingShowWatchProviderAvailability))) {
+      if (_watchlist.experienceLoading ||
+          (_watchlist.filters.tab == 1 &&
+              (_watchlist.loadingWatchProviderAvailability ||
+                  _watchlist.loadingShowWatchProviderAvailability))) {
         return ListView(padding: const EdgeInsets.only(bottom: 24), children: [
           ...header,
           const Padding(
@@ -1953,15 +448,15 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                   label: 'Loading watchlist picks', rows: 3)),
         ]);
       }
-      final emptyLabel = _experienceLoading
+      final emptyLabel = _watchlist.experienceLoading
           ? 'Finding your picks…'
-          : _experienceError != null
+          : _watchlist.experienceError != null
               ? 'Your picks couldn’t load'
-              : _usesExperience
+              : _watchlist.usesExperience
                   ? 'Nothing fits all of this yet. Try a different description or adjust your filters.'
-                  : switch (_selectedTab) {
-                      1 => _loadingWatchProviderAvailability ||
-                              _loadingShowWatchProviderAvailability
+                  : switch (_watchlist.filters.tab) {
+                      1 => _watchlist.loadingWatchProviderAvailability ||
+                              _watchlist.loadingShowWatchProviderAvailability
                           ? 'Checking your providers...'
                           : 'Nothing you can watch right now',
                       2 => 'No upcoming titles in your watchlist',
@@ -1981,9 +476,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _selectedTab == 3
+                    _watchlist.filters.tab == 3
                         ? Icons.check_circle_outline
-                        : _selectedTab == 1
+                        : _watchlist.filters.tab == 1
                             ? Icons.play_circle_outline_rounded
                             : Icons.movie_outlined,
                     size: 64,
@@ -1999,7 +494,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                     TextButton(
                         onPressed: _clearFilters,
                         child: const Text('Clear filters')),
-                  if (_selectedTab == 0 &&
+                  if (_watchlist.filters.tab == 0 &&
                       _searchController.text.isEmpty &&
                       !hasItems) ...[
                     const SizedBox(height: 8),
@@ -2028,23 +523,26 @@ class _WatchlistScreenState extends State<WatchlistScreen>
 
         final itemIndex = index - header.length;
         final pageStart = (itemIndex ~/ 20) * 20;
-        _scheduleEnrichment(
+        _watchlist.scheduleEnrichment(
             items.skip(pageStart).take(itemIndex % 20 >= 15 ? 40 : 20));
         final item = items[itemIndex];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (_usesExperience &&
-                _experienceFits[_experienceKey(item)] != null)
+            if (_watchlist.usesExperience &&
+                _watchlist.experienceFits[_watchlist.experienceKey(item)] !=
+                    null)
               Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text([
-                    ..._experienceFits[_experienceKey(item)]!.reasons,
+                    ..._watchlist
+                        .experienceFits[_watchlist.experienceKey(item)]!
+                        .reasons,
                   ].join(' · '))),
             item is WatchlistMovie
                 ? _buildWatchlistRow(item, user)
-                : _buildShowWatchlistRow(item as _WatchlistShowEntry),
+                : _buildShowWatchlistRow(item as WatchlistShowEntry),
           ]),
         );
       },
@@ -2053,10 +551,11 @@ class _WatchlistScreenState extends State<WatchlistScreen>
 
   Future<void> _pickFromTonight(List<Object> items) async {
     if (items.isEmpty) return;
-    final item =
-        _usesExperience ? items.first : items[Random().nextInt(items.length)];
+    final item = _watchlist.usesExperience
+        ? items.first
+        : items[Random().nextInt(items.length)];
     final movie = item is WatchlistMovie ? item : null;
-    final show = item is _WatchlistShowEntry ? item : null;
+    final show = item is WatchlistShowEntry ? item : null;
     final title = movie?.movie?.title ?? show!.title;
     final runtime = movie?.movie?.runtime ?? show?.runtime;
     await showModalBottomSheet<void>(
@@ -2080,9 +579,12 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                   Text([
                     if (runtime != null && runtime > 0)
                       '$runtime min${show != null ? ' per episode (estimated)' : ''}',
-                    if (_mood != WatchlistMood.any)
-                      ...(_experienceFits[_experienceKey(item)]?.reasons ?? []),
-                    _usesExperience
+                    if (_watchlist.filters.mood != WatchlistMood.any)
+                      ...(_watchlist
+                              .experienceFits[_watchlist.experienceKey(item)]
+                              ?.reasons ??
+                          []),
+                    _watchlist.usesExperience
                         ? 'Best available fit from ${items.length} matching titles'
                         : 'Randomly chosen from your ${items.length} matching titles'
                   ].join(' · ')),
@@ -2096,58 +598,6 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                       },
                       child: const Text('View watch options')),
                 ])));
-  }
-
-  int _compareWatchlistItems(Object first, Object second) {
-    if (_sortBy == 'runtimeAsc') {
-      int value(Object item) =>
-          (item is WatchlistMovie
-              ? item.movie?.runtime
-              : (item as _WatchlistShowEntry).runtime) ??
-          999999;
-      final comparison = value(first).compareTo(value(second));
-      if (comparison != 0) return comparison;
-    }
-    final firstTitle = first is WatchlistMovie
-        ? first.movie?.title ?? ''
-        : (first as _WatchlistShowEntry).title;
-    final secondTitle = second is WatchlistMovie
-        ? second.movie?.title ?? ''
-        : (second as _WatchlistShowEntry).title;
-    if (_sortBy == 'titleAsc') return firstTitle.compareTo(secondTitle);
-    if (_sortBy == 'titleDesc') return secondTitle.compareTo(firstTitle);
-
-    if (_sortBy == 'ratingDesc' ||
-        _sortBy == 'yearAsc' ||
-        _sortBy == 'yearDesc') {
-      double? value(Object item) {
-        if (_sortBy == 'ratingDesc') {
-          return item is WatchlistMovie
-              ? item.movie?.voteAverage
-              : (item as _WatchlistShowEntry).voteAverage;
-        }
-        final date = item is WatchlistMovie
-            ? item.movie?.releaseDate
-            : (item as _WatchlistShowEntry).firstAirDate;
-        return double.tryParse(date?.split('-').first ?? '');
-      }
-
-      final a = value(first), b = value(second);
-      if (a == null && b != null) return 1;
-      if (b == null && a != null) return -1;
-      if (a != null && b != null && a != b) {
-        return _sortBy == 'yearAsc' ? a.compareTo(b) : b.compareTo(a);
-      }
-    }
-    final firstAddedAt = DateTime.tryParse(first is WatchlistMovie
-            ? first.createdAt ?? ''
-            : (first as _WatchlistShowEntry).createdAt ?? '') ??
-        DateTime.fromMillisecondsSinceEpoch(0);
-    final secondAddedAt = DateTime.tryParse(second is WatchlistMovie
-            ? second.createdAt ?? ''
-            : (second as _WatchlistShowEntry).createdAt ?? '') ??
-        DateTime.fromMillisecondsSinceEpoch(0);
-    return secondAddedAt.compareTo(firstAddedAt);
   }
 
   Widget _buildCheckboxFilter({
@@ -2213,12 +663,12 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             child: Wrap(spacing: 16, children: [
               for (final (index, label) in ['All', 'Movies', 'Shows'].indexed)
                 Semantics(
-                  selected: _mediaFilter == index,
+                  selected: _watchlist.filters.media == index,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       border: Border(
                           bottom: BorderSide(
-                        color: _mediaFilter == index
+                        color: _watchlist.filters.media == index
                             ? context.colors.primaryText
                             : Colors.transparent,
                         width: 3,
@@ -2226,7 +676,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                     ),
                     child: TextButton(
                       style: TextButton.styleFrom(
-                        foregroundColor: _mediaFilter == index
+                        foregroundColor: _watchlist.filters.media == index
                             ? context.colors.white
                             : context.colors.light,
                         minimumSize: const Size(48, 48),
@@ -2236,12 +686,13 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                         textStyle: TextStyle(
                           fontFamily: FlixieTypography.fontFamily,
                           fontSize: 15,
-                          fontWeight: _mediaFilter == index
+                          fontWeight: _watchlist.filters.media == index
                               ? FontWeight.w700
                               : FontWeight.w500,
                         ),
                       ),
-                      onPressed: () => setState(() => _mediaFilter = index),
+                      onPressed: () => _watchlist
+                          .updateFilters((filters) => filters.media = index),
                       child: Text(label),
                     ),
                   ),
@@ -2253,39 +704,42 @@ class _WatchlistScreenState extends State<WatchlistScreen>
 
   Widget _buildWatchlistRow(WatchlistMovie item, dynamic user) {
     final isWatched = user?.isMovieWatched(item.movieId) ?? false;
-    final pending = !_completedEnrichment.contains('movie:${item.movieId}');
+    final pending =
+        !_watchlist.completedEnrichment.contains('movie:${item.movieId}');
     final isLoadingProviders =
-        pending && !_movieWatchProviders.containsKey(item.movieId);
+        pending && !_watchlist.movieWatchProviders.containsKey(item.movieId);
     final providers =
-        _movieWatchProviders[item.movieId] ?? const <WatchProvider>[];
-    final canWatchNow = _isAvailableOnUserProviders(item.movieId);
+        _watchlist.movieWatchProviders[item.movieId] ?? const <WatchProvider>[];
+    final canWatchNow = _watchlist.isAvailableOnUserProviders(item.movieId);
     return WatchlistMovieRow(
       watchlistItem: item,
       isWatched: isWatched,
       availableProviders: providers,
-      userWatchProviderIds: _tonightServices
-          ? (_selectedProviderIds ?? _userWatchProviderIds)
-          : _userWatchProviderIds,
-      userWatchProviderMatchKeys: _tonightServices
-          ? [..._savedProviders, ..._searchProviders]
-              .where((p) => (_selectedProviderIds ?? _userWatchProviderIds)
+      userWatchProviderIds: _watchlist.filters.servicesOnly
+          ? (_watchlist.filters.providerIds ?? _watchlist.userWatchProviderIds)
+          : _watchlist.userWatchProviderIds,
+      userWatchProviderMatchKeys: _watchlist.filters.servicesOnly
+          ? [..._watchlist.savedProviders, ..._watchlist.searchProviders]
+              .where((p) => (_watchlist.filters.providerIds ??
+                      _watchlist.userWatchProviderIds)
                   .contains(p.id))
               .map((p) => p.matchKey)
               .toSet()
-          : _userWatchProviderMatchKeys,
+          : _watchlist.userWatchProviderMatchKeys,
       canWatchNow: canWatchNow,
       isLoadingProviders: isLoadingProviders,
       providersFailed: !isLoadingProviders &&
-          !_movieWatchProviders.containsKey(item.movieId),
+          !_watchlist.movieWatchProviders.containsKey(item.movieId),
       region: context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB',
       onEditPreferences: _editPreferences,
-      onRetryProviders: () => _retryEnrichment(item),
-      isLoadingFriends:
-          pending && !_recommendationsByMovieId.containsKey(item.movieId),
-      friendsFailed:
-          !pending && !_recommendationsByMovieId.containsKey(item.movieId),
-      onRetryFriends: () => _retryEnrichment(item),
-      recommendations: _recommendationsByMovieId[item.movieId] ?? const [],
+      onRetryProviders: () => _watchlist.retryEnrichment(item),
+      isLoadingFriends: pending &&
+          !_watchlist.recommendationsByMovieId.containsKey(item.movieId),
+      friendsFailed: !pending &&
+          !_watchlist.recommendationsByMovieId.containsKey(item.movieId),
+      onRetryFriends: () => _watchlist.retryEnrichment(item),
+      recommendations:
+          _watchlist.recommendationsByMovieId[item.movieId] ?? const [],
       onTap: () => context.push(
           movieDetailPath(
             item.movieId,
@@ -2295,15 +749,15 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             'title': item.movie?.title,
             'poster': item.movie?.posterPath
           }),
-      onMarkAsWatched: () => _markAsWatched(item),
-      onAddToFavourites: () => _addToFavorites(item),
-      onAddToList: () => _showAddToListSheet(item),
-      onRequestToWatch: () => _showWatchRequestSheet(item),
-      onRemove: () => _removeFromWatchlist(item),
+      onMarkAsWatched: () => _actions.markAsWatched(item),
+      onAddToFavourites: () => _actions.addToFavourites(item),
+      onAddToList: () => _actions.addToList(item),
+      onRequestToWatch: () => _actions.requestWatch(item),
+      onRemove: () => _actions.removeMovie(item),
     );
   }
 
-  Widget _buildShowWatchlistRow(_WatchlistShowEntry item) {
+  Widget _buildShowWatchlistRow(WatchlistShowEntry item) {
     void details() => context.push(
         showDetailPath(item.showId, source: DetailSource.watchlist),
         extra: {'title': item.title, 'poster': item.posterPath});
@@ -2334,1337 +788,37 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       isWatched: item.watched,
       onTap: details,
       onMarkAsWatched: details,
-      onRemove: () => _removeShowFromWatchlist(item),
-      availableProviders: _showWatchProviders[item.showId] ?? const [],
-      userWatchProviderIds: _tonightServices
-          ? (_selectedProviderIds ?? _userWatchProviderIds)
-          : _userWatchProviderIds,
-      userWatchProviderMatchKeys: _tonightServices
-          ? [..._savedProviders, ..._searchProviders]
-              .where((p) => (_selectedProviderIds ?? _userWatchProviderIds)
+      onRemove: () => _actions.removeShow(item),
+      availableProviders:
+          _watchlist.showWatchProviders[item.showId] ?? const [],
+      userWatchProviderIds: _watchlist.filters.servicesOnly
+          ? (_watchlist.filters.providerIds ?? _watchlist.userWatchProviderIds)
+          : _watchlist.userWatchProviderIds,
+      userWatchProviderMatchKeys: _watchlist.filters.servicesOnly
+          ? [..._watchlist.savedProviders, ..._watchlist.searchProviders]
+              .where((p) => (_watchlist.filters.providerIds ??
+                      _watchlist.userWatchProviderIds)
                   .contains(p.id))
               .map((p) => p.matchKey)
               .toSet()
-          : _userWatchProviderMatchKeys,
+          : _watchlist.userWatchProviderMatchKeys,
       region: context.read<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB',
       isLoadingProviders:
-          !_completedEnrichment.contains('show:${item.showId}') &&
-              !_showWatchProviders.containsKey(item.showId),
-      providersFailed: _completedEnrichment.contains('show:${item.showId}') &&
-          !_showWatchProviders.containsKey(item.showId),
+          !_watchlist.completedEnrichment.contains('show:${item.showId}') &&
+              !_watchlist.showWatchProviders.containsKey(item.showId),
+      providersFailed:
+          _watchlist.completedEnrichment.contains('show:${item.showId}') &&
+              !_watchlist.showWatchProviders.containsKey(item.showId),
       onEditPreferences: _editPreferences,
-      onRetryProviders: () => _retryEnrichment(item),
-      recommendations: _friendsByShowId[item.showId] ?? const [],
-      isLoadingFriends: !_completedEnrichment.contains('show:${item.showId}') &&
-          !_friendsByShowId.containsKey(item.showId),
-      friendsFailed: _completedEnrichment.contains('show:${item.showId}') &&
-          !_friendsByShowId.containsKey(item.showId),
-      onRetryFriends: () => _retryEnrichment(item),
+      onRetryProviders: () => _watchlist.retryEnrichment(item),
+      recommendations: _watchlist.friendsByShowId[item.showId] ?? const [],
+      isLoadingFriends:
+          !_watchlist.completedEnrichment.contains('show:${item.showId}') &&
+              !_watchlist.friendsByShowId.containsKey(item.showId),
+      friendsFailed:
+          _watchlist.completedEnrichment.contains('show:${item.showId}') &&
+              !_watchlist.friendsByShowId.containsKey(item.showId),
+      onRetryFriends: () => _watchlist.retryEnrichment(item),
     );
   }
-
-  Future<void> _removeShowFromWatchlist(_WatchlistShowEntry item) async {
-    final authProvider = context.read<AuthProvider>();
-    final user = authProvider.dbUser;
-    if (user == null) return;
-    try {
-      await ShowService.removeFromWatchlist(user.id, item.showId);
-      final updated = List<dynamic>.from(user.showWatchlist ?? const [])
-        ..removeWhere((entry) {
-          if (entry is! Map) return false;
-          return _watchlistInt(entry['showId']) == item.showId;
-        });
-      authProvider.updateUserList(showWatchlist: updated);
-      if (!mounted) return;
-      setState(
-        () => _allShowWatchlist = _allShowWatchlist
-            .where((show) => show.showId != item.showId)
-            .toList(growable: false),
-      );
-      _filterWatchlist();
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-            type: FlixieToastType.success,
-            content: Text('${item.title} removed from watchlist')),
-      );
-    } catch (error) {
-      logger.w('[Watchlist] Show removal failed: $error');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showFlixieToast(
-        FlixieToast(
-            type: FlixieToastType.error,
-            content: const Text('Couldn’t remove show from watchlist'),
-            action: SnackBarAction(
-                label: 'Retry',
-                onPressed: () {
-                  if (mounted) _removeShowFromWatchlist(item);
-                })),
-      );
-    }
-  }
-
-  bool _isUserProvider(WatchProvider provider) =>
-      _userWatchProviderIds.contains(provider.id) ||
-      _userWatchProviderMatchKeys.contains(provider.matchKey);
-}
-
-class _WatchlistShowEntry {
-  const _WatchlistShowEntry({
-    required this.showId,
-    required this.title,
-    required this.removed,
-    required this.watched,
-    this.posterPath,
-    this.firstAirDate,
-    this.status,
-    this.numberOfEpisodes,
-    this.numberOfSeasons,
-    this.voteAverage,
-    this.runtime,
-    this.genres = const [],
-    this.createdAt,
-  });
-
-  final int showId;
-  final String title;
-  final bool removed;
-  final bool watched;
-  final String? posterPath;
-  final String? firstAirDate;
-  final String? status;
-  final int? numberOfEpisodes;
-  final int? numberOfSeasons;
-  final double? voteAverage;
-  final int? runtime;
-  final List<String> genres;
-  final String? createdAt;
-
-  bool get needsDetails =>
-      title == 'TV show' ||
-      title.trim().isEmpty ||
-      posterPath == null ||
-      firstAirDate == null ||
-      numberOfSeasons == null ||
-      runtime == null ||
-      genres.isEmpty;
-
-  _WatchlistShowEntry withShow(TvShow show) => _WatchlistShowEntry.fromJson({
-        'showId': showId,
-        'removed': removed,
-        'watched': watched,
-        'createdAt': createdAt,
-        'show': {
-          ...show.toJson(),
-          if (show.genres.isEmpty) 'genres': genres,
-          if (show.episodeRuntime == null) 'episodeRuntime': runtime,
-        },
-      });
-
-  factory _WatchlistShowEntry.fromJson(Map<String, dynamic> json) {
-    final show = json['show'] is Map
-        ? Map<String, dynamic>.from(json['show'] as Map)
-        : const <String, dynamic>{};
-    return _WatchlistShowEntry(
-      showId: _watchlistInt(json['showId']) ?? _watchlistInt(show['id']) ?? 0,
-      title: (show['title'] ?? show['name'] ?? 'TV show').toString(),
-      removed: json['removed'] == true,
-      watched: json['watched'] == true,
-      posterPath: (show['posterPath'] ?? show['poster_path'])?.toString(),
-      firstAirDate: (show['firstAirDate'] ??
-              show['first_air_date'] ??
-              show['releaseDate'])
-          ?.toString(),
-      status: show['status']?.toString(),
-      numberOfEpisodes: _watchlistInt(show['numberOfEpisodes']),
-      numberOfSeasons:
-          _watchlistInt(show['numberOfSeasons'] ?? show['number_of_seasons']),
-      voteAverage: double.tryParse('${show['voteAverage'] ?? ''}'),
-      runtime: TvShow.fromJson(show).episodeRuntime,
-      genres: (show['genres'] as List? ?? const [])
-          .map((g) => g is Map ? '${g['name'] ?? ''}' : '$g')
-          .where((g) => g.isNotEmpty)
-          .toList(),
-      createdAt: json['createdAt']?.toString(),
-    );
-  }
-}
-
-int? _watchlistInt(dynamic value) {
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value?.toString() ?? '');
-}
-
-class _WatchlistMovieSearchSheet extends StatefulWidget {
-  const _WatchlistMovieSearchSheet({required this.existingMovieIds});
-
-  final Set<int> existingMovieIds;
-
-  @override
-  State<_WatchlistMovieSearchSheet> createState() =>
-      _WatchlistMovieSearchSheetState();
-}
-
-class _WatchlistMovieSearchSheetState
-    extends State<_WatchlistMovieSearchSheet> {
-  final TextEditingController _controller = TextEditingController();
-  Timer? _debounce;
-  List<MovieShort> _results = [];
-  bool _isSearching = false;
-  String _query = '';
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged(String value) {
-    _debounce?.cancel();
-    final query = value.trim();
-    setState(() => _query = query);
-    if (query.length < 3) {
-      setState(() {
-        _results = [];
-        _isSearching = false;
-      });
-      return;
-    }
-
-    _debounce = Timer(const Duration(milliseconds: 350), () {
-      _search(query);
-    });
-  }
-
-  Future<void> _search(String query) async {
-    setState(() => _isSearching = true);
-    try {
-      final response = await SearchService.search(query, type: 'movie');
-      final movies = response.results
-          .where((item) => !item.isPerson && item.movie != null)
-          .map((item) => item.movie!)
-          .toList(growable: false);
-      if (!mounted) return;
-      setState(() {
-        _results = movies;
-        _isSearching = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isSearching = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.82,
-      minChildSize: 0.55,
-      maxChildSize: 0.94,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: context.colors.background,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.colors.medium.withValues(alpha: 0.45),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 8, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Add to Watchlist',
-                        style: TextStyle(
-                          color: context.colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close_rounded,
-                          color: context.colors.light),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  onChanged: _onSearchChanged,
-                  style: TextStyle(color: context.colors.textPrimary),
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search movies',
-                    hintStyle: TextStyle(color: context.colors.medium),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        color: context.colors.medium),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Clear search',
-                            icon: Icon(Icons.close_rounded,
-                                color: context.colors.medium),
-                            onPressed: () {
-                              _controller.clear();
-                              _onSearchChanged('');
-                            },
-                          ),
-                    filled: true,
-                    fillColor: context.colors.surfaceElevated,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: FlixieColors.primary),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(child: _buildResults(scrollController)),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildResults(ScrollController scrollController) {
-    if (_query.length < 3) {
-      return Center(
-        child: Text(
-          'Search for a movie to add',
-          style: TextStyle(color: context.colors.medium),
-        ),
-      );
-    }
-
-    if (_isSearching) {
-      return const Center(
-        child: CircularProgressIndicator(color: FlixieColors.primary),
-      );
-    }
-
-    if (_results.isEmpty) {
-      return Center(
-        child: Text(
-          'No movies found for "$_query"',
-          style: TextStyle(color: context.colors.medium),
-        ),
-      );
-    }
-
-    return ListView.separated(
-      controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-      itemCount: _results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final movie = _results[index];
-        final isAdded = widget.existingMovieIds.contains(movie.id);
-        return _WatchlistMovieSearchResultTile(
-          movie: movie,
-          isAdded: isAdded,
-          onTap: isAdded ? null : () => Navigator.pop(context, movie),
-        );
-      },
-    );
-  }
-}
-
-class _WatchlistMovieSearchResultTile extends StatelessWidget {
-  const _WatchlistMovieSearchResultTile({
-    required this.movie,
-    required this.isAdded,
-    required this.onTap,
-  });
-
-  final MovieShort movie;
-  final bool isAdded;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final posterUrl = movie.poster == null
-        ? null
-        : 'https://image.tmdb.org/t/p/w185${movie.poster}';
-    final year = _movieYear(movie.releaseDate);
-    final vote = hideMovieRatings(context, movie.id) ? null : movie.voteAverage;
-
-    return Material(
-      color: context.colors.surfaceElevated,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(7),
-                child: SizedBox(
-                  width: 48,
-                  height: 72,
-                  child: posterUrl == null
-                      ? const _MoviePosterPlaceholder()
-                      : CachedNetworkImage(
-                          imageUrl: posterUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) =>
-                              const _MoviePosterPlaceholder(),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      movie.name,
-                      style: TextStyle(
-                        color: context.colors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        if (year != null)
-                          Text(
-                            year,
-                            style: TextStyle(
-                              color: context.colors.medium,
-                              fontSize: 12,
-                            ),
-                          ),
-                        if (year != null && vote != null && vote > 0)
-                          Text(
-                            '  •  ',
-                            style: TextStyle(
-                              color: context.colors.medium,
-                              fontSize: 12,
-                            ),
-                          ),
-                        if (vote != null && vote > 0) ...[
-                          Icon(Icons.star_rounded,
-                              color: context.colors.tertiary, size: 13),
-                          const SizedBox(width: 2),
-                          Text(
-                            vote.toStringAsFixed(1),
-                            style: TextStyle(
-                              color: context.colors.tertiary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Icon(
-                isAdded
-                    ? Icons.check_circle_rounded
-                    : Icons.add_circle_outline_rounded,
-                color: isAdded ? context.colors.success : FlixieColors.primary,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  static String? _movieYear(String? releaseDate) {
-    if (releaseDate == null || releaseDate.isEmpty) return null;
-    final parsed = DateTime.tryParse(releaseDate);
-    if (parsed != null) return parsed.year.toString();
-    return releaseDate.length >= 4 ? releaseDate.substring(0, 4) : null;
-  }
-}
-
-class _MoviePosterPlaceholder extends StatelessWidget {
-  const _MoviePosterPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: FlixieColors.primary.withValues(alpha: 0.18),
-      child: const Icon(Icons.movie_outlined, color: FlixieColors.primary),
-    );
-  }
-}
-
-class WatchlistMovieRow extends StatelessWidget {
-  final bool isShow, isLoadingFriends, friendsFailed, providersFailed;
-  final String region;
-  final String? metadataOverride;
-  final VoidCallback? onRetryFriends, onRetryProviders, onEditPreferences;
-  final WatchlistMovie watchlistItem;
-  final bool isWatched;
-  final List<WatchProvider> availableProviders;
-  final Set<int> userWatchProviderIds;
-  final Set<String> userWatchProviderMatchKeys;
-  final bool canWatchNow;
-  final bool isLoadingProviders;
-  final List<FriendRecommendationItem> recommendations;
-  final VoidCallback onTap;
-  final VoidCallback onMarkAsWatched;
-  final VoidCallback? onAddToFavourites;
-  final VoidCallback? onAddToList;
-  final VoidCallback? onRequestToWatch;
-  final VoidCallback onRemove;
-
-  const WatchlistMovieRow({
-    super.key,
-    this.isShow = false,
-    this.isLoadingFriends = false,
-    this.friendsFailed = false,
-    this.providersFailed = false,
-    this.region = 'GB',
-    this.metadataOverride,
-    this.onRetryFriends,
-    this.onRetryProviders,
-    this.onEditPreferences,
-    required this.watchlistItem,
-    required this.isWatched,
-    this.availableProviders = const <WatchProvider>[],
-    this.userWatchProviderIds = const <int>{},
-    this.userWatchProviderMatchKeys = const <String>{},
-    this.canWatchNow = false,
-    this.isLoadingProviders = false,
-    this.recommendations = const [],
-    required this.onTap,
-    required this.onMarkAsWatched,
-    this.onAddToFavourites,
-    this.onAddToList,
-    this.onRequestToWatch,
-    required this.onRemove,
-  });
-
-  static String _runtimeLabel(int? minutes) {
-    if (minutes == null || minutes == 0) return '';
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    if (h == 0) return '${m}m';
-    if (m == 0) return '${h}h';
-    return '${h}h ${m}m';
-  }
-
-  static String _formatDate(String? iso) {
-    if (iso == null) return '';
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return '';
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final movie = watchlistItem.movie;
-    if (movie == null) return const SizedBox.shrink();
-    final metadata = metadataOverride ??
-        [
-          if (movie.releaseDate?.isNotEmpty == true)
-            movie.releaseDate!.split('-').first,
-          if (_runtimeLabel(movie.runtime).isNotEmpty)
-            _runtimeLabel(movie.runtime),
-          ...movie.genres.take(2),
-          if (isWatched) 'Watched',
-        ].join(' · ');
-    return Material(
-      color: Colors.transparent,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Semantics(
-              label: '${movie.title} poster',
-              image: true,
-              button: true,
-              onTap: onTap,
-              child: ExcludeSemantics(
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 68,
-                      height: 102,
-                      child: movie.posterPath == null
-                          ? const _MoviePosterPlaceholder()
-                          : CachedNetworkImage(
-                              imageUrl:
-                                  'https://image.tmdb.org/t/p/w342${movie.posterPath}',
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) =>
-                                  const _MoviePosterPlaceholder(),
-                              errorWidget: (_, __, ___) =>
-                                  const _MoviePosterPlaceholder(),
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-                child: InkWell(
-                    onTap: onTap,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 44),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(movie.title,
-                                style: TextStyle(
-                                    color: context.colors.textPrimary,
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
-                            Text(metadata,
-                                style: TextStyle(
-                                    color: context.colors.light, fontSize: 13)),
-                            const SizedBox(height: 7),
-                            Wrap(spacing: 6, runSpacing: 6, children: [
-                              FlixiePill.label(
-                                  label: Text(isShow ? 'Show' : 'Movie')),
-                              if (releaseStatus(movie.releaseDate) ==
-                                  ReleaseStatus.comingSoon)
-                                const FlixiePill.label(
-                                  avatar: Icon(Icons.event_outlined),
-                                  label: Text('Coming soon'),
-                                ),
-                            ]),
-                            if (releaseStatus(movie.releaseDate) ==
-                                ReleaseStatus.comingSoon) ...[
-                              const SizedBox(height: 4),
-                              Text('Releases ${_formatDate(movie.releaseDate)}',
-                                  style: TextStyle(
-                                      color: context.colors.light,
-                                      fontSize: 13)),
-                            ],
-                          ]),
-                    ))),
-            PopupMenuButton<String>(
-              tooltip: 'More actions',
-              color: context.colors.surfaceElevated,
-              onSelected: (value) {
-                switch (value) {
-                  case 'details':
-                    onTap();
-                  case 'watched':
-                    onMarkAsWatched();
-                  case 'favourite':
-                    onAddToFavourites?.call();
-                  case 'list':
-                    onAddToList?.call();
-                  case 'request_watch':
-                    onRequestToWatch?.call();
-                  case 'remove':
-                    onRemove();
-                }
-              },
-              itemBuilder: (_) => [
-                if (_formatDate(watchlistItem.createdAt).isNotEmpty)
-                  PopupMenuItem<String>(
-                      enabled: false,
-                      child: Text(
-                          'Added ${_formatDate(watchlistItem.createdAt)}')),
-                const PopupMenuItem(
-                    value: 'details', child: Text('Title details')),
-                PopupMenuItem(
-                    value: 'watched',
-                    child: Text(isShow
-                        ? 'Manage episodes & watched status'
-                        : 'Mark as Watched')),
-                if (!isShow || onAddToFavourites != null)
-                  const PopupMenuItem(
-                      value: 'favourite', child: Text('Add to favourites')),
-                if (!isShow || onAddToList != null)
-                  const PopupMenuItem(
-                      value: 'list', child: Text('Add to list')),
-                if (!isShow || onRequestToWatch != null)
-                  const PopupMenuItem(
-                      value: 'request_watch', child: Text('Invite friends')),
-                const PopupMenuItem(value: 'remove', child: Text('Remove')),
-              ],
-              child: Semantics(
-                  label: 'Actions for ${movie.title}',
-                  button: true,
-                  child: SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Icon(Icons.more_horiz_rounded,
-                          color: context.colors.light))),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          _FriendsViewing(
-              movieId: movie.id,
-              friends: recommendations,
-              title: movie.title,
-              isShow: isShow,
-              loading: isLoadingFriends,
-              failed: friendsFailed,
-              onRetry: onRetryFriends),
-          _WatchProvidersInline(
-              providers: availableProviders,
-              userWatchProviderIds: userWatchProviderIds,
-              userWatchProviderMatchKeys: userWatchProviderMatchKeys,
-              isLoading: isLoadingProviders,
-              failed: providersFailed,
-              region: region,
-              onRetry: onRetryProviders,
-              onEditPreferences: onEditPreferences),
-          const SizedBox(height: 12),
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: Theme.of(context).brightness == Brightness.light
-                ? context.colors.textPrimary.withValues(alpha: .2)
-                : context.colors.tabBarBorder,
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-Future<void> _watchlistDetailSheet(
-    BuildContext context, String title, List<Widget> children) {
-  return showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    useSafeArea: true,
-    isScrollControlled: true,
-    backgroundColor: context.colors.surface,
-    builder: (context) => ConstrainedBox(
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .8),
-      child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            Row(children: [
-              Expanded(
-                  child: Text(title,
-                      style: TextStyle(
-                          color: context.colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700))),
-              IconButton(
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close))
-            ]),
-            ...children,
-          ]),
-    ),
-  );
-}
-
-class _FriendsViewing extends StatelessWidget {
-  const _FriendsViewing(
-      {required this.friends,
-      required this.title,
-      required this.movieId,
-      this.isShow = false,
-      this.loading = false,
-      this.failed = false,
-      this.onRetry});
-  final int movieId;
-  final List<FriendRecommendationItem> friends;
-  final String title;
-  final bool isShow, loading, failed;
-  final VoidCallback? onRetry;
-
-  Widget _avatar(FriendRecommendationItem friend) => SizedBox(
-      width: 44,
-      height: 44,
-      child: Center(
-          child: ProfileAvatarView(
-              avatar: friend.avatar ??
-                  (friend.avatarUrl?.isNotEmpty == true
-                      ? ProfileAvatar(
-                          id: 0,
-                          key: friend.userId,
-                          displayName: friend.username,
-                          storagePath: '',
-                          imageUrl: friend.avatarUrl)
-                      : null),
-              profileBadges: friend.profileBadges,
-              fallbackText: friend.username.isEmpty
-                  ? '?'
-                  : friend.username.characters.first.toUpperCase(),
-              fallbackColor: FlixieColors.primary,
-              size: 32)));
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Loading friends…',
-            style: TextStyle(color: context.colors.light, fontSize: 12)),
-        const ContentPlaceholder(
-            label: 'Loading friends', style: ContentPlaceholderStyle.compact),
-      ]);
-    }
-    if (failed) {
-      return TextButton.icon(
-          onPressed: onRetry,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Friends couldn’t load · Retry'));
-    }
-    final watched = friends.where((f) => f.watched).toList();
-    final rated = friends
-        .where((f) =>
-            f.rating != null && f.ratingScope == (isShow ? 'show' : 'movie'))
-        .toList();
-    final average = rated.isEmpty
-        ? null
-        : rated.fold<double>(0, (sum, f) => sum + f.rating!) / rated.length;
-    final summary =
-        '${watched.length} ${watched.length == 1 ? 'friend' : 'friends'} watched';
-    final scoresHidden = hideMovieRatings(context, movieId, isShow: isShow);
-    final ratingLabel = scoresHidden
-        ? 'Rate to see friends’ scores'
-        : average == null
-            ? 'No friends’ ratings yet'
-            : 'Friends’ average ${average.toStringAsFixed(1)}/10 · ${rated.length} rated';
-    return InkWell(
-      onTap: () => showModalBottomSheet<void>(
-        context: context,
-        useRootNavigator: true,
-        useSafeArea: true,
-        isScrollControlled: true,
-        backgroundColor: context.colors.background,
-        builder: (sheetContext) => ConstrainedBox(
-          constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(sheetContext).height * .85),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text('Friends who watched',
-                            style: TextStyle(
-                                fontFamily: FlixieTypography.fontFamily,
-                                color: context.colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800))),
-                    IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: Icon(Icons.close, color: context.colors.light)),
-                  ]),
-                  Text(
-                      '$title · ${watched.length} watched · ${rated.length} rated',
-                      style:
-                          TextStyle(color: context.colors.light, fontSize: 13)),
-                  const SizedBox(height: 20),
-                  Divider(height: 1, color: context.colors.tabBarBorder),
-                  if (friends.isEmpty)
-                    Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Text('No friends watched yet',
-                            style: TextStyle(color: context.colors.light))),
-                  for (final friend in friends) ...[
-                    Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: LayoutBuilder(builder: (context, constraints) {
-                          final scope = friend.ratingScope.isEmpty
-                              ? (isShow ? 'show' : 'movie')
-                              : friend.ratingScope;
-                          final scopeLabel =
-                              '${scope[0].toUpperCase()}${scope.substring(1)} rating';
-                          final state =
-                              friend.watched ? 'Watched' : 'Not marked watched';
-                          final details = Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                    friend.displayName?.trim().isNotEmpty ==
-                                            true
-                                        ? friend.displayName!
-                                        : friend.username,
-                                    style: TextStyle(
-                                        color: context.colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 3),
-                                Text(
-                                    '$state · ${friend.rating == null ? 'Not rated yet' : scopeLabel}',
-                                    style: TextStyle(
-                                        color: context.colors.light,
-                                        fontSize: 13)),
-                              ]);
-                          final rating = Text(
-                              hideMovieRatings(context, movieId,
-                                      isShow: isShow, ownerId: friend.userId)
-                                  ? 'Hidden'
-                                  : friend.rating == null
-                                      ? '—'
-                                      : '${friend.rating! == friend.rating!.roundToDouble() ? friend.rating!.toInt() : friend.rating}/10',
-                              style: TextStyle(
-                                  color: friend.rating == null
-                                      ? context.colors.light
-                                      : context.colors.warning,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800));
-                          final stacked = constraints.maxWidth < 360 &&
-                              MediaQuery.textScalerOf(context).scale(16) > 24;
-                          return Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                _avatar(friend),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                    child: stacked
-                                        ? Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                                details,
-                                                const SizedBox(height: 6),
-                                                rating
-                                              ])
-                                        : details),
-                                if (!stacked) ...[
-                                  const SizedBox(width: 12),
-                                  rating
-                                ],
-                              ]);
-                        })),
-                    Divider(height: 1, color: context.colors.tabBarBorder),
-                  ],
-                  const SizedBox(height: 16),
-                  Text(
-                      average == null
-                          ? 'No friends’ ratings yet'
-                          : 'Friends’ average ${average.toStringAsFixed(1)}/10 · Based on ${rated.length} ${rated.length == 1 ? 'rating' : 'ratings'}',
-                      style:
-                          TextStyle(color: context.colors.light, fontSize: 13)),
-                  if (isShow) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                        'Show-level ratings only. Season and episode ratings are separate. Watched means marked watched, not necessarily every episode completed.',
-                        style: TextStyle(
-                            color: context.colors.light, fontSize: 12)),
-                  ],
-                ]),
-          ),
-        ),
-      ),
-      child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: LayoutBuilder(builder: (context, constraints) {
-              final avatars =
-                  Wrap(children: watched.take(3).map(_avatar).toList());
-              final text = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(watched.isEmpty ? 'No friends watched yet' : summary,
-                        style: TextStyle(
-                            color: context.colors.white, fontSize: 13)),
-                    Text(ratingLabel,
-                        style: TextStyle(
-                            color: context.colors.light, fontSize: 12)),
-                  ]);
-              if (constraints.maxWidth < 360 ||
-                  MediaQuery.textScalerOf(context).scale(14) > 20) {
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [if (watched.isNotEmpty) avatars, text]);
-              }
-              return Row(children: [
-                if (watched.isNotEmpty) ...[avatars, const SizedBox(width: 8)],
-                Expanded(child: text),
-                Icon(Icons.chevron_right, color: context.colors.light)
-              ]);
-            }),
-          )),
-    );
-  }
-}
-
-class _WatchProvidersInline extends StatelessWidget {
-  const _WatchProvidersInline(
-      {required this.providers,
-      required this.userWatchProviderIds,
-      required this.userWatchProviderMatchKeys,
-      required this.isLoading,
-      this.failed = false,
-      this.region = 'GB',
-      this.onEditPreferences,
-      this.onRetry});
-  final List<WatchProvider> providers;
-  final Set<int> userWatchProviderIds;
-  final Set<String> userWatchProviderMatchKeys;
-  final bool isLoading, failed;
-  final String region;
-  final VoidCallback? onRetry, onEditPreferences;
-
-  bool _included(WatchProvider p) =>
-      p.isIncludedOffer &&
-      (p.isFree ||
-          userWatchProviderIds.contains(p.id) ||
-          userWatchProviderMatchKeys.contains(p.matchKey));
-  String _label(WatchProvider p) => [
-        if (p.isIncludedOffer)
-          p.isFree
-              ? 'Included · Free${p.availabilityTypes.contains('ads') ? ' with ads' : ''}'
-              : _included(p)
-                  ? 'Included'
-                  : 'Subscription',
-        if (p.isRental) 'Rent',
-        if (p.isPurchase) 'Buy',
-        if (!p.hasExplicitAvailabilityType) 'Availability unconfirmed',
-      ].join(' · ');
-
-  @override
-  Widget build(BuildContext context) {
-    if (isLoading) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Loading watch options…',
-            style: TextStyle(color: context.colors.light, fontSize: 12)),
-        const ContentPlaceholder(
-            label: 'Loading availability',
-            style: ContentPlaceholderStyle.providers),
-      ]);
-    }
-    if (failed) {
-      return TextButton.icon(
-          onPressed: onRetry,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Availability couldn’t load · Retry'));
-    }
-    final canStream = providers.any(_included);
-    final streamIcon = Icon(
-      Icons.play_arrow_outlined,
-      size: 18,
-      color:
-          canStream ? context.colors.providerIncluded : context.colors.danger,
-      semanticLabel: canStream
-          ? 'Streaming available to you'
-          : 'No streaming option on your services',
-    );
-    final sorted = [...providers]..sort((a, b) {
-        if (_included(a) != _included(b)) return _included(a) ? -1 : 1;
-        return a.displayPriority.compareTo(b.displayPriority);
-      });
-    const labelStyle = TextStyle(fontSize: 13, fontWeight: FontWeight.w700);
-    final optionsStyle = TextStyle(color: context.colors.light, fontSize: 12);
-    Widget logo(WatchProvider provider) => Tooltip(
-          message: '${provider.providerName} · ${_label(provider)}',
-          excludeFromSemantics: true,
-          child: Semantics(
-            image: true,
-            label: '${provider.providerName} · ${_label(provider)}',
-            child: Container(
-              width: 40,
-              height: 40,
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: userWatchProviderIds.contains(provider.id) ||
-                          userWatchProviderMatchKeys.contains(provider.matchKey)
-                      ? context.colors.providerIncluded
-                      : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: provider.logoPath.isEmpty
-                    ? const _ProviderLogoFallback()
-                    : CachedNetworkImage(
-                        imageUrl: provider.logoUrl,
-                        fit: BoxFit.contain,
-                        placeholder: (_, __) => const _ProviderLogoFallback(),
-                        errorWidget: (_, __, ___) =>
-                            const _ProviderLogoFallback(),
-                      ),
-              ),
-            ),
-          ),
-        );
-    final grouped = <String, WatchProvider>{};
-    for (final provider in sorted) {
-      final key = '${provider.id}:${provider.providerName}';
-      final previous = grouped[key];
-      grouped[key] = previous == null
-          ? provider
-          : WatchProvider(
-              id: previous.id,
-              providerName: previous.providerName,
-              displayPriority: previous.displayPriority,
-              logoPath: previous.logoPath,
-              tvShows: previous.tvShows,
-              movies: previous.movies,
-              isVisible: previous.isVisible,
-              supportsGb: previous.supportsGb,
-              supportsUs: previous.supportsUs,
-              watchUrl: previous.verifiedWatchUri != null
-                  ? previous.watchUrl
-                  : provider.watchUrl,
-              availabilityTypes: {
-                ...previous.availabilityTypes,
-                ...provider.availabilityTypes
-              },
-            );
-    }
-    final offers = grouped.values.toList();
-    final countryName = switch (region) {
-      'GB' => 'United Kingdom',
-      'US' => 'United States',
-      _ => region,
-    };
-    Future<void> openProvider(WatchProvider provider) async {
-      try {
-        final opened = await launchUrl(provider.verifiedWatchUri!,
-            mode: LaunchMode.externalApplication);
-        if (opened) return;
-      } catch (_) {}
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Couldn’t open watch options. Try again.')));
-      }
-    }
-
-    void openOptions() => _watchlistDetailSheet(context, 'Where to watch', [
-          Row(children: [
-            Icon(Icons.location_on_outlined,
-                size: 18, color: context.colors.light),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text(countryName,
-                    style:
-                        TextStyle(color: context.colors.white, fontSize: 14))),
-            if (onEditPreferences != null)
-              TextButton(
-                  onPressed: onEditPreferences, child: const Text('Change')),
-          ]),
-          const SizedBox(height: 12),
-          if (offers.isEmpty)
-            Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Text('No providers found in this country.',
-                    style: TextStyle(color: context.colors.light))),
-          for (final provider in offers) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child:
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                logo(provider),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(provider.providerName,
-                          style: TextStyle(
-                              color: context.colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Text(_label(provider),
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: _included(provider)
-                                  ? context.colors.providerIncluded
-                                  : context.colors.light)),
-                      if (provider.isAddOn && provider.isIncludedOffer) ...[
-                        const SizedBox(height: 4),
-                        Text('Separate add-on subscription',
-                            style: TextStyle(
-                                color: context.colors.light, fontSize: 12)),
-                      ],
-                    ])),
-                if (provider.verifiedWatchUri != null)
-                  IconButton(
-                      tooltip: 'View ${provider.providerName} watch options',
-                      onPressed: () => openProvider(provider),
-                      icon: Icon(Icons.open_in_new,
-                          size: 20, color: context.colors.primaryText)),
-              ]),
-            ),
-            Divider(height: 1, color: context.colors.tabBarBorder),
-          ],
-          const SizedBox(height: 20),
-          Text(
-              'Availability via TMDB / JustWatch. Confirm prices and plans with the service.',
-              style: TextStyle(color: context.colors.light, fontSize: 12)),
-        ]);
-    return Semantics(
-      button: true,
-      label: 'All watch options',
-      child: InkWell(
-        onTap: openOptions,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: LayoutBuilder(builder: (context, constraints) {
-              double textWidth(String text, TextStyle style) {
-                final painter = TextPainter(
-                  text: TextSpan(
-                      text: text,
-                      style: DefaultTextStyle.of(context).style.merge(style)),
-                  textDirection: Directionality.of(context),
-                  textScaler: MediaQuery.textScalerOf(context),
-                )..layout();
-                final width = painter.width.ceilToDouble();
-                painter.dispose();
-                return width;
-              }
-
-              String heading(int count) {
-                if (sorted.isEmpty) return 'No providers found';
-                final firstLabel = _label(sorted.first);
-                return sorted.take(count).every((p) => _label(p) == firstLabel)
-                    ? firstLabel
-                    : 'Watch on';
-              }
-
-              String remaining(int count) => count < sorted.length
-                  ? '+${sorted.length - count} options'
-                  : 'View options';
-
-              // Measure the actual labels at the current text scale, reserving
-              // the overflow count before choosing how many logos can fit.
-              var visibleCount = 0;
-              for (var count = 1; count <= sorted.length; count++) {
-                final width = 26 +
-                    textWidth(heading(count), labelStyle) +
-                    8 +
-                    count * 40 +
-                    (count - 1) * 7 +
-                    12 +
-                    textWidth(remaining(count), optionsStyle);
-                if (width <= constraints.maxWidth) {
-                  visibleCount = count;
-                }
-              }
-              final stacked = visibleCount == 0;
-              if (stacked && sorted.isNotEmpty) {
-                visibleCount = 1;
-                for (var count = 1; count <= sorted.length; count++) {
-                  if (count * 40 +
-                          (count - 1) * 7 +
-                          12 +
-                          textWidth(remaining(count), optionsStyle) <=
-                      constraints.maxWidth) {
-                    visibleCount = count;
-                  }
-                }
-              }
-              final label = heading(visibleCount);
-              final title = Text(label,
-                  style: labelStyle.copyWith(
-                    color: label.startsWith('Included')
-                        ? context.colors.providerIncluded
-                        : context.colors.light,
-                  ));
-              final logos = sorted.take(visibleCount).map(logo).toList();
-              final more = Text(remaining(visibleCount), style: optionsStyle);
-              if (stacked) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      streamIcon,
-                      const SizedBox(width: 8),
-                      Expanded(child: title),
-                    ]),
-                    const SizedBox(height: 8),
-                    Wrap(
-                        spacing: 7,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [...logos, more]),
-                  ],
-                );
-              }
-              return Row(children: [
-                streamIcon,
-                const SizedBox(width: 8),
-                title,
-                const SizedBox(width: 8),
-                for (var i = 0; i < logos.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 7),
-                  logos[i],
-                ],
-                const Spacer(),
-                const SizedBox(width: 12),
-                more,
-              ]);
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProviderLogoFallback extends StatelessWidget {
-  const _ProviderLogoFallback();
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-        color: context.colors.surfaceElevated,
-        child: Icon(Icons.tv_rounded, size: 18, color: context.colors.light),
-      );
 }

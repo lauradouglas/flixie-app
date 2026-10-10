@@ -22,7 +22,6 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
   LibraryImportController get c => widget.controller;
   bool _reading = false;
   bool _restoring = false;
-  bool _leaving = false;
   String? _error;
   String _filter = 'all';
 
@@ -47,26 +46,13 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
 
   void _changed() {
     if (mounted) setState(() {});
-    if (_leaving && !c.busy && mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).pop();
-      });
-    }
   }
 
-  void _leave() {
-    if (c.busy) {
-      _leaving = true;
-      c.pause();
-    } else {
-      Navigator.of(context).pop();
-    }
-  }
+  void _leave() => Navigator.of(context).pop();
 
   @override
   void dispose() {
     c.removeListener(_changed);
-    c.dispose();
     super.dispose();
   }
 
@@ -192,7 +178,7 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
             .toList() ??
         [];
     return PopScope(
-        canPop: !c.busy,
+        canPop: true,
         onPopInvokedWithResult: (didPop, result) {
           if (!didPop) _leave();
         },
@@ -340,7 +326,7 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                                     ? 'Pausing after this title…'
                                     : 'Pause')),
                             Text(
-                                'Keep this screen open while importing. If you leave, your progress is saved here.',
+                                'You can keep using Flixie. We’ll let you know when this finishes. If you close the app, return here to resume.',
                                 style: TextStyle(color: context.colors.light)),
                           ] else ...[
                             if (c.doneCount > 0) ...[

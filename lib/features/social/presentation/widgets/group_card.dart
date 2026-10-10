@@ -6,7 +6,6 @@ import 'package:flixie_app/models/group.dart';
 import 'package:flixie_app/models/group_member.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_badges.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
 
 class GroupCard extends StatelessWidget {
@@ -38,6 +37,15 @@ class GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final count = memberCount ?? group.memberCount;
+    final status = statusLabel != null && statusLabel!.isNotEmpty
+        ? _GroupInfoChip(
+            label: statusLabel!,
+            color: statusLabel == 'Invite pending'
+                ? context.colors.warning
+                : statusLabel == 'Community'
+                    ? context.colors.medium
+                    : context.colors.success)
+        : null;
     if (compact) {
       final description = group.description?.trim() ?? '';
       return Padding(
@@ -95,63 +103,68 @@ class GroupCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GroupAvatar(group: group, radius: 30),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              group.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: context.colors.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
+            LayoutBuilder(builder: (context, constraints) {
+              final reflow = constraints.maxWidth < 330 ||
+                  MediaQuery.textScalerOf(context).scale(12) > 18;
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GroupAvatar(group: group, radius: 30),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      group.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: context.colors.textPrimary,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(Icons.more_horiz_rounded,
+                                      color: context.colors.medium, size: 20),
+                                ],
                               ),
-                            ),
-                          ),
-                          Icon(Icons.more_horiz_rounded,
-                              color: context.colors.medium, size: 20),
-                        ],
-                      ),
-                      if (count != null)
-                        Text(
-                          '${_formatCount(count)} member${count == 1 ? '' : 's'}',
-                          style: const TextStyle(
-                            color: FlixieColors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                              if (count != null)
+                                Text(
+                                  '${_formatCount(count)} member${count == 1 ? '' : 's'}',
+                                  style: const TextStyle(
+                                    color: FlixieColors.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              if (members.isNotEmpty) ...[
+                                const SizedBox(height: 7),
+                                _MemberAvatars(
+                                    members: members, totalCount: count),
+                              ],
+                            ],
                           ),
                         ),
-                      if (members.isNotEmpty) ...[
-                        const SizedBox(height: 7),
-                        _MemberAvatars(members: members, totalCount: count),
+                        if (status != null && !reflow)
+                          Padding(
+                              padding: const EdgeInsets.only(top: 34),
+                              child: status),
                       ],
-                    ],
-                  ),
-                ),
-                if (statusLabel != null && statusLabel!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 34),
-                    child: _GroupInfoChip(
-                      label: statusLabel!,
-                      color: statusLabel == 'Invite pending'
-                          ? context.colors.warning
-                          : statusLabel == 'Community'
-                              ? context.colors.medium
-                              : context.colors.success,
                     ),
-                  ),
-              ],
-            ),
+                    if (status != null && reflow)
+                      Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: status),
+                  ]);
+            }),
             const SizedBox(height: 10),
             Divider(height: 1, color: context.colors.tabBarBorder),
             const SizedBox(height: 10),
@@ -187,18 +200,15 @@ class _MemberAvatars extends StatelessWidget {
   final List<GroupMember> members;
   final int? totalCount;
 
-  Widget _avatar(GroupMember member) => SpecialAvatarFrame(
-        badges: member.profileBadges,
-        frameWidth: 3,
-        child: ProfileAvatarView(
-          avatar: member.avatar,
-          fallbackText: member.initials ??
-              (member.username?.isNotEmpty == true
-                  ? member.username![0].toUpperCase()
-                  : '?'),
-          fallbackColor: FlixieColors.primary,
-          size: 26,
-        ),
+  Widget _avatar(GroupMember member) => ProfileAvatarView(
+        avatar: member.avatar,
+        profileBadges: member.profileBadges,
+        fallbackText: member.initials ??
+            (member.username?.isNotEmpty == true
+                ? member.username![0].toUpperCase()
+                : '?'),
+        fallbackColor: FlixieColors.primary,
+        size: 32,
       );
 
   @override

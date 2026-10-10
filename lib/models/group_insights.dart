@@ -342,11 +342,15 @@ class GroupInsightUser {
   final String id;
   final String username;
   final String? avatarUrl;
+  final ProfileAvatar? avatar;
+  final List<String> profileBadges;
 
   const GroupInsightUser({
     required this.id,
     required this.username,
     this.avatarUrl,
+    this.avatar,
+    this.profileBadges = const [],
   });
 
   factory GroupInsightUser.fromJson(Map<String, dynamic> json) {
@@ -354,6 +358,15 @@ class GroupInsightUser {
       id: (json['id'] ?? json['userId'] ?? '').toString(),
       username: (json['username'] ?? json['name'] ?? '').toString(),
       avatarUrl: json['avatarUrl'] as String?,
+      avatar: json['avatar'] is Map<String, dynamic>
+          ? ProfileAvatar.fromJson(json['avatar'] as Map<String, dynamic>)
+          : null,
+      profileBadges: List.unmodifiable(
+          (json['profileBadges'] as List? ?? const [])
+              .map((badge) => badge is Map
+                  ? (badge['badge'] ?? '').toString()
+                  : badge.toString())
+              .where((badge) => badge.isNotEmpty)),
     );
   }
 }

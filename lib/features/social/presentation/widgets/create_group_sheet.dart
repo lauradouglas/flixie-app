@@ -1,12 +1,13 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/group.dart';
+import 'package:flixie_app/features/social/presentation/controllers/friend_actions_controller.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
-import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
@@ -22,11 +23,32 @@ class CreateGroupSheet extends StatefulWidget {
 }
 
 class _CreateGroupSheetState extends State<CreateGroupSheet> {
+  final FriendActionsController _friendActions =
+      FriendActionsController.instance;
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _abbrController = TextEditingController();
   final _descController = TextEditingController();
   bool _isPublic = true;
+  late final String? _viewer;
+  bool get _owns =>
+      mounted && context.read<AuthProvider>().dbUser?.id == _viewer;
+  @override
+  void initState() {
+    super.initState();
+    _viewer = context.read<AuthProvider>().dbUser?.id;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewer = context.watch<AuthProvider>().dbUser?.id;
+    if (viewer == _viewer) return;
+    final route = ModalRoute.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && route?.isCurrent == true) Navigator.of(context).pop();
+    });
+  }
 
   // Step 1 - add members (before creation)
   int _step = 0;
@@ -48,14 +70,15 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) return;
+    if (!_owns || userId == null) return;
     _loadFriendsForInvite(userId);
     setState(() => _step = 1);
   }
 
   Future<void> _createGroupWithMembers() async {
     final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) return;
+    if (!_owns || userId == null) return;
+    if (_inviting) return;
     setState(() => _inviting = true);
     try {
       final members = [
@@ -77,14 +100,16 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
         'ownerId': userId,
         'members': members,
       });
+      if (!_owns) return;
       await analytics.groupCreated(
         groupType: _isPublic ? 'public' : 'private',
         source: 'group',
       );
+      if (!_owns) return;
       widget.onCreated?.call(group);
     } catch (e) {
       logger.e('Create group error: $e');
-      if (mounted) {
+      if (mounted && _owns) {
         ScaffoldMessenger.of(context).showFlixieToast(
           FlixieToast(
               type: FlixieToastType.error,
@@ -94,14 +119,14 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
         return;
       }
     }
-    if (mounted) Navigator.of(context).pop();
+    if (mounted && _owns) Navigator.of(context).pop();
   }
 
   Future<void> _loadFriendsForInvite(String userId) async {
-    if (mounted) setState(() => _loadingFriends = true);
+    if (_owns) setState(() => _loadingFriends = true);
     try {
-      final data = await FriendService.getFriends(userId);
-      if (mounted) {
+      final data = await _friendActions.getFriends(userId);
+      if (mounted && _owns) {
         setState(() {
           _friends = data.friendships
               .map((f) => f.friendUser)
@@ -111,7 +136,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loadingFriends = false);
+      if (_owns) setState(() => _loadingFriends = false);
     }
   }
 
@@ -299,7 +324,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
         const SizedBox(height: 8),
         Expanded(
           child: _loadingFriends
-              ? const Center(child: CircularProgressIndicator())
+              ? const ContentListSkeleton()
               : filtered.isEmpty
                   ? Center(
                       child: Text(
@@ -413,3 +438,14 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
     );
   }
 }
+
+Future<void> showProfileCreateGroupSheet(BuildContext context,
+        {required ValueChanged<Group> onCreated}) =>
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: context.colors.tabBarBackgroundFocused,
+      builder: (_) => CreateGroupSheet(onCreated: onCreated),
+    );

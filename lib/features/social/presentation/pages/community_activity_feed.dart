@@ -5,6 +5,7 @@ import 'dart:async';
 import '../widgets/community_watchlist_button.dart';
 import 'package:go_router/go_router.dart';
 import '../widgets/community_preferences.dart';
+import '../widgets/social_account_sheet.dart';
 import '../widgets/community_bookmark_button.dart';
 import 'package:flixie_app/models/friendship.dart';
 import '../controllers/community_connections_controller.dart';
@@ -30,8 +31,10 @@ class CommunityActivityFeed extends StatefulWidget {
       this.initialFollowing = false,
       this.showAudienceSelector = true,
       this.onReady,
+      this.active = true,
       this.friendActions = const FriendActionsController()});
   final CommunityService service;
+  final bool active;
   final bool showSettingsButton;
   final bool initialFollowing;
   final bool showAudienceSelector;
@@ -42,7 +45,7 @@ class CommunityActivityFeed extends StatefulWidget {
 }
 
 class CommunityActivityFeedState extends State<CommunityActivityFeed>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   final List<ActivityListItem> _items = [];
   CommunityConnectionsController? _connections;
   bool _loading = true, _loadingMore = false, _savingSetting = false;
@@ -53,6 +56,34 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
       _newPosts = false,
       _checking = false;
   Timer? _newPostsTimer;
+  bool _tickerActive = true;
+  bool _foreground = true, _viewerKnown = false, _refreshOnVisible = false;
+  String? _viewer;
+  bool get _active => widget.active && _foreground && _tickerActive;
+  void _syncPolling() {
+    _newPostsTimer?.cancel();
+    _newPostsTimer = null;
+    if (!_active) return;
+    _newPostsTimer =
+        Timer.periodic(const Duration(minutes: 1), (_) => _checkNewPosts());
+    if (_refreshOnVisible) {
+      _refreshOnVisible = false;
+      _refresh();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CommunityActivityFeed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) _syncPolling();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _syncPolling();
+  }
+
   String? _cursor, _error, _settingsError;
   int _generation = 0, _settingsGeneration = 0;
   @override
@@ -60,11 +91,13 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _foreground = WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     StarredPeople.instance.addListener(_starsChanged);
     _following = widget.initialFollowing;
     _refresh();
-    _newPostsTimer =
-        Timer.periodic(const Duration(minutes: 1), (_) => _checkNewPosts());
+    _syncPolling();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) widget.onReady?.call();
     });
@@ -74,9 +107,27 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final tickerActive = TickerMode.valuesOf(context).enabled;
+    if (_tickerActive != tickerActive) {
+      _tickerActive = tickerActive;
+      _syncPolling();
+    }
     final auth = context.watch<AuthProvider?>();
     final userId = auth?.dbUser?.id;
-    if (_connections?.userId == userId) return;
+    final changedAccount = _viewerKnown && _viewer != userId;
+    if (_viewerKnown && !changedAccount) return;
+    _viewerKnown = true;
+    _viewer = userId;
+    if (changedAccount) {
+      _generation++;
+      _settingsGeneration++;
+      _items.clear();
+      _cursor = null;
+      _sharing = null;
+      _loading = true;
+      _loadingMore = _savingSetting = _newPosts = false;
+      _error = _settingsError = null;
+    }
     _connections?.dispose();
     _connections = userId == null
         ? null
@@ -89,12 +140,22 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
           );
     // Loading and cache updates run after this build, outside provider notification.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _connections?.refresh();
+      if (!mounted) return;
+      if (changedAccount) {
+        _refresh();
+      } else {
+        _connections?.refresh();
+      }
     });
   }
 
   void _starsChanged() {
-    if (mounted && _sort == 'for-you' && !_savedOnly) _refresh();
+    if (!mounted || _sort != 'for-you' || _savedOnly) return;
+    if (_active) {
+      _refresh();
+    } else {
+      _refreshOnVisible = true;
+    }
   }
 
   void _blockedChanged() {
@@ -106,6 +167,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     StarredPeople.instance.removeListener(_starsChanged);
     _newPostsTimer?.cancel();
     _connections?.dispose();
@@ -187,7 +249,9 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   }
 
   Future<void> _checkNewPosts() async {
-    if (_checking ||
+    if (!_active ||
+        !TickerMode.valuesOf(context).enabled ||
+        _checking ||
         _loading ||
         _savedOnly ||
         (_sort != 'latest' && _sort != 'for-you') ||
@@ -202,6 +266,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
           ? await widget.service.following(filter: _filter, sort: _sort)
           : await widget.service.load(filter: _filter, sort: _sort);
       if (mounted &&
+          _active &&
           generation == _generation &&
           page.items.isNotEmpty &&
           '${page.items.first.type.value}:${page.items.first.id}' !=
@@ -214,15 +279,17 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   }
 
   Future<void> _hide(ActivityListItem item, String action) async {
+    if (!mounted) return;
+    final viewer = _viewer;
     try {
       await widget.service.feedPreference(item, action);
-      if (mounted) {
+      if (mounted && viewer == _viewer) {
         setState(() => _items.removeWhere((p) => action == 'mute'
             ? p.userId == item.userId
             : p.id == item.id && p.type == item.type));
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && viewer == _viewer) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Couldn’t update your feed. Try again.')));
       }
@@ -230,24 +297,26 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   }
 
   Future<void> _setSharing(bool value) async {
-    ++_settingsGeneration;
+    final generation = ++_settingsGeneration;
     setState(() {
       _savingSetting = true;
       _settingsError = null;
     });
     try {
       await widget.service.setSharing(value);
-      if (!mounted) return;
+      if (!mounted || generation != _settingsGeneration) return;
       setState(() => _sharing = value);
       await _load();
     } catch (_) {
-      if (mounted) {
+      if (mounted && generation == _settingsGeneration) {
         setState(() => _settingsError = 'Sharing wasn’t changed. Try again.');
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Couldn’t update sharing. Please try again.')));
       }
     } finally {
-      if (mounted) setState(() => _savingSetting = false);
+      if (mounted && generation == _settingsGeneration) {
+        setState(() => _savingSetting = false);
+      }
     }
   }
 
@@ -262,120 +331,137 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
   }
 
   Future<void> showSettings() async {
+    final viewer = _viewer;
     if (_sharing == null) await _settings();
-    if (!mounted) return;
+    if (!mounted || viewer != _viewer) return;
     await showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
         useSafeArea: true,
         isScrollControlled: true,
-        builder: (sheetContext) => StatefulBuilder(
-            builder: (sheetContext, update) => SizedBox(
-                height: MediaQuery.sizeOf(sheetContext).height * .8,
-                child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(children: [
-                            const Expanded(
-                                child: Text('Around Flixie sharing',
-                                    style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w800))),
-                            IconButton(
-                                tooltip: 'Close settings',
-                                onPressed: () => Navigator.pop(sheetContext),
-                                icon: const Icon(Icons.close))
-                          ]),
-                          const Text(
-                              'Share your existing and future film and show reviews, including ratings, and public personal lists with everyone on Flixie. Watch history, watchlists and watch plans stay out of Around Flixie. Turning this off stops sharing reviews and lists through Around Flixie and community review feeds; Friends is unchanged. Discussions and public replies you publish are separate and remain until you delete them.'),
-                          if (_settingsError != null)
-                            TextButton(
-                                onPressed: () async {
-                                  await _settings();
-                                  if (sheetContext.mounted) update(() {});
-                                },
-                                child: Text('$_settingsError Retry')),
-                          SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Share on Around Flixie'),
-                              value: _sharing ?? false,
-                              onChanged: _sharing == null || _savingSetting
-                                  ? null
-                                  : (value) async {
-                                      final pending = _setSharing(value);
-                                      update(() {});
-                                      await pending;
+        builder: (sheetContext) => SocialAccountSheet(
+            viewer: viewer,
+            child: StatefulBuilder(
+                builder: (sheetContext, update) => SizedBox(
+                    height: MediaQuery.sizeOf(sheetContext).height * .8,
+                    child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                const Expanded(
+                                    child: Text('Around Flixie sharing',
+                                        style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w800))),
+                                IconButton(
+                                    tooltip: 'Close settings',
+                                    onPressed: () =>
+                                        Navigator.pop(sheetContext),
+                                    icon: const Icon(Icons.close))
+                              ]),
+                              const Text(
+                                  'Share your existing and future film and show reviews, including ratings, and public personal lists with everyone on Flixie. Watch history, watchlists and watch plans stay out of Around Flixie. Turning this off stops sharing reviews and lists through Around Flixie and community review feeds; Friends is unchanged. Discussions and public replies you publish are separate and remain until you delete them.'),
+                              if (_settingsError != null)
+                                TextButton(
+                                    onPressed: () async {
+                                      await _settings();
                                       if (sheetContext.mounted) update(() {});
-                                    }),
-                          CommunityPreferences(service: widget.service),
-                        ])))));
+                                    },
+                                    child: Text('$_settingsError Retry')),
+                              SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text('Share on Around Flixie'),
+                                  value: _sharing ?? false,
+                                  onChanged: _sharing == null || _savingSetting
+                                      ? null
+                                      : (value) async {
+                                          final pending = _setSharing(value);
+                                          update(() {});
+                                          await pending;
+                                          if (sheetContext.mounted) {
+                                            update(() {});
+                                          }
+                                        }),
+                              CommunityPreferences(service: widget.service),
+                            ]))))));
   }
 
   Future<void> _postOptions(ActivityListItem item) async {
+    final viewer = _viewer;
     await showModalBottomSheet<void>(
         context: context,
         useRootNavigator: true,
         useSafeArea: true,
         isScrollControlled: true,
-        builder: (sheet) => ConstrainedBox(
-            constraints:
-                BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * .7),
-            child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(item.mediaTitle ?? item.listName ?? 'Post options',
-                          style: const TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w700)),
-                      TextButton.icon(
-                          onPressed: () {
-                            Navigator.pop(sheet);
-                            context.push(widget.service.postPath(item));
-                          },
-                          icon: const Icon(Icons.chat_bubble_outline),
-                          label: const Text('View post')),
-                      TextButton.icon(
-                          icon: const Icon(Icons.visibility_off_outlined),
-                          label: const Text('Hide this post'),
-                          onPressed: () {
-                            Navigator.pop(sheet);
-                            _hide(item, 'hide');
-                          }),
-                      TextButton.icon(
-                          icon: const Icon(Icons.person_off_outlined),
-                          label: const Text('Show less from this person'),
-                          onPressed: () {
-                            Navigator.pop(sheet);
-                            _hide(item, 'mute');
-                          }),
-                      if (item.movieId != null || item.showId != null)
-                        CommunityWatchlistButton(item: item),
-                      if (item.userId !=
-                          context.read<AuthProvider?>()?.dbUser?.id)
-                        TextButton.icon(
-                            icon: const Icon(Icons.flag_outlined),
-                            label: const Text('Report or block'),
-                            onPressed: () {
-                              Navigator.pop(sheet);
-                              SafetyActions.contentMenu(context,
-                                  targetType: item.type ==
-                                          ActivityListType.movieReview
-                                      ? 'MOVIE_REVIEW'
-                                      : item.type == ActivityListType.showReview
-                                          ? 'SHOW_REVIEW'
-                                          : 'MOVIE_LIST',
-                                  targetId: item.id,
-                                  reportedUserId: item.userId,
-                                  username: item.username,
-                                  contentPreview: item.reviewData?.body ??
-                                      item.listName ??
-                                      '');
-                            }),
-                    ]))));
+        builder: (sheet) => SocialAccountSheet(
+            viewer: viewer,
+            child: ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(sheet).height * .7),
+                child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                              item.mediaTitle ??
+                                  item.listName ??
+                                  'Post options',
+                              style: const TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.w700)),
+                          TextButton.icon(
+                              onPressed: () {
+                                Navigator.pop(sheet);
+                                if (!mounted || viewer != _viewer) return;
+                                context.push(widget.service.postPath(item));
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline),
+                              label: const Text('View post')),
+                          TextButton.icon(
+                              icon: const Icon(Icons.visibility_off_outlined),
+                              label: const Text('Hide this post'),
+                              onPressed: () {
+                                Navigator.pop(sheet);
+                                if (!mounted || viewer != _viewer) return;
+                                _hide(item, 'hide');
+                              }),
+                          TextButton.icon(
+                              icon: const Icon(Icons.person_off_outlined),
+                              label: const Text('Show less from this person'),
+                              onPressed: () {
+                                Navigator.pop(sheet);
+                                if (!mounted || viewer != _viewer) return;
+                                _hide(item, 'mute');
+                              }),
+                          if (item.movieId != null || item.showId != null)
+                            CommunityWatchlistButton(item: item),
+                          if (item.userId !=
+                              context.read<AuthProvider?>()?.dbUser?.id)
+                            TextButton.icon(
+                                icon: const Icon(Icons.flag_outlined),
+                                label: const Text('Report or block'),
+                                onPressed: () {
+                                  Navigator.pop(sheet);
+                                  if (!mounted || viewer != _viewer) return;
+                                  SafetyActions.contentMenu(context,
+                                      targetType: item.type ==
+                                              ActivityListType.movieReview
+                                          ? 'MOVIE_REVIEW'
+                                          : item.type ==
+                                                  ActivityListType.showReview
+                                              ? 'SHOW_REVIEW'
+                                              : 'MOVIE_LIST',
+                                      targetId: item.id,
+                                      reportedUserId: item.userId,
+                                      username: item.username,
+                                      contentPreview: item.reviewData?.body ??
+                                          item.listName ??
+                                          '');
+                                }),
+                        ])))));
   }
 
   @override

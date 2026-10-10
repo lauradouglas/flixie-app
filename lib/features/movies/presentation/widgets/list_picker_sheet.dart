@@ -76,6 +76,9 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final adaptive = MediaQuery.sizeOf(context).width < 400 ||
+        MediaQuery.sizeOf(context).height < 500 ||
+        MediaQuery.textScalerOf(context).scale(16) > 24;
     final query = _searchController.text.trim().toLowerCase();
     final filtered = widget.items
         .where((item) => item.name.toLowerCase().contains(query))
@@ -89,123 +92,142 @@ class _ListPickerSheetState extends State<ListPickerSheet> {
           color: context.colors.background,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                margin: const EdgeInsets.only(top: 12, bottom: 14),
-                decoration: BoxDecoration(
-                  color: context.colors.medium.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(99),
-                ),
+        child: _body(adaptive, [
+          Center(
+            child: Container(
+              width: 42,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 14),
+              decoration: BoxDecoration(
+                color: context.colors.medium.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(99),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Add to lists',
-                            style: TextStyle(
-                                color: context.colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 4),
-                        Text(
-                            'Choose every list this ${widget.mediaLabel} belongs in.',
-                            style: TextStyle(
-                                color: context.colors.medium, fontSize: 13)),
-                      ],
-                    ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            child: Flex(
+              direction: adaptive ? Axis.vertical : Axis.horizontal,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(
+                  flex: adaptive ? 0 : 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Add to lists',
+                          style: TextStyle(
+                              color: context.colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(
+                          'Choose every list this ${widget.mediaLabel} belongs in.',
+                          style: TextStyle(
+                              color: context.colors.medium, fontSize: 13)),
+                    ],
                   ),
-                  OutlinedButton.icon(
-                    onPressed: widget.saving ? null : widget.onCreate,
-                    icon: const Icon(Icons.add, size: 17),
-                    label: const Text('New list'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: context.colors.primaryText,
-                      side: const BorderSide(color: FlixieColors.primary),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 9),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22),
-              child: TextField(
-                controller: _searchController,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  hintText: 'Search your lists',
-                  prefixIcon: Icon(Icons.search_rounded),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: widget.items.isEmpty
-                  ? Center(
-                      child: Text('You haven’t created any lists yet.',
-                          style: TextStyle(color: context.colors.medium)))
-                  : filtered.isEmpty
-                      ? Center(
-                          child: Text('No matching lists.',
-                              style: TextStyle(color: context.colors.medium)))
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(22, 0, 22, 16),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 9),
-                          itemBuilder: (_, index) {
-                            final item = filtered[index];
-                            return _PickerListRow(
-                              item: item,
-                              selected: widget.selectedIds.contains(item.id),
-                              onTap: widget.saving
-                                  ? null
-                                  : () => widget.onToggle(item.id),
-                            );
-                          },
-                        ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 4, 22, 4),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: widget.saving ? null : widget.onDone,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                OutlinedButton.icon(
+                  onPressed: widget.saving ? null : widget.onCreate,
+                  icon: const Icon(Icons.add, size: 17),
+                  label: const Text('New list'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.colors.primaryText,
+                    side: const BorderSide(color: FlixieColors.primary),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   ),
-                  child: widget.saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(
-                          'Done · Added to ${widget.selectedIds.length} ${widget.selectedIds.length == 1 ? 'list' : 'lists'}'),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                hintText: 'Search your lists',
+                prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
-            Center(
-              child: TextButton(
-                onPressed: widget.saving ? null : widget.onCancel,
-                child: const Text('Cancel'),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: widget.items.isEmpty
+                ? Center(
+                    child: Text('You haven’t created any lists yet.',
+                        style: TextStyle(color: context.colors.medium)))
+                : filtered.isEmpty
+                    ? Center(
+                        child: Text('No matching lists.',
+                            style: TextStyle(color: context.colors.medium)))
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(22, 0, 22, 16),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 9),
+                        itemBuilder: (_, index) {
+                          final item = filtered[index];
+                          return _PickerListRow(
+                            item: item,
+                            selected: widget.selectedIds.contains(item.id),
+                            onTap: widget.saving
+                                ? null
+                                : () => widget.onToggle(item.id),
+                          );
+                        },
+                      ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 4, 22, 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.saving ? null : widget.onDone,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                ),
+                child: widget.saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text(
+                        'Done · Added to ${widget.selectedIds.length} ${widget.selectedIds.length == 1 ? 'list' : 'lists'}'),
               ),
             ),
-          ],
-        ),
+          ),
+          Center(
+            child: TextButton(
+              onPressed: widget.saving ? null : widget.onCancel,
+              child: const Text('Cancel'),
+            ),
+          ),
+        ]),
       ),
     );
+  }
+
+  Widget _body(bool adaptive, List<Widget> children) {
+    if (!adaptive) {
+      return Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: children);
+    }
+    return SingleChildScrollView(
+        child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final child in children)
+          if (child is Expanded)
+            SizedBox(
+                height: MediaQuery.sizeOf(context).height * .35,
+                child: child.child)
+          else
+            child
+      ],
+    ));
   }
 }
 
@@ -233,7 +255,7 @@ class _PickerListRow extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          height: shared ? 104 : 90,
+          constraints: BoxConstraints(minHeight: shared ? 104 : 90),
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
@@ -249,12 +271,11 @@ class _PickerListRow extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(item.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             color: context.colors.white,
                             fontSize: 14,
@@ -268,8 +289,6 @@ class _PickerListRow extends StatelessWidget {
                         Expanded(
                           child: Text(
                             '${item.countLabel} · ${_visibilityLabel(item.visibility, item.collaborators.length, item.groupName, isGroup, shared)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 color: context.colors.medium, fontSize: 12),
                           ),

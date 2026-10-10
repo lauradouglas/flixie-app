@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/library_import/data/library_import_session.dart';
+import 'package:flixie_app/core/widgets/flixie_toast.dart';
+import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,6 +33,8 @@ import 'package:flixie_app/core/utils/app_icon_badge_service.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
+
+final _importMessenger = GlobalKey<ScaffoldMessengerState>();
 
 bool _hasFirebaseDartDefines(FirebaseOptions options) {
   return options.apiKey.isNotEmpty &&
@@ -147,6 +152,32 @@ void main() async {
             context.read<MovieService>(),
           ),
         ),
+        ChangeNotifierProxyProvider<AuthProvider, LibraryImportSession>(
+          lazy: false,
+          create: (context) => LibraryImportSession(
+            onNotice: (message, kind, changed) {
+              _importMessenger.currentState?.showFlixieToast(FlixieToast(
+                content: Text(message),
+                type: switch (kind) {
+                  LibraryImportNoticeKind.success => FlixieToastType.success,
+                  LibraryImportNoticeKind.info => FlixieToastType.info,
+                  LibraryImportNoticeKind.error => FlixieToastType.error,
+                },
+              ));
+              if (changed) {
+                TabRefreshController.watchlist.value++;
+                TabRefreshController.requestHomeRefresh();
+                unawaited(context
+                    .read<AuthProvider>()
+                    .refreshUserData()
+                    .catchError((Object error) {
+                  logger.w('Could not refresh the library after import.');
+                }));
+              }
+            },
+          ),
+          update: (_, auth, session) => session!..syncUser(auth.dbUser?.id),
+        ),
         ChangeNotifierProxyProvider<AuthProvider, MovieRatingPrivacy>(
           create: (_) => MovieRatingPrivacy.instance,
           update: (_, auth, privacy) => (privacy ?? MovieRatingPrivacy.instance)
@@ -210,6 +241,8 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    PushNotificationService.detachRouter(_router);
+    _router.dispose();
     super.dispose();
   }
 
@@ -218,6 +251,7 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
     final mode = context.watch<AppearanceController>().mode;
     return MaterialApp.router(
       title: 'Flixie',
+      scaffoldMessengerKey: _importMessenger,
       debugShowCheckedModeBanner: false,
       color: FlixieColors.background,
       theme: AppTheme.lightTheme,
