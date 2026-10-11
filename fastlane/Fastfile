@@ -1,5 +1,6 @@
 require "shellwords"
 require "bundler"
+require File.expand_path("slack_notifications", __dir__)
 
 # Paths are rooted explicitly: Fastlane executes lanes from fastlane/.
 ROOT = File.expand_path("..", __dir__)
@@ -212,4 +213,29 @@ platform :android do
     ))
   end
 
+end
+
+# Fastlane invokes these for the completed top-level lane, including nested builds.
+after_all do |lane, options|
+  labels = {
+    'ios beta' => 'TestFlight upload completed (processing may still be pending)',
+    'ios submit' => 'Submitted for Apple review (manual release after approval)',
+    'android draft' => 'Google Play draft uploaded',
+    'android promote' => 'Google Play production draft prepared',
+    'android submit' => 'Submitted to Google Play production (review/public availability may still be pending)'
+  }
+  platform = Actions.lane_context[SharedValues::PLATFORM_NAME].to_s
+  key = [platform, lane.to_s.sub(/\A(?:ios|android)_/, '')].join(' ')
+  label = labels[key]
+  if label
+    FlixieSlack.notify("Flixie: #{label}. Version #{ENV['RELEASE_VERSION'] || 'unspecified'}, build #{options[:build_number] || ENV['BUILD_NUMBER'] || 'unspecified'}")
+  end
+end
+
+error do |lane, _exception, _options|
+  platform = Actions.lane_context[SharedValues::PLATFORM_NAME].to_s
+  key = [platform, lane.to_s.sub(/\A(?:ios|android)_/, '')].join('_')
+  if %w[ios_beta ios_submit android_draft android_promote android_submit].include?(key)
+    FlixieSlack.notify("Flixie: #{lane} failed. Inspect the release log; no exception or credential details are sent to Slack.")
+  end
 end

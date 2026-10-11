@@ -1,5 +1,47 @@
 # Regression testing
 
+## Android Firebase session persistence
+
+Android explicitly uses `firebase-auth:24.0.1`: FlutterFire 5.x otherwise resolves
+23.2.1, which Firebase flags for a persistent-storage regression. This correction
+is Android-only; it does not change Firebase projects or bypass authentication.
+See [Firebase's Auth 23.2.1 warning](https://firebase.google.com/support/release-notes/android#auth_v23-2-1).
+
+The native `AuthSessionPersistenceTest` uses a named demo Firebase app and the
+local Auth emulator. It signs in anonymously, restores the same user across two
+separate killed processes (including token refresh), then checks explicit logout
+across another restart. It never uses production identities. This exercises the
+shared native persistence layer, not live Google/Apple provider flows or a
+Play-signed installation on an affected physical device.
+
+Start the Auth emulator with Java 21:
+
+```sh
+firebase emulators:start --only auth --project demo-flixie-session --config scripts/auth-session-emulators.json
+```
+
+Boot **Flixie_Patrol** with hardware graphics (`-gpu host`), then build and run:
+
+```sh
+cd android
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest -PflixieWidgetTestRunner=androidx.test.runner.AndroidJUnitRunner
+cd ..
+bash scripts/test-android-auth-session.sh emulator-5554
+```
+
+The script reinstalls only on the guarded dedicated AVD. It invokes the native
+runner directly because Orchestrator clears app data between tests, which would
+invalidate a persistence test. Existing Patrol journeys keep their normal runner.
+App-level checks: `flutter test test/auth_recovery_test.dart test/core/auth/auth_session_recovery_test.dart`.
+
+11 October 2026 verification: all 34 app-level checks passed. Gradle's release
+dependency report confirms Auth 24.0.1 replaces 23.2.1, and both debug APKs
+compiled successfully. Native execution remains unverified: the dedicated AVD
+stalled during installation, then during instrumentation even after a cold boot
+with hardware graphics and ADB recovery. Do not count those attempts as passes.
+The user's report concerns Play Store installs and all login providers; validate
+an updated Play-signed build on the affected phone before declaring it resolved.
+
 Flixie uses two layers:
 
 - Flutter unit, widget and golden tests: models, state, API contracts, forms,

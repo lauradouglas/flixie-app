@@ -226,10 +226,12 @@ void main() {
     await next(tester);
     await tap(tester, 'Find my picks');
     expect(find.text('Alien'), findsOneWidget);
+    await tap(tester, 'Change preferences');
+    await tester.ensureVisible(find.text('With a friend'));
+    await tester.tap(find.text('With a friend'));
+    await tester.pump();
     pending.completeError(Exception('offline'));
     await tester.pumpAndSettle();
-    await tap(tester, 'Change preferences');
-    await tap(tester, 'With a friend');
     expect(find.textContaining('Some viewers couldn’t load'), findsOneWidget);
     service.pendingFriends = null;
     await tap(tester, 'Retry viewers');

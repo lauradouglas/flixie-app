@@ -2,6 +2,12 @@
 # Exercise the actual lane definitions without SDKs, credentials or network.
 require 'minitest/autorun'
 require 'tmpdir'
+module SharedValues
+  PLATFORM_NAME = :platform
+end
+module Actions
+  def self.lane_context; @lane_context ||= {}; end
+end
 
 module UI
   def self.user_error!(message)
@@ -23,6 +29,10 @@ class LaneHarness
     @platform = name
     yield
   end
+  def after_all(&block); @after_all = block; end
+  def error(&block); @error_hook = block; end
+  def completed(platform, lane, options = {}); Actions.lane_context[:platform] = platform; @after_all.call(lane, options); end
+  def failed(platform, lane); Actions.lane_context[:platform] = platform; @error_hook.call(lane, RuntimeError.new, {}); end
   def desc(*) ; end
   def lane(name, &block)
     @lanes[[@platform, name]] = block
@@ -54,6 +64,25 @@ class FastlaneTest < Minitest::Test
   def teardown
     ENV.replace(@previous_env)
   end
+  def test_slack_release_hooks_use_actual_platform_and_lane_names
+    messages = []
+    original = FlixieSlack.method(:notify)
+    FlixieSlack.define_singleton_method(:notify) { |text| messages << text }
+    begin
+      @runner.completed(:ios, :submit, build_number: 101)
+      @runner.completed(:android, :submit, build_number: 102)
+      @runner.completed(:ios, :screenshots)
+      @runner.failed(:android, :submit)
+    ensure
+      FlixieSlack.define_singleton_method(:notify, original)
+    end
+    assert_equal 3, messages.size
+    assert_includes messages[0], 'manual release after approval'
+    assert_includes messages[0], '101'
+    assert_includes messages[1], 'review/public availability may still be pending'
+    assert_includes messages[2], 'failed'
+  end
+
   def test_production_submit_sends_for_review_and_includes_notes
     @runner.run(:android, :submit, build_number: 99)
     upload = @runner.calls.find { |kind, _| kind == :play }.last

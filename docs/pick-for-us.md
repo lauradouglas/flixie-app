@@ -123,3 +123,63 @@ in one tap, including during loading and after repeated changes of preferences.
 Back still moves between stages. Direct route entry without a previous page falls
 back to Home. All 26 focused picker tests passed, covering close from mood,
 evening, results and an in-flight request completing after disposal.
+
+## Empty-result investigation — 10 October 2026
+
+The user reported “No films fit just yet” for Switch off and Keep my options
+open, despite saving Netflix, Prime Video, Apple TV, Disney+ and HBO. Their live
+account/country and production response have not been inspected.
+
+The backend now excludes watched/rejected/session films before the 300-film
+discovery limit, preventing a large viewing history from exhausting the pool.
+It also reads fresh regional provider caches across the ranked pool so cached
+matches beyond the first 36 films remain eligible. At most 36 candidates still
+need provider-service lookups; unknown/stale availability is never assumed.
+Missing required viewing settings return an actionable Settings message.
+Runtime, mood, content exclusions and rental consent remain mandatory.
+
+Regression fixtures exercise a 300-film history and available films beyond the
+lookup boundary. The existing offline fixture accounts and seed instructions
+above remain available. The local database was offline during this investigation;
+no database data was changed and the phone's live result remains unverified.
+These are local backend fixes requiring release before affecting a hosted app.
+
+## Switch-off follow-up — 10 October 2026
+
+The user confirmed Keep my options open returns movies with the same streaming
+and 120-minute settings, while Switch off is empty. The GitHub API - Deploy run
+38092030341 succeeded for commit 1e0f9c4, including Azure deployment.
+
+Code inspection found Switch off requires reviewed low complexity/intensity/light
+weight or an explicit gentle-viewing metadata signal. The editorial catalogue is
+empty; only five phrases currently qualify as inferred gentle evidence. This
+explains a credible mood-specific empty result, but live candidate metadata has
+not been inspected. The 30 focused controller/ranking/experience tests pass.
+
+A decision is pending on clearly labelled nearby suggestions when mood evidence
+is missing. Runtime, services, exclusions and rental consent must remain intact;
+no automatic mood relaxation has been implemented.
+
+## Nearby Switch off suggestions — 10 October 2026
+
+The user approved clearly labelled nearby suggestions after confirming that Keep
+my options open returns films with the same viewing settings. The backend now
+tries actual Switch off matches first and fills missing streaming picks with
+nearby comedy/family/romance candidates. These genres are retrieval hints, not
+evidence of gentle viewing. Each nearby result states “Nearby suggestion — gentle
+viewing hasn’t been verified”; the response also explains the fallback. Existing
+clients display the returned reasons/message without an app release.
+
+Known horror, heavy, bleak, violent, dark-humour or complex evidence excludes
+nearby candidates; horror/thriller/crime/war genres are also withheld. Explicit
+content exclusions still require coverage, and time, subscriptions, country,
+rewatch/rejection/session exclusions, genre requests and rental consent remain
+mandatory. Nearby suggestions require possible matches to be enabled and a
+single Switch off/chill intent. Other moods and Watchlist matching remain strict.
+The existing 36 lookup budget reserves 12 slots for nearby candidates when needed;
+fresh cached exact matches are still considered beyond the live lookup cap.
+
+Focused backend regression tests and TypeScript checks verify the change. The
+fictional local picker seed/preview instructions above remain applicable. No
+production data was seeded and the change has not yet been deployed or tested
+against the live account.

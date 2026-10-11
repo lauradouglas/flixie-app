@@ -333,3 +333,38 @@ RELEASE_VERSION=2.0.1 bundle exec fastlane ios submit build_number:99 ipa:build/
 ```
 
 Release 2.0.1 (99) was submitted to Google Play production and Apple review on 10 October 2026 and made available to internal TestFlight testers.
+
+## TestFlight build 101 — 11 October 2026
+
+Built and uploaded 2.0.1 (101) from the current working tree, including the
+community discovery filters and null community-rating fix. The signed IPA
+passed release entitlement validation. All 41 focused community/Pick for Us
+tests, 18 Fastlane tests and iOS release guard checks passed; focused analysis
+of the community screen reported no issues. Apple processing completed and the
+TestFlight lane succeeded. No App Review submission was made: the user explicitly
+reserved submission for a later instruction. No Android or backend deployment
+was performed.
+
+## Android production build 101 — 11 October 2026
+
+At the user's explicit request, built and submitted Android 2.0.1 (101) to
+Google Play production with the Android Firebase Auth 24.0.1 session persistence
+fix. The signed release bundle built successfully, the Google OAuth preflight
+passed, and Fastlane committed the production edit with changes sent for review.
+An independent Play API read confirmed production version code 101, release
+status `completed`, and the en-GB note: “Fixed a bug that signed users out when
+reopening the app.” This API status does not establish Google review approval or
+public availability. The 34 focused auth tests passed before release; the native
+emulator restart test remained unverified because instrumentation stalled (see
+docs/testing.md). No Apple review submission or backend deployment was made.
+
+## App Review submission 2.0.1 (101) — 11 October 2026
+
+At the user's explicit request, reused the processed, VALID TestFlight build 101
+and submitted it for Apple production review. The cancelled 2.0.1 submission
+was DEVELOPER_REJECTED with build 100 selected. Preserved its en-GB release notes:
+“Explore Flixie without signing in, plus performance improvements.” The existing
+IPA passed signed release entitlement validation; App Store precheck passed and
+Fastlane confirmed successful submission. Manual release after approval remains
+selected. No duplicate binary upload, screenshot changes or backend deployment
+was performed.

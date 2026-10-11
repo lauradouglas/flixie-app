@@ -76,6 +76,21 @@ class SpaceFixture extends CommunitySpaceService {
       };
     }
     if (path == '/discover') {
+      if (query['filter'] == 'show') {
+        return {
+          'items': [
+            {
+              'id': 1429,
+              'title': 'Attack on Titan',
+              'kind': 'show',
+              'posterPath': null,
+              'average': null,
+              'count': 0
+            }
+          ],
+          'nextOffset': null,
+        };
+      }
       return {
         'items': [
           {
@@ -503,6 +518,18 @@ void main() {
     expect(find.text('Spirited Away'), findsOneWidget);
     expect(find.text('8.8/10'), findsOneWidget);
     expect(find.text('42 Anime members'), findsOneWidget);
+    expect(fixture.calls.last, contains('filter: all'));
+    await tapSpace(t, 'Shows');
+    expect(fixture.calls.last, contains('filter: show'));
+    expect(find.text('Attack on Titan'), findsOneWidget);
+    expect(find.text('Spirited Away'), findsNothing);
+    expect(find.text('No community ratings yet'), findsOneWidget);
+    await tapSpace(t, 'Movies');
+    expect(fixture.calls.last, contains('filter: movie'));
+    expect(find.text('Spirited Away'), findsOneWidget);
+    expect(find.text('Attack on Titan'), findsNothing);
+    await tapSpace(t, 'All');
+    expect(fixture.calls.last, contains('filter: all'));
   });
   testWidgets(
       'failed refresh of a complete feed retries and keeps loaded posts',

@@ -211,6 +211,7 @@ class _SpaceCollectionState extends State<SpaceCollection> {
   String? _error;
   dynamic _next;
   int _generation = 0;
+  String _discoverFilter = 'all';
   String get _nextField => widget.section == 'discover'
       ? 'nextOffset'
       : widget.section == 'people'
@@ -252,8 +253,11 @@ class _SpaceCollectionState extends State<SpaceCollection> {
       }
     });
     try {
-      final page = await widget.service.get(widget.communityId,
-          '/${widget.section}', {if (more) _queryField: _next.toString()});
+      final page =
+          await widget.service.get(widget.communityId, '/${widget.section}', {
+        if (more) _queryField: _next.toString(),
+        if (widget.section == 'discover') 'filter': _discoverFilter,
+      });
       if (!mounted || revision != _generation) return;
       setState(() {
         if (!more) _items.clear();
@@ -319,11 +323,34 @@ class _SpaceCollectionState extends State<SpaceCollection> {
                   'discussions' =>
                     'Ask for a recommendation or talk through a title. Respect the spoiler boundary.',
                   'discover' =>
-                    'Ratings from joined members’ public reviews. One latest score per person, with the sample size shown.',
+                    'Popular movies and shows, boosted by recent high ratings from this community. Member scores and sample sizes are shown.',
                   _ =>
                     'Read their reviews before deciding to follow. Joining never follows anyone for you.'
                 },
                 style: TextStyle(color: context.colors.medium)),
+            if (widget.section == 'discover') ...[
+              const SizedBox(height: 16),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final filter in {
+                  'all': 'All',
+                  'movie': 'Movies',
+                  'show': 'Shows'
+                }.entries)
+                  ChoiceChip(
+                    label: Text(filter.value),
+                    selected: _discoverFilter == filter.key,
+                    onSelected: (_) {
+                      if (_discoverFilter == filter.key) return;
+                      setState(() {
+                        _discoverFilter = filter.key;
+                        _items.clear();
+                        _next = null;
+                      });
+                      _load();
+                    },
+                  ),
+              ]),
+            ],
             if (widget.section == 'discussions') ...[
               const SizedBox(height: 16),
               FilledButton(
@@ -562,7 +589,9 @@ class _SpaceCollectionState extends State<SpaceCollection> {
           Text(
               hidden
                   ? 'Rate first to reveal community scores'
-                  : '${(row['average'] as num).toStringAsFixed(1)}/10',
+                  : row['average'] == null
+                      ? 'No community ratings yet'
+                      : '${(row['average'] as num).toStringAsFixed(1)}/10',
               style: TextStyle(
                   color: context.colors.light,
                   fontSize: hidden ? 14 : 16,
