@@ -78,7 +78,9 @@ class _SearchScreenState extends State<SearchScreen> {
   void _openEntity(SearchEntityResult item) async {
     if (item.type == SearchEntityType.collection) {
       if (!await GuestAccess.require(context,
-          title: 'Explore your collections', path: '/search')) return;
+          title: 'Explore your collections', path: '/search')) {
+        return;
+      }
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute<void>(

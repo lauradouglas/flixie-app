@@ -175,7 +175,7 @@ class MentionFixture extends SpaceFixture {
         'items': [author]
       };
     }
-    if (path.endsWith('/replies'))
+    if (path.endsWith('/replies')) {
       return {
         'items': [
           {'id': 'parent', 'user': author, 'body': 'An interesting point'},
@@ -189,8 +189,10 @@ class MentionFixture extends SpaceFixture {
         ],
         'nextCursor': null
       };
-    if (path == '/replies/parent')
+    }
+    if (path == '/replies/parent') {
       return {'id': 'parent', 'user': author, 'body': 'An interesting point'};
+    }
     return super.get(id, path, query);
   }
 }

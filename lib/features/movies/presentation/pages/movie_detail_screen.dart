@@ -114,7 +114,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     await _data.load(widget.movieId);
     if (!mounted ||
         _data.movie == null ||
-        context.read<AuthProvider>().dbUser == null) return;
+        context.read<AuthProvider>().dbUser == null) {
+      return;
+    }
     final intent = GuestAccess.takeAction('/movies/${widget.movieId}');
     switch (intent) {
       case 'watchlist':
@@ -509,7 +511,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     if (!await GuestAccess.require(context,
         title: 'Plan a watch with friends',
         path: '/movies/${widget.movieId}',
-        intent: 'plan')) return;
+        intent: 'plan')) {
+      return;
+    }
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
     final friends = auth.cachedFriends?.friendships ?? [];

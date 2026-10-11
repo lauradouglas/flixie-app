@@ -25,17 +25,17 @@ class TrendingCarouselSkeleton extends StatelessWidget {
                               SizedBox(width: constraints.maxWidth * .08),
                               SizedBox(
                                   width: constraints.maxWidth * .84,
-                                  child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6),
+                                  child: const Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(horizontal: 6),
                                       child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            const SkeletonBox(
+                                            SkeletonBox(
                                                 height: 280, borderRadius: 18),
-                                            const SizedBox(height: 14),
-                                            const Padding(
+                                            SizedBox(height: 14),
+                                            Padding(
                                                 padding: EdgeInsets.symmetric(
                                                     horizontal: 14),
                                                 child: Column(
@@ -73,7 +73,7 @@ class TrendingCarouselSkeleton extends StatelessWidget {
                                                       ]),
                                                     ])),
                                           ]))),
-                              Expanded(
+                              const Expanded(
                                   child: SkeletonBox(
                                       height: 280, borderRadius: 18)),
                             ])),

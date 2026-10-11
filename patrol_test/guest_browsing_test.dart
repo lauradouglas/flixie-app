@@ -23,6 +23,8 @@ void main() {
   patrolTest(
       'guest browses Home and a film; save prompts without a write; You offers signup',
       ($) async {
+    // Patrol fixtures intentionally use the test-only preferences API.
+    // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({'guest_welcome_seen_v1': true});
     final requests = <http.Request>[];
     useApiFixture(MockClient((request) async {

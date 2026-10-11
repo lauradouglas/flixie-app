@@ -23,10 +23,14 @@ class ForegroundInboxTracker {
           !announce ||
           !fresh ||
           item.isRead ||
-          item.closed == true) continue;
+          item.closed == true) {
+        continue;
+      }
       if ((item.type == FlixieNotification.friendRequest ||
               item.type == FlixieNotification.groupInvite) &&
-          !item.isPending) continue;
+          !item.isPending) {
+        continue;
+      }
       final data = <String, dynamic>{
         'type': item.type,
         'event': item.event,

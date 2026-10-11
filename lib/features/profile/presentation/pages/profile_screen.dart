@@ -9,11 +9,9 @@ import 'package:flixie_app/models/user.dart' as models;
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/favourite_limits.dart';
-import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_header.dart';
 
-import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import '../controllers/profile_controller.dart';
 import '../profile_action_flow.dart';
 import '../widgets/profile_library_tab.dart';
@@ -62,24 +60,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final dbUser =
         context.select<AuthProvider, models.User?>((auth) => auth.dbUser);
     if (dbUser == null) return const GuestWelcomeScreen(you: true);
-    final firebaseUser = context
-        .select<AuthProvider, firebase.User?>((auth) => auth.firebaseUser);
 
-    // Prefer database user info, fallback to Firebase
-    final displayName = dbUser?.firstName?.trim().isNotEmpty == true
-        ? dbUser!.firstName!.trim()
-        : dbUser?.username ?? firebaseUser?.displayName ?? 'Guest User';
-    final username = dbUser?.username ?? firebaseUser?.displayName ?? '';
-    final bio = dbUser?.bio;
-    final userId = dbUser?.id;
+    // The guest route above guarantees a database user here.
+    final displayName = dbUser.firstName?.trim().isNotEmpty == true
+        ? dbUser.firstName!.trim()
+        : dbUser.username;
+    final username = dbUser.username;
+    final bio = dbUser.bio;
+    final userId = dbUser.id;
 
-    final favoriteMovies = (dbUser?.favoriteMovies ?? [])
+    final favoriteMovies = (dbUser.favoriteMovies ?? [])
         .where((favorite) => favorite.removed != true)
         .toList(growable: false);
-    final favoriteShows = (dbUser?.favoriteShows ?? const <dynamic>[])
+    final favoriteShows = (dbUser.favoriteShows ?? const <dynamic>[])
         .where(isActiveFavouriteShow)
         .toList(growable: false);
-    final favoritePeople = dbUser?.favoritePeople ?? [];
+    final favoritePeople = dbUser.favoritePeople ?? [];
 
     return FlixiePageScaffold(
       appBar: FlixieTitleAppBar(
@@ -93,94 +89,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const ProfileNotificationButton(),
         ],
       ),
-      body: dbUser == null &&
-              _data.activityLoading &&
-              _data.ratingsLoading &&
-              _data.profileExtrasLoading
-          ? const ProfileScreenSkeleton()
-          : FlixieRefresh(
-              color: FlixieColors.primary,
-              onRefresh: _data.refresh,
-              child: CustomScrollView(
-                key: const PageStorageKey('profile-scroll'),
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                      child: ProfileHeader(
-                    displayName: displayName,
-                    username: username,
-                    bio: bio,
-                    iconColor: dbUser?.iconColor,
-                    avatar: dbUser?.avatar,
-                    profileBadges: dbUser?.profileBadges ?? const [],
-                    memberSince: _memberSinceLabel(dbUser?.createdAt),
-                    onPreview: userId == null
-                        ? null
-                        : () => context.push('/friends/$userId?preview=true'),
-                  )),
-                  SliverToBoxAdapter(
-                      child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 0),
-                          child: dbUser == null
-                              ? const SizedBox.shrink()
-                              : ProfileLibraryTotals(user: dbUser))),
-                  SliverToBoxAdapter(
-                      child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                  onPressed: () =>
-                                      context.push('/profile/people'),
-                                  icon: const Icon(Icons.people_outline,
-                                      size: 19),
-                                  label: const Text('Friends & following'))))),
-                  SliverPersistentHeader(
-                      pinned: true,
-                      delegate: ProfileTabsDelegate(
-                          height: 48 +
-                              (MediaQuery.textScalerOf(context).scale(16) -
-                                      16) *
-                                  2,
-                          child: ProfileTabSelector(
-                              selected: _data.selectedTab,
-                              onSelected: _data.selectTab))),
-                  SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                      sliver: _data.selectedTab == ProfileTab.activity
-                          ? _activityTab()
-                          : SliverToBoxAdapter(
-                              child: _data.selectedTab == ProfileTab.stats
-                                  ? ProfileStatsTab(
-                                      wrapped: _data.wrapped,
-                                      failed: _data.statsFailed,
-                                      onRetry: _data.loadStats,
-                                      ratings: _data.ratings,
-                                      reviewCount: _data.reviewCount,
-                                      directorPeople: _data.directorPeople,
-                                      user: dbUser)
-                                  : ProfileLibraryTab(
-                                      userId: userId,
-                                      favoriteMovies: favoriteMovies,
-                                      favoritePeople: favoritePeople,
-                                      favoriteShows: favoriteShows,
-                                      activity: _data.recentActivity,
-                                      continueWatching: _data.continueWatching,
-                                      watchProviders: _data.watchProviders,
-                                      loadingExtras: _data.profileExtrasLoading,
-                                      failedExtras: _data.profileExtrasFailed,
-                                      loadingActivity:
-                                          _data.recentActivityLoading,
-                                      onRemoveShow:
-                                          _flow.removeContinueWatching,
-                                      onManageProviders:
-                                          _flow.openWatchProviders,
-                                      onRatings: _flow.openRatings,
-                                      onRetryExtras: _data.loadProfileExtras))),
-                ],
-              ),
-            ),
+      body: FlixieRefresh(
+        color: FlixieColors.primary,
+        onRefresh: _data.refresh,
+        child: CustomScrollView(
+          key: const PageStorageKey('profile-scroll'),
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+                child: ProfileHeader(
+              displayName: displayName,
+              username: username,
+              bio: bio,
+              iconColor: dbUser.iconColor,
+              avatar: dbUser.avatar,
+              profileBadges: dbUser.profileBadges,
+              memberSince: _memberSinceLabel(dbUser.createdAt),
+              onPreview: () => context.push('/friends/$userId?preview=true'),
+            )),
+            SliverToBoxAdapter(
+                child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                    child: ProfileLibraryTotals(user: dbUser))),
+            SliverToBoxAdapter(
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                            onPressed: () => context.push('/profile/people'),
+                            icon: const Icon(Icons.people_outline, size: 19),
+                            label: const Text('Friends & following'))))),
+            SliverPersistentHeader(
+                pinned: true,
+                delegate: ProfileTabsDelegate(
+                    height: 48 +
+                        (MediaQuery.textScalerOf(context).scale(16) - 16) * 2,
+                    child: ProfileTabSelector(
+                        selected: _data.selectedTab,
+                        onSelected: _data.selectTab))),
+            SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                sliver: _data.selectedTab == ProfileTab.activity
+                    ? _activityTab()
+                    : SliverToBoxAdapter(
+                        child: _data.selectedTab == ProfileTab.stats
+                            ? ProfileStatsTab(
+                                wrapped: _data.wrapped,
+                                failed: _data.statsFailed,
+                                onRetry: _data.loadStats,
+                                ratings: _data.ratings,
+                                reviewCount: _data.reviewCount,
+                                directorPeople: _data.directorPeople,
+                                user: dbUser)
+                            : ProfileLibraryTab(
+                                userId: userId,
+                                favoriteMovies: favoriteMovies,
+                                favoritePeople: favoritePeople,
+                                favoriteShows: favoriteShows,
+                                activity: _data.recentActivity,
+                                continueWatching: _data.continueWatching,
+                                watchProviders: _data.watchProviders,
+                                loadingExtras: _data.profileExtrasLoading,
+                                failedExtras: _data.profileExtrasFailed,
+                                loadingActivity: _data.recentActivityLoading,
+                                onRemoveShow: _flow.removeContinueWatching,
+                                onManageProviders: _flow.openWatchProviders,
+                                onRatings: _flow.openRatings,
+                                onRetryExtras: _data.loadProfileExtras))),
+          ],
+        ),
+      ),
     );
   }
 

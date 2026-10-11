@@ -118,19 +118,21 @@ class MovieListDetailFixture {
     if (path.endsWith('/fixture-list/items')) return json(entries);
     if (path.endsWith('/fixture-list/members')) return json(membership);
     if (path == '/users/list-owner') return json(listPerson('list-owner'));
-    if (path.startsWith('/friends/'))
+    if (path.startsWith('/friends/')) {
       return json({
         'friendships': [
           {'id': 'friend-edge', 'friend': listPerson('list-new-friend')}
         ]
       });
-    if (path == '/search')
+    }
+    if (path == '/search') {
       return json({
         'results': [
           {'id': 3, 'title': 'Spider-Man', 'media_type': 'movie'},
           {'id': 3, 'name': 'Obsession TV', 'media_type': 'tv'}
         ]
       });
+    }
     unexpected.add(call);
     return json({'message': 'Unexpected fixture endpoint: $call'}, 500);
   }

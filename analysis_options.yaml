@@ -1,5 +1,10 @@
 include: package:flutter_lints/flutter.yaml
 
+# This byte-verified historical benchmark must retain its original source.
+analyzer:
+  exclude:
+    - patrol_test/support/group_insights_memory_before.dart
+
 linter:
   rules:
     - always_declare_return_types

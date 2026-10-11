@@ -16,7 +16,6 @@ import 'package:flixie_app/features/profile/presentation/widgets/friend_profile_
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/features/profile/presentation/controllers/friend_profile_controller.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/friend_profile_content.dart';
-import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/review.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
@@ -176,7 +175,7 @@ void main() {
       ..compatibilityLoading = false
       ..sharedFavCount = 3
       ..sharedRatings = [
-        MovieRating(
+        const MovieRating(
             id: 'rating',
             userId: 'friend',
             movieId: 1,
@@ -208,21 +207,23 @@ void main() {
         final fixture = FriendScreenFixture();
         fixture.install();
         addTearDown(fixture.dispose);
-        final controller = FriendProfileController(
-            auth: fixture.auth, subjectId: 'friend')
-          ..user = friendUser('friend')
-          ..selectedTab = tab
-          ..reviewsLoading = false
-          ..reviews = [
-            Review.fromJson({
-              'id': 'review',
-              'userId': 'friend',
-              'title': 'Worth watching',
-              'body': 'A great evening.',
-              'rating': 8,
-              media: media == 'movie' ? {'title': 'Alien'} : {'title': 'The OA'},
-            })
-          ];
+        final controller =
+            FriendProfileController(auth: fixture.auth, subjectId: 'friend')
+              ..user = friendUser('friend')
+              ..selectedTab = tab
+              ..reviewsLoading = false
+              ..reviews = [
+                Review.fromJson({
+                  'id': 'review',
+                  'userId': 'friend',
+                  'title': 'Worth watching',
+                  'body': 'A great evening.',
+                  'rating': 8,
+                  media: media == 'movie'
+                      ? {'title': 'Alien'}
+                      : {'title': 'The OA'},
+                })
+              ];
         addTearDown(controller.dispose);
         await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
             value: fixture.auth,

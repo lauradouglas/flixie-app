@@ -81,7 +81,7 @@ void main() {
                     }),
                     201);
               }
-              if (request.url.path.endsWith('/lists'))
+              if (request.url.path.endsWith('/lists')) {
                 return http.Response(
                     jsonEncode([
                       {
@@ -92,7 +92,8 @@ void main() {
                       }
                     ]),
                     200);
-              if (request.url.path.contains('friends'))
+              }
+              if (request.url.path.contains('friends')) {
                 return http.Response(
                     jsonEncode({
                       'friendships': [],
@@ -100,6 +101,7 @@ void main() {
                       'requestedFriends': []
                     }),
                     200);
+              }
               return http.Response('[]', 200);
             }));
   });

@@ -60,7 +60,7 @@ void main() {
           save: (value) async {
             writes.add(value);
             if (fail) throw StateError('offline');
-            if (pending != null) await pending!.future;
+            if (pending != null) await pending.future;
           }),
     ))));
     await tester.pumpAndSettle();
@@ -81,7 +81,7 @@ void main() {
     await tester.tap(toggle);
     await tester.pump();
     expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
-    pending!.complete();
+    pending.complete();
     await tester.pumpAndSettle();
     expect(tester.widget<SwitchListTile>(toggle).value, true);
     expect(writes, [false, true, true]);

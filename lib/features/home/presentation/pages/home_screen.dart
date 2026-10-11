@@ -617,13 +617,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _buildGreetingAndPlans(),
               _buildTrendingSection(),
               _buildInCinemasSection(),
-              if (userId != null)
-                FindTonightsFilmSection(onPick: () async {
-                  await context.push('/pick-for-us');
-                  if (mounted) await _refreshAll();
-                }),
-              if (userId != null)
-                HomeCommunitySection(key: _communityKey, userId: userId),
+              FindTonightsFilmSection(onPick: () async {
+                await context.push('/pick-for-us');
+                if (mounted) await _refreshAll();
+              }),
+              HomeCommunitySection(key: _communityKey, userId: userId),
             ],
           ),
         ),

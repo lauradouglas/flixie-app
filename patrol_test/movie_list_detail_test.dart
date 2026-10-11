@@ -9,6 +9,8 @@ import 'support/movie_list_detail_fixture.dart';
 void main() {
   patrolTest('mixed list adds a movie and show then removes only the movie',
       ($) async {
+    // Patrol fixtures intentionally use the test-only preferences API.
+    // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({});
     final api = MovieListDetailFixture();
     final auth = ListDetailAuth();
@@ -28,7 +30,11 @@ void main() {
     await $(find.byTooltip('Close')).tap();
     expect(api.entries.where((e) => e['movieId'] == 3), hasLength(1));
     expect(api.entries.where((e) => e['showId'] == 3), hasLength(1));
-    await $(find.descendant(of: find.byWidgetPredicate((w) => w is MovieListPosterCard && w.entry.movieId == 3), matching: find.byTooltip('List item actions'))).tap();
+    await $(find.descendant(
+            of: find.byWidgetPredicate(
+                (w) => w is MovieListPosterCard && w.entry.movieId == 3),
+            matching: find.byTooltip('List item actions')))
+        .tap();
     await $('Remove from list').tap();
     await $('Remove').tap();
     expect(api.entries.where((e) => e['movieId'] == 3), isEmpty);
@@ -40,6 +46,8 @@ void main() {
   });
   patrolTest('owner adds and removes a member without leaving the list route',
       ($) async {
+    // Patrol fixtures intentionally use the test-only preferences API.
+    // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({});
     final api = MovieListDetailFixture();
     final auth = ListDetailAuth();
@@ -63,6 +71,8 @@ void main() {
     expect(api.unexpected, isEmpty);
   });
   patrolTest('collaborator cancels then leaves a shared list', ($) async {
+    // Patrol fixtures intentionally use the test-only preferences API.
+    // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({});
     final api = MovieListDetailFixture()..owner = false;
     final auth = ListDetailAuth()..switchViewer('list-friend');

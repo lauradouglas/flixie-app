@@ -22,14 +22,14 @@ void main() {
       TvShowCredit(
           id: 0, name: 'Emily Mortimer', character: 'MacKenzie McHale'),
     ]);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(const MaterialApp(
         home: Scaffold(
             body: MediaQuery(
-                data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+                data: MediaQueryData(textScaler: TextScaler.linear(2)),
                 child: SingleChildScrollView(
                     child: Column(children: [
-                  ShowInfoSection(show: show, credits: const []),
-                  ShowCastSection(show: show, credits: const [])
+                  ShowInfoSection(show: show, credits: []),
+                  ShowCastSection(show: show, credits: [])
                 ]))))));
     expect(find.text('Created by'), findsOneWidget);
     expect(find.text('Language'), findsNothing);

@@ -73,9 +73,10 @@ void main() {
                 },
             };
           } else if (path.endsWith('/community/profiles/friend/follow')) {
-            if (request.method == 'PUT')
+            if (request.method == 'PUT') {
               following =
                   (jsonDecode(request.body) as Map)['following'] as bool;
+            }
             data = {'following': following};
           } else if (path.endsWith('/friends/me')) {
             data = {

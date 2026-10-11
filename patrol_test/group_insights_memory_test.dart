@@ -69,8 +69,9 @@ class _ImageControlClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    if (request.url.path.endsWith('/insights'))
+    if (request.url.path.endsWith('/insights')) {
       periods.add(request.url.queryParameters['timeWindow']);
+    }
     final response =
         await http.Response.fromStream(await database.send(request));
     if (!request.url.path.startsWith('/groups/') ||

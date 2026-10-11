@@ -17,8 +17,9 @@ class CommunityMentionText extends StatelessWidget {
     var cursor = 0;
     for (final match in _mention.allMatches(text)) {
       final start = match.start + match.group(1)!.length;
-      if (start > cursor)
+      if (start > cursor) {
         spans.add(TextSpan(text: text.substring(cursor, start)));
+      }
       spans.add(TextSpan(
         text: match.group(2),
         style: TextStyle(color: context.colors.primaryText),

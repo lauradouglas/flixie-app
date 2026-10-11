@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -116,17 +115,22 @@ void main() {
   }
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     for (final connect in [false, true]) {
-      testWidgets('$platform offers supported providers for connect=$connect', (tester) async {
+      testWidgets('$platform offers supported providers for connect=$connect',
+          (tester) async {
         final auth = _Auth();
         addTearDown(auth.dispose);
         await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
           value: auth,
-          child: MaterialApp(home: Scaffold(body: SocialAuthButtons(
-            connect: connect, onSignedIn: () {},
+          child: MaterialApp(
+              home: Scaffold(
+                  body: SocialAuthButtons(
+            connect: connect,
+            onSignedIn: () {},
           ))),
         ));
         final prefix = connect ? 'Connect' : 'Continue';
-        expect(find.text('$prefix with Apple'), platform == TargetPlatform.iOS ? findsOneWidget : findsNothing);
+        expect(find.text('$prefix with Apple'),
+            platform == TargetPlatform.iOS ? findsOneWidget : findsNothing);
         expect(find.text('$prefix with Google'), findsOneWidget);
         await tester.tap(find.text('$prefix with Google'));
         await tester.pumpAndSettle();

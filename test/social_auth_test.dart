@@ -74,7 +74,7 @@ class SocialService extends Fake implements AuthService {
   }
 }
 
-model.User profile() => model.User(
+model.User profile() => const model.User(
       id: 'fixture-db-user',
       externalId: 'fixture-social-user',
       username: 'alien_fan',

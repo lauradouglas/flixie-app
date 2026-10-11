@@ -230,8 +230,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                                   ? null
                                   : () => setState(() {
                                         _rating = selected ? null : value;
-                                        if (_rating == null)
+                                        if (_rating == null) {
                                           _recommended = null;
+                                        }
                                       }),
                               child: Column(
                                   mainAxisSize: MainAxisSize.min,

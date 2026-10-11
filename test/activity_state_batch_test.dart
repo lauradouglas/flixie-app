@@ -102,8 +102,9 @@ void main() {
     final paths = <String>[];
     final client = MockClient((request) async {
       paths.add(request.url.path);
-      if (request.method == 'POST')
+      if (request.method == 'POST') {
         return http.Response('{}', absent ? 404 : 403);
+      }
       return http.Response(
           jsonEncode(request.url.path.endsWith('/bookmark')
               ? {'saved': false}

@@ -39,7 +39,9 @@ class ShowDetailActionFlow {
         message:
             'Create an account to keep your watchlist and come back to this show whenever you’re ready.',
         path: '/shows/${_data.showId}',
-        intent: 'watchlist')) return;
+        intent: 'watchlist')) {
+      return;
+    }
     if (!context.mounted) return;
     if (_data.updatingAction != null || !context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
@@ -116,7 +118,9 @@ class ShowDetailActionFlow {
     if (!await GuestAccess.require(context,
         title: 'Save your favourites',
         path: '/shows/${_data.showId}',
-        intent: 'favorite')) return;
+        intent: 'favorite')) {
+      return;
+    }
     if (!context.mounted) return;
     if (_data.updatingAction != null || !context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;
@@ -220,7 +224,9 @@ class ShowDetailActionFlow {
     if (!await GuestAccess.require(context,
         title: 'Build your lists',
         path: '/shows/${_data.showId}',
-        intent: 'list')) return;
+        intent: 'list')) {
+      return;
+    }
     if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
@@ -251,7 +257,9 @@ class ShowDetailActionFlow {
   Future<void> setSeasonWatched(TvSeason season, bool watched) async {
     if (!await GuestAccess.require(context,
         title: 'Keep track of what you watch',
-        path: '/shows/${_data.showId}')) return;
+        path: '/shows/${_data.showId}')) {
+      return;
+    }
     if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
@@ -298,7 +306,9 @@ class ShowDetailActionFlow {
     if (!mounted) return;
     if (!await GuestAccess.require(context,
         title: 'Keep track of what you watch',
-        path: '/shows/${_data.showId}')) return;
+        path: '/shows/${_data.showId}')) {
+      return;
+    }
     if (!mounted) return;
     final show = _data.show;
     final userId = _data.auth.dbUser?.id;
@@ -395,7 +405,9 @@ class ShowDetailActionFlow {
       {bool undo = false}) async {
     if (!await GuestAccess.require(context,
         title: 'Keep track of what you watch',
-        path: '/shows/${_data.showId}')) return;
+        path: '/shows/${_data.showId}')) {
+      return;
+    }
     if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
@@ -587,7 +599,9 @@ class ShowDetailActionFlow {
     if (!await GuestAccess.require(context,
         title: 'Rate this show',
         path: '/shows/${_data.showId}',
-        intent: 'rate')) return;
+        intent: 'rate')) {
+      return;
+    }
     if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     var selectedRating = _data.userRating;
@@ -682,7 +696,9 @@ class ShowDetailActionFlow {
         message:
             'Create an account to write your review and discuss it with other film fans.',
         path: '/shows/${_data.showId}',
-        intent: 'review')) return;
+        intent: 'review')) {
+      return;
+    }
     if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
     final user = context.read<AuthProvider>().dbUser;

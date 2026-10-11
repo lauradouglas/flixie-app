@@ -16,7 +16,7 @@ void main() {
     addTearDown(auth.dispose);
     MovieList list(int count) => MovieList.fromJson({
           'id': 'list',
-          'userId': auth.dbUser!.id,
+          'userId': auth.dbUser.id,
           'name': 'Friday films',
           'visibility': 'PUBLIC',
           'itemCount': count
@@ -28,7 +28,7 @@ void main() {
           child: MaterialApp(
               home: Scaffold(
                   body: ListsPreviewSection(
-                      userId: auth.dbUser!.id,
+                      userId: auth.dbUser.id,
                       title: 'Your lists',
                       emptyMessage: 'Empty',
                       allowManage: true)))));
@@ -50,7 +50,7 @@ void main() {
     addTearDown(auth.dispose);
     Map<String, dynamic> fixture(String id, String date) => {
           'id': id,
-          'userId': auth.dbUser!.id,
+          'userId': auth.dbUser.id,
           'name': id,
           'visibility': 'PRIVATE',
           'createdAt': date,
@@ -64,7 +64,7 @@ void main() {
           child: MaterialApp(
               home: Scaffold(
                   body: ListsPreviewSection(
-                      userId: auth.dbUser!.id,
+                      userId: auth.dbUser.id,
                       title: 'Your lists',
                       emptyMessage: 'Empty',
                       allowManage: true)))));

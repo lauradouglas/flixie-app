@@ -138,7 +138,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
     await _data.load(widget.showId);
     if (!mounted ||
         _data.show == null ||
-        context.read<AuthProvider>().dbUser == null) return;
+        context.read<AuthProvider>().dbUser == null) {
+      return;
+    }
     final intent = GuestAccess.takeAction('/shows/${widget.showId}');
     switch (intent) {
       case 'watchlist':
@@ -245,9 +247,10 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         final hasSynopsis = show.overview?.trim().isNotEmpty == true;
         final friendSummary = _data.friendSummary ?? show.friendSummary;
         final sections = [
-          if (hasSynopsis) Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: _buildSynopsis(context, show)),
+          if (hasSynopsis)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildSynopsis(context, show)),
           if (friendSummary != null && friendSummary.friendCount > 0)
             _buildFriendSummary(show),
           _buildSeasonOverview(show),

@@ -30,11 +30,11 @@ void main() {
         status: 'Ended',
         firstAirDate: '2012-06-24',
         lastAirDate: '2014-12-14');
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(const MaterialApp(
         home: Scaffold(
             body: CustomScrollView(slivers: [
-      const ShowDetailHero(show: show),
-      SliverToBoxAdapter(child: ShowInfoSection(show: show, credits: const []))
+      ShowDetailHero(show: show),
+      SliverToBoxAdapter(child: ShowInfoSection(show: show, credits: []))
     ]))));
     expect(find.text('2012–2014'), findsOneWidget);
     expect(

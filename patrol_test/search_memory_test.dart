@@ -46,8 +46,9 @@ class _ImageControlClient extends http.BaseClient {
   final urls = <String, int>{};
   final queries = <String>[];
   dynamic transform(dynamic value, int width) {
-    if (value is List)
+    if (value is List) {
       return value.map((item) => transform(item, width)).toList();
+    }
     if (value is! Map<String, dynamic>) return value;
     return {
       for (final entry in value.entries)
