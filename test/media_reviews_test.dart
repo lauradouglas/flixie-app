@@ -129,7 +129,7 @@ void main() {
             home: Scaffold(
                 body: MediaReviewsSection(
           reviews: const [],
-          currentUserId: null,
+          currentUserId: 'review-viewer-fixture',
           loading: loading,
           failed: failed,
           onRetry: () => retries++,

@@ -5,6 +5,9 @@ import 'package:flixie_app/models/watchlist_movie.dart';
 import 'package:flixie_app/models/watch_provider.dart';
 
 class TestAuth extends ChangeNotifier implements AuthProvider {
+  @override
+  bool get activityIncludesRefreshedProfile => false;
+
   List<int> ids = [1];
   final providerRequests = <List<int>>[];
   Future<void>? providerGate;

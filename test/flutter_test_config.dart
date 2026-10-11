@@ -8,9 +8,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
     goldenFileComparator = RasterGoldenComparator(
         previous.basedir.resolve('flutter_test_config.dart'));
   }
-  try {
-    await testMain();
-  } finally {
-    goldenFileComparator = previous;
-  }
+  // testMain registers tests; they execute after this hook returns. Keep the
+  // comparator installed for the lifetime of this isolated test process.
+  await testMain();
 }

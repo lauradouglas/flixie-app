@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -10,20 +11,25 @@ void main() {
         (tester) async {
       final pending = Completer<void>();
       var calls = 0;
-      await tester.pumpWidget(MaterialApp(
-          home: Scaffold(
-              body: Builder(
-        builder: (context) => TextButton(
-            onPressed: () => showFlixiePromptSheet<void>(
-                  context: context,
-                  isDismissible: false,
-                  builder: (_) => LogoutSheet(onSignOut: () {
-                    calls++;
-                    return pending.future;
-                  }),
-                ),
-            child: const Text('Open')),
-      ))));
+      final router = GoRouter(routes: [
+        GoRoute(
+            path: '/',
+            builder: (_, __) => Scaffold(
+                    body: Builder(
+                  builder: (context) => TextButton(
+                      onPressed: () => showFlixiePromptSheet<void>(
+                            context: context,
+                            isDismissible: false,
+                            builder: (_) => LogoutSheet(onSignOut: () {
+                              calls++;
+                              return pending.future;
+                            }),
+                          ),
+                      child: const Text('Open')),
+                )))
+      ]);
+      addTearDown(router.dispose);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(TextButton, 'Log Out'));

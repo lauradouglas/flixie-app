@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/home/presentation/widgets/trending_carousel_skeleton.dart';
 import 'package:flixie_app/features/home/presentation/widgets/in_cinemas_section.dart';
 import 'package:flixie_app/core/utils/genre_catalogue.dart';
@@ -133,7 +134,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                       for (final group in community['communities'] as List)
                         if (isVisibleGenre(group['name'] as String,
                             id: group['id'] as int))
-                          ActionChip(
+                          FlixiePill.action(
                               avatar: GenreIcon(group['name'] as String),
                               label: Text(group['name'] as String),
                               onPressed: () => GuestAccess.require(context,

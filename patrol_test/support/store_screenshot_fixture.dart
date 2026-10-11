@@ -474,7 +474,8 @@ class StoreScreenshotFixture {
       };
     }
     if (request.method != 'GET') return unexpected(request);
-    if (path == '/trending/movie/day' ||
+    if (path == '/movies/now_playing' ||
+        path == '/trending/movie/day' ||
         path == '/users/store-viewer/recommendations') {
       return screenshotMovies;
     }

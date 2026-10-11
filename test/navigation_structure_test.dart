@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'support/navigation_structure_fixture.dart';
+import 'package:provider/provider.dart';
+import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'support/watchlist_auth.dart';
 
 void main() {
   testWidgets(
@@ -11,7 +14,10 @@ void main() {
       refreshed.add(path);
     });
     addTearDown(router.dispose);
-    await t.pumpWidget(MaterialApp.router(routerConfig: router));
+    final auth = TestAuth();
+    addTearDown(auth.dispose);
+    await t.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: auth, child: MaterialApp.router(routerConfig: router)));
     await t.pumpAndSettle();
     final labels = ['Home', 'Discover', 'Plans', 'Social', 'Profile'];
     final paths = ['/', '/search', '/plans', '/social', '/profile'];
@@ -41,7 +47,10 @@ void main() {
       (t) async {
     final router = navigationStructureFixture();
     addTearDown(router.dispose);
-    await t.pumpWidget(MaterialApp.router(routerConfig: router));
+    final auth = TestAuth();
+    addTearDown(auth.dispose);
+    await t.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: auth, child: MaterialApp.router(routerConfig: router)));
     await t.pumpAndSettle();
     await t.tap(find.text('Discover'));
     await t.pumpAndSettle();

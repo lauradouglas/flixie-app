@@ -3,6 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/raster_golden_comparator.dart';
 
 void main() {
+  test('rounding comparator remains installed when registered tests execute',
+      () {
+    expect(goldenFileComparator, isA<RasterGoldenComparator>());
+  });
   final baseline = Uint8List.fromList(List.filled(40000, 128));
   test('allows at most five sparse two-level RGB changes in 10000 pixels', () {
     final actual = Uint8List.fromList(baseline);

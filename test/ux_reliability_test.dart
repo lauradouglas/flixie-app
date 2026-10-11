@@ -435,7 +435,10 @@ void main() {
           ])
     ]);
     addTearDown(router.dispose);
-    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    final auth = FixtureAuth();
+    addTearDown(auth.dispose);
+    await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: auth, child: MaterialApp.router(routerConfig: router)));
     await tester.pumpAndSettle();
     expect(
         tester

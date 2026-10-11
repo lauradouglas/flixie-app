@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -336,7 +337,7 @@ class _SpaceCollectionState extends State<SpaceCollection> {
                   'movie': 'Movies',
                   'show': 'Shows'
                 }.entries)
-                  ChoiceChip(
+                  FlixiePill.choice(
                     label: Text(filter.value),
                     selected: _discoverFilter == filter.key,
                     onSelected: (_) {

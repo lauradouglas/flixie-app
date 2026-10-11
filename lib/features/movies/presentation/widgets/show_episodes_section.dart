@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/show_episode_card.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flutter/material.dart';
@@ -71,7 +72,7 @@ class ShowEpisodesSection extends StatelessWidget {
           for (final season in show.seasons)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
+              child: FlixiePill.choice(
                 label: Text(season.seasonNumber == 0
                     ? 'Specials'
                     : 'Season ${season.seasonNumber}'),
