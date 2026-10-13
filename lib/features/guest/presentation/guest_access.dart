@@ -29,6 +29,7 @@ class GuestAccess {
         '/search',
         '/profile',
         '/welcome',
+        '/around-flixie',
         '/help-support',
         '/about-credits'
       ].contains(path) ||

@@ -192,73 +192,98 @@ class FavouritePosterRail extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 8),
-        SizedBox(
-          height: (circular ? 96 : 146) +
-              6 +
-              MediaQuery.textScalerOf(context).scale(36),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: circular ? items.length : items.length.clamp(0, 10),
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final rawPath = item.imagePath;
-              final imageUrl = rawPath == null
-                  ? null
-                  : rawPath.startsWith('http')
-                      ? rawPath
-                      : 'https://image.tmdb.org/t/p/w342$rawPath';
-              return SizedBox(
-                width: 104,
-                child: InkWell(
-                  onTap: item.route == null
-                      ? null
-                      : () => context.push(item.route!),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          circular ? 999 : 10,
-                        ),
-                        child: SizedBox(
-                          width: circular ? 96 : 104,
-                          height: circular ? 96 : 146,
-                          child: imageUrl == null
-                              ? ColoredBox(
-                                  color: context.colors.surfaceElevated,
-                                  child: Icon(
-                                    Icons.favorite_outline_rounded,
-                                    color: context.colors.medium,
+        LayoutBuilder(builder: (context, constraints) {
+          final tablet = constraints.maxWidth >= 550;
+          final width = tablet
+              ? ((constraints.maxWidth - 40) / 5).clamp(104.0, 160.0)
+              : 104.0;
+          final posterHeight = circular
+              ? width - 8
+              : tablet
+                  ? width * 1.5
+                  : 146.0;
+          var titleHeight = MediaQuery.textScalerOf(context).scale(36);
+          if (tablet) {
+            for (final item in items.take(10)) {
+              final painter = TextPainter(
+                text: TextSpan(
+                    text: item.title,
+                    style: DefaultTextStyle.of(context).style.merge(
+                        const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700))),
+                textDirection: Directionality.of(context),
+                textScaler: MediaQuery.textScalerOf(context),
+              )..layout(maxWidth: width);
+              if (painter.height > titleHeight) titleHeight = painter.height;
+              painter.dispose();
+            }
+          }
+          return SizedBox(
+            height: posterHeight + 6 + titleHeight,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: circular ? items.length : items.length.clamp(0, 10),
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final rawPath = item.imagePath;
+                final imageUrl = rawPath == null
+                    ? null
+                    : rawPath.startsWith('http')
+                        ? rawPath
+                        : 'https://image.tmdb.org/t/p/w342$rawPath';
+                return SizedBox(
+                  width: width,
+                  child: InkWell(
+                    onTap: item.route == null
+                        ? null
+                        : () => context.push(item.route!),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                            circular ? 999 : 10,
+                          ),
+                          child: SizedBox(
+                            width: circular ? width - 8 : width,
+                            height: posterHeight,
+                            child: imageUrl == null
+                                ? ColoredBox(
+                                    color: context.colors.surfaceElevated,
+                                    child: Icon(
+                                      Icons.favorite_outline_rounded,
+                                      color: context.colors.medium,
+                                    ),
+                                  )
+                                : Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.image_not_supported_outlined,
+                                    ),
                                   ),
-                                )
-                              : Image.network(
-                                  imageUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.image_not_supported_outlined,
-                                  ),
-                                ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.colors.light,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                        const SizedBox(height: 6),
+                        Text(
+                          item.title,
+                          maxLines: tablet ? null : 2,
+                          overflow: tablet ? null : TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.colors.light,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-        ),
+                );
+              },
+            ),
+          );
+        }),
       ],
     );
   }

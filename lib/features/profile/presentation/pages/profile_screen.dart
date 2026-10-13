@@ -78,6 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final favoritePeople = dbUser.favoritePeople ?? [];
 
     return FlixiePageScaffold(
+      adaptiveContent: true,
       appBar: FlixieTitleAppBar(
         title: const Text('Profile'),
         actions: [
@@ -97,21 +98,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-                child: ProfileHeader(
-              displayName: displayName,
-              username: username,
-              bio: bio,
-              iconColor: dbUser.iconColor,
-              avatar: dbUser.avatar,
-              profileBadges: dbUser.profileBadges,
-              memberSince: _memberSinceLabel(dbUser.createdAt),
-              onPreview: () => context.push('/friends/$userId?preview=true'),
-            )),
-            SliverToBoxAdapter(
-                child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                    child: ProfileLibraryTotals(user: dbUser))),
+                child: LayoutBuilder(builder: (context, constraints) {
+              final header = ProfileHeader(
+                displayName: displayName,
+                username: username,
+                bio: bio,
+                iconColor: dbUser.iconColor,
+                avatar: dbUser.avatar,
+                profileBadges: dbUser.profileBadges,
+                memberSince: _memberSinceLabel(dbUser.createdAt),
+                onPreview: () => context.push('/friends/$userId?preview=true'),
+              );
+              final totals = Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: ProfileLibraryTotals(user: dbUser));
+              if (constraints.maxWidth >= 700 &&
+                  MediaQuery.textScalerOf(context).scale(1) <= 1.4) {
+                return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: header),
+                          const SizedBox(width: 24),
+                          SizedBox(
+                            width: 300,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: ProfileLibraryTotals(
+                                  user: dbUser, tablet: true),
+                            ),
+                          ),
+                        ]));
+              }
+              return Column(children: [header, totals]);
+            })),
             SliverToBoxAdapter(
                 child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -137,6 +158,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: _data.selectedTab == ProfileTab.stats
                             ? ProfileStatsTab(
                                 wrapped: _data.wrapped,
+                                milestones: _data.milestones,
+                                milestonesLoading: _data.milestonesLoading,
+                                milestonesFailed: _data.milestonesFailed,
+                                onRetryMilestones: () =>
+                                    _data.loadMilestones(forceRefresh: true),
                                 failed: _data.statsFailed,
                                 onRetry: _data.loadStats,
                                 ratings: _data.ratings,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/app/theme/appearance_controller.dart';
 import 'settings_tile.dart';
+import 'app_icon_choices.dart';
 
 class AppearanceSetting extends StatelessWidget {
   const AppearanceSetting({super.key});
@@ -74,6 +75,7 @@ class AppearanceSetting extends StatelessWidget {
                           }
                         },
                       ),
+                    const AppIconChoices(),
                   ]),
             ),
           ),

@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/social/presentation/utils/friend_selection.dart';
+import 'package:flixie_app/features/social/data/starred_people.dart';
+import 'package:flixie_app/models/friendship.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -198,9 +201,7 @@ class MovieFriendsSection extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
-          final visible = activities.where((activity) {
-            final matchesQuery = query.isEmpty ||
-                activity.username.toLowerCase().contains(query);
+          final visible = selectFriends(activities.where((activity) {
             final matchesTab = switch (selectedTab) {
               FriendActivityTab.all => true,
               FriendActivityTab.watched => activity.watched,
@@ -209,8 +210,12 @@ class MovieFriendsSection extends StatelessWidget {
               FriendActivityTab.reviews => activity.recommended == true,
               FriendActivityTab.lists => true,
             };
-            return matchesQuery && matchesTab;
-          }).toList(growable: false);
+            return matchesTab;
+          }),
+              userOf: (f) => FriendshipUser(
+                  id: f.userId, username: f.username, firstName: f.firstName),
+              starred: StarredPeople.instance.ids,
+              query: query);
           final tabs = <(FriendActivityTab, String, int)>[
             (FriendActivityTab.all, 'All', activities.length),
             (FriendActivityTab.watched, 'Watched', watchedCount),

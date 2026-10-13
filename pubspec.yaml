@@ -90,8 +90,10 @@ flutter:
   assets:
     - assets/images/
     - assets/icon/
+    - assets/icon/community_pips/
     - assets/icon/communities/
     - assets/splash/
+    - assets/splash/pip/
 
 # Native icons are maintained directly, including Apple appearances and Android
 # monochrome layers. See docs/app-logo-installation.md; do not run the legacy

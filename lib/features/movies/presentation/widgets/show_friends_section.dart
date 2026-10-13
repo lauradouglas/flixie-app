@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/models/movie_friend_activity.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_friend_activity_row.dart';
@@ -160,10 +162,14 @@ class _ShowFriendsSectionState extends State<ShowFriendsSection> {
                   icon: Icon(Icons.close_rounded, color: context.colors.light)),
             ]),
             Expanded(
-                child: ListView(
-                    controller: controller,
-                    children:
-                        summary.friends.map(_buildShowFriendRow).toList())),
+                child: FriendSearchScope<TvShowFriend>(
+                    items: summary.friends,
+                    expanded: true,
+                    userOf: (f) =>
+                        FriendshipUser(id: f.userId, username: f.username),
+                    builder: (context, visible) => ListView(
+                        controller: controller,
+                        children: visible.map(_buildShowFriendRow).toList()))),
           ]),
         ),
       ),

@@ -73,6 +73,23 @@ class AppReviewService {
     }
   }
 
+  /// Opens the listing without taking the user to the review composer.
+  static Future<bool> openUpdateListing() async {
+    try {
+      if (Platform.isIOS) {
+        if (!RegExp(r'^\d+$').hasMatch(_appStoreId)) return false;
+        return await launchUrl(
+          Uri.https('apps.apple.com', '/app/id$_appStoreId'),
+          mode: LaunchMode.externalApplication,
+        );
+      }
+      await InAppReview.instance.openStoreListing();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// The Settings action deliberately opens the store listing rather than
   /// requesting the quota-limited native prompt.
   static Future<bool> openStoreListing() async {

@@ -19,6 +19,12 @@ String mediaDeepLink(ChatShareMedia movie) {
   ).toString();
 }
 
+/// Public HTTPS link with an install fallback on the Flixie website.
+String mediaWebLink(ChatShareMedia media) => Uri.https(
+    'www.flixie.co.uk',
+    '/${media.isShow ? 'shows' : 'movies'}/${media.id}',
+    const {'source': 'shared_link'}).toString();
+
 String buildMediaSharePayload({
   required ChatShareMedia movie,
   required String message,

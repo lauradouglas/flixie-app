@@ -1,3 +1,7 @@
+import 'route_error_screen.dart';
+import 'package:flixie_app/features/guest/presentation/guest_community_feed.dart';
+import 'package:flixie_app/features/social/presentation/pages/private_communities_screen.dart';
+import 'flixie_tablet_navigation.dart';
 import 'package:flixie_app/features/collections/collection_screen.dart';
 import 'package:flixie_app/features/authentication/presentation/cinema_auth_page.dart';
 import 'package:flixie_app/features/guest/data/first_open_store.dart';
@@ -81,10 +85,21 @@ Page<void> _calmPage(GoRouterState state, Widget child) {
 /// Opens immediately on iOS, retaining an interactive left-edge back gesture.
 /// CupertinoPageRoute supplies iOS's interactive left-edge back gesture.
 Page<void> _pushPage(GoRouterState state, Widget child) {
+  if (state.uri.path == '/watchlist' ||
+      state.uri.path.startsWith('/movies/') ||
+      state.uri.path.startsWith('/shows/')) {
+    child = FlixieTabletRouteFrame(
+        watchlist: state.uri.path == '/watchlist', child: child);
+  }
   if (defaultTargetPlatform == TargetPlatform.iOS) {
+    final activityPost =
+        child is FriendActivityScreen || child is CommunityPostScreen;
     return InstantSwipePage<void>(
       key: state.pageKey,
       name: _screenNameFor(state),
+      dismissDuration: Duration(milliseconds: activityPost ? 180 : 300),
+      swipeSettleDuration:
+          activityPost ? const Duration(milliseconds: 180) : null,
       child: child,
     );
   }
@@ -180,6 +195,9 @@ GoRouter buildRouter(
   Future<bool>? firstWelcome;
   return GoRouter(
     navigatorKey: rootNavigatorKey,
+    errorBuilder: (context, state) => RouteErrorScreen(
+      unknownLink: state.error is GoException,
+    ),
     observers: [_FlixieAnalyticsObserver(analytics)],
     refreshListenable: authProvider.authStatusListenable,
     initialLocation: '/',
@@ -196,6 +214,12 @@ GoRouter buildRouter(
         return '/';
       }
       final hasCompletedSetup = authProvider.dbUser?.completedSetup ?? false;
+      // Native universal links may retain their HTTPS origin in state.uri.
+      // Setup stores only internal paths, including the title's source query.
+      final internalLocation = Uri(
+        path: state.uri.path,
+        query: state.uri.hasQuery ? state.uri.query : null,
+      ).toString();
       if (state.uri.path == '/search' &&
           state.uri.queryParameters['focus'] == '1') {
         pendingSetupDestination = '/search?focus=1';
@@ -206,7 +230,7 @@ GoRouter buildRouter(
       }
       if (!hasCompletedSetup) {
         pendingSetupDestination =
-            setupDestination(state.uri.toString()) ?? pendingSetupDestination;
+            setupDestination(internalLocation) ?? pendingSetupDestination;
       }
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
@@ -232,7 +256,11 @@ GoRouter buildRouter(
         if (!isSplash &&
             GuestAccess.isPublicPath(state.uri.path) &&
             state.uri.path != '/') {
-          initialGuestPath = state.uri.toString();
+          initialGuestPath = internalLocation;
+          // Retain a cold-start title for restored members too, even when a
+          // cached complete profile is already present during auth loading.
+          pendingSetupDestination =
+              setupDestination(internalLocation) ?? pendingSetupDestination;
         }
         return isSplash ? null : '/splash';
       }
@@ -337,6 +365,9 @@ GoRouter buildRouter(
       return null;
     },
     routes: [
+      GoRoute(
+          path: '/around-flixie',
+          builder: (_, __) => const GuestCommunityFeed()),
       GoRoute(path: '/welcome', builder: (_, __) => const GuestWelcomeScreen()),
       GoRoute(
         path: '/splash',
@@ -496,6 +527,22 @@ GoRouter buildRouter(
                   discussionId: state.pathParameters['discussionId']!,
                   initialReplyId: state.uri.queryParameters['reply'],
                   service: const CommunitySpaceService()))),
+      GoRoute(
+          path: '/private-communities',
+          pageBuilder: (context, state) => _pushPage(
+              state,
+              PrivateCommunitiesScreen(
+                  key: ValueKey(
+                      'private:${state.uri.queryParameters['invitation']}:${context.read<AuthProvider>().dbUser?.id}'),
+                  inviteKey: state.uri.queryParameters['invitation']))),
+      GoRoute(
+          path: '/community-invites/:token',
+          pageBuilder: (context, state) => _pushPage(
+              state,
+              PrivateCommunitiesScreen(
+                  key: ValueKey(
+                      'invite:${state.pathParameters['token']}:${context.read<AuthProvider>().dbUser?.id}'),
+                  inviteKey: state.pathParameters['token']))),
       GoRoute(
           path: '/genre-communities/:genreId',
           pageBuilder: (context, state) => _pushPage(
@@ -842,41 +889,60 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final guest = context.watch<AuthProvider>().dbUser == null;
     final branches = guest ? [0, 1, 4] : [0, 1, 2, 3, 4];
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            context.colors.surface,
-            context.colors.background,
-            context.colors.navy,
-          ],
+    void selectBranch(int index) {
+      if (index == selectedIndex) {
+        unawaited(_retapKey.currentState?.refresh());
+      } else {
+        navigationShell.goBranch(index);
+      }
+    }
+
+    return LayoutBuilder(builder: (context, constraints) {
+      final tablet = constraints.maxWidth >= flixieTabletNavigationBreakpoint;
+      final content =
+          NavigationRetapRegion(key: _retapKey, child: navigationShell);
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              context.colors.surface,
+              context.colors.background,
+              context.colors.navy
+            ],
+          ),
         ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        // Android's navigation bar can occupy a side in landscape.
-        // Pages handle their own top inset; the shell owns side protection.
-        body: SafeArea(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
             top: false,
             bottom: false,
-            child:
-                NavigationRetapRegion(key: _retapKey, child: navigationShell)),
-        bottomNavigationBar: _FlixieNavBar(
-          guest: guest,
-          selectedIndex: branches.indexOf(selectedIndex),
-          onDestinationSelected: (visibleIndex) {
-            final index = branches[visibleIndex];
-            if (index == selectedIndex) {
-              unawaited(_retapKey.currentState?.refresh());
-              return;
-            }
-            navigationShell.goBranch(index);
-          },
+            child: tablet
+                ? Row(children: [
+                    FlixieTabletNavigation(
+                      selectedIndex: selectedIndex,
+                      guest: guest,
+                      unreadMessages:
+                          context.watch<ChatUnreadController?>()?.total ?? 0,
+                      onSelected: selectBranch,
+                      onWatchlist: () => context.push('/watchlist'),
+                    ),
+                    Expanded(child: content),
+                  ])
+                : content,
+          ),
+          bottomNavigationBar: tablet
+              ? null
+              : _FlixieNavBar(
+                  guest: guest,
+                  selectedIndex: branches.indexOf(selectedIndex),
+                  onDestinationSelected: (visibleIndex) =>
+                      selectBranch(branches[visibleIndex]),
+                ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 

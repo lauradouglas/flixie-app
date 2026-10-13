@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'package:flutter/material.dart';
@@ -91,11 +92,15 @@ class _CommunityRepliesState extends State<CommunityReplies>
       _spoilers = false;
       FocusScope.of(context).unfocus();
       await _load();
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'Couldn’t post. Your draft is still here. Replies may have been turned off.')));
+        final message = error is ApiException && error.statusCode == 403
+            ? 'You can’t reply to this post right now. Your draft is still here.'
+            : error is ApiException && error.statusCode == 404
+                ? 'This post or parent comment is no longer available. Your draft is still here.'
+                : 'Couldn’t post your reply. Your draft is still here. Please try again.';
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     } finally {
       if (mounted) setState(() => _sending = false);

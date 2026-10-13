@@ -226,6 +226,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
         'A spoiler reply');
+    expect(find.text('Couldn’t post your reply. Your draft is still here. Please try again.'), findsOneWidget);
+    expect(find.textContaining('turned off'), findsNothing);
     service.failReply = false;
     await tester.tap(find.text('Post reply'));
     await tester.pumpAndSettle();

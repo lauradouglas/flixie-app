@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/presentation/widgets/review_count_label.dart';
 import '../widgets/show_viewing_timeline.dart';
 import 'package:flixie_app/features/sharing/presentation/media_chat_share.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/settings_edit_profile_sheet.dart';
@@ -225,6 +226,7 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _ShowTabsHeaderDelegate(
+                  reviewCount: context.read<AuthProvider>().dbUser != null && !_data.reviewsLoading && !_data.reviewsFailed ? _data.reviews.length : null,
                   selected: _selectedTab,
                   onSelected: (tab) => setState(() => _selectedTab = tab),
                 ),
@@ -732,8 +734,9 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
 class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
   const _ShowTabsHeaderDelegate(
-      {required this.selected, required this.onSelected});
+      {required this.selected, required this.onSelected, this.reviewCount});
 
+  final int? reviewCount;
   final _ShowDetailTab selected;
   final ValueChanged<_ShowDetailTab> onSelected;
 
@@ -782,7 +785,11 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
                 child: Semantics(
                     selected: active,
                     button: true,
-                    child: Text(entry.value,
+                    child: entry.key == _ShowDetailTab.reviews
+                        ? ReviewCountLabel(count: reviewCount,
+                            style: TextStyle(color: active ? context.colors.textPrimary : context.colors.light,
+                              fontWeight: active ? FontWeight.w800 : FontWeight.w500))
+                        : Text(entry.value,
                         style: TextStyle(
                           color: active
                               ? context.colors.textPrimary
@@ -800,7 +807,7 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _ShowTabsHeaderDelegate oldDelegate) =>
-      oldDelegate.selected != selected;
+      oldDelegate.selected != selected || oldDelegate.reviewCount != reviewCount;
 }
 
 class _ErrorState extends StatelessWidget {

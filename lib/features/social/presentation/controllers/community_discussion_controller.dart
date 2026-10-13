@@ -105,6 +105,13 @@ class CommunityDiscussionController extends ChangeNotifier {
       final ids = _replies.map((r) => r['id']).toSet();
       _replies.addAll(rows.where((r) => ids.add(r['id'])));
       next = page['nextCursor'];
+      if (page['readThrough'] case final String boundary) {
+        // A read-marker failure must not hide successfully loaded replies.
+        try {
+          await service.post(communityId, '$path/read',
+              {'readThrough': boundary, 'reveal': true});
+        } catch (_) {}
+      }
     } catch (_) {
       if (current()) {
         failedMore = more;

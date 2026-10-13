@@ -15,6 +15,7 @@ bool notificationBelongsInInbox(FlixieNotification notification) =>
 
 bool notificationNeedsResponse(FlixieNotification n) {
   if (n.closed == true) return false;
+  if (n.type == FlixieNotification.communityInvite) return n.isPending;
   if (n.isWatchPlanNotification) {
     final request = n.linkedWatchRequest;
     if (request != null) {
@@ -65,6 +66,16 @@ String? notificationPlanLabel(FlixieNotification n) {
 }
 
 String notificationHeadline(FlixieNotification n) {
+  if (n.type == FlixieNotification.communityInvite) {
+    final community = n.data?['communityName']?.toString() ?? 'the community';
+    if (n.action == FlixieNotification.actionAccepted) {
+      return 'You joined $community';
+    }
+    if (n.closed == true) {
+      return 'Invitation to $community is no longer available';
+    }
+    return n.message;
+  }
   if (n.type == FlixieNotification.communityReply) {
     return n.message.isNotEmpty
         ? n.message
@@ -175,13 +186,17 @@ class NotificationInboxCard extends StatelessWidget {
                 'SCHEDULE_PROPOSED' => needs ? 'Review proposal' : 'View plan',
                 'PLAN_READY_TO_LOG' => 'Log watch',
                 'ALL_PARTICIPANTS_LOGGED' || 'RECAP_UPDATED' => 'View recap',
-                _ => n.type == FlixieNotification.groupInvite
-                    ? 'View invitation'
-                    : n.isWatchPlanNotification
-                        ? 'View plan'
-                        : n.type == FlixieNotification.listShared
-                            ? 'View list'
-                            : 'View profile',
+                _ => n.type == FlixieNotification.communityInvite
+                    ? (n.action == FlixieNotification.actionAccepted
+                        ? 'View community'
+                        : 'View invitation')
+                    : n.type == FlixieNotification.groupInvite
+                        ? 'View invitation'
+                        : n.isWatchPlanNotification
+                            ? 'View plan'
+                            : n.type == FlixieNotification.listShared
+                                ? 'View list'
+                                : 'View profile',
               };
     final avatar = ProfileAvatarView(
         avatar: n.senderAvatar,

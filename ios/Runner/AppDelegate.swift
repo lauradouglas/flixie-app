@@ -11,6 +11,7 @@ import UserNotifications
   private let pushTapChannelName = "flixie/push_taps"
   private var widgetRevision = UUID()
   private var widgetChannel: FlutterMethodChannel?
+  private var appIconChannel: FlutterMethodChannel?
   private var badgeChannel: FlutterMethodChannel?
   private var pushTapChannel: FlutterMethodChannel?
   private var pendingPushTap: [String: String]?
@@ -50,7 +51,38 @@ import UserNotifications
     registerChannels(with: engineBridge.applicationRegistrar.messenger())
   }
 
+  private func registerAppIconChannel(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "flixie/app_icon", binaryMessenger: messenger)
+    appIconChannel = channel
+    channel.setMethodCallHandler { call, result in
+      let app = UIApplication.shared
+      switch call.method {
+      case "status":
+        result(["supported": app.supportsAlternateIcons,
+                "selected": app.alternateIconName == "PipGlasses" ? "pipGlasses" : "default"])
+      case "set":
+        guard let name = call.arguments as? String,
+              name == "default" || name == "pipGlasses",
+              app.supportsAlternateIcons else {
+          result(FlutterError(code: "ICON_UNAVAILABLE", message: "App icon unavailable", details: nil))
+          return
+        }
+        let target: String? = name == "default" ? nil : "PipGlasses"
+        if app.alternateIconName == target { result(nil); return }
+        app.setAlternateIconName(target) { error in
+          DispatchQueue.main.async {
+            if let error = error {
+              result(FlutterError(code: "ICON_FAILED", message: error.localizedDescription, details: nil))
+            } else { result(nil) }
+          }
+        }
+      default: result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
   private func registerChannels(with messenger: FlutterBinaryMessenger) {
+    registerAppIconChannel(with: messenger)
     registerWatchlistWidgetChannel(with: messenger)
     registerBadgeChannel(with: messenger)
     registerPushTapChannel(with: messenger)

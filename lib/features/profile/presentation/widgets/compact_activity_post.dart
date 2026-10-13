@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
@@ -20,6 +21,7 @@ class CompactActivityPost extends StatefulWidget {
       this.onOpenList,
       this.onReview,
       this.onComment,
+      this.commentCount,
       this.onReply,
       this.onReact,
       this.busy = false,
@@ -27,6 +29,7 @@ class CompactActivityPost extends StatefulWidget {
       this.saveAction,
       this.onOptions,
       this.publicPost = false});
+  final int? commentCount;
   final ActivityListItem item;
   final String label, age;
   final ActivityReactionSummary reactions;
@@ -315,7 +318,8 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                   children: [
                 if (widget.onReact != null)
                   Builder(
-                      builder: (anchor) => TextButton.icon(
+                      builder: (anchor) => IconButton(
+                          tooltip: 'Add reaction',
                           onPressed: widget.busy || widget.onReact == null
                               ? null
                               : () => widget.onReact!(anchor),
@@ -324,13 +328,13 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                                   ? context.colors.primaryText
                                   : secondary,
                               size: 22),
-                          label: const Text('React'),
-                          style: TextButton.styleFrom(
+                          style: IconButton.styleFrom(
                               foregroundColor: secondary))),
                 for (final entry in widget.reactions.counts.entries)
                   if (entry.value > 0)
                     Semantics(
-                        label: '${entry.key}: ${entry.value} reactions',
+                        label:
+                            '${ActivityReaction.fromEmoji(entry.key)?.label ?? 'Reaction'}: ${entry.value} reactions',
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 7),
@@ -343,9 +347,7 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                                     : Colors.transparent),
                           ),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Text(entry.key,
-                                style:
-                                    const TextStyle(fontSize: 16, height: 1)),
+                            PipReaction(entry.key),
                             const SizedBox(width: 6),
                             Text('${entry.value}',
                                 style:
@@ -353,28 +355,16 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                           ]),
                         )),
                 if (widget.onComment != null)
-                  widget.publicPost
-                      ? TextButton.icon(
-                          onPressed: widget.onComment,
-                          icon:
-                              const Icon(Icons.arrow_forward_rounded, size: 16),
-                          label: const Text('View post'),
-                          style: TextButton.styleFrom(
-                              foregroundColor: context.colors.primaryText,
-                              minimumSize: const Size(44, 44),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 8),
-                              textStyle: Theme.of(context)
-                                  .textTheme
-                                  .labelLarge
-                                  ?.copyWith(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500)))
-                      : IconButton(
-                          tooltip: 'Comments',
-                          onPressed: widget.onComment,
-                          icon: Icon(Icons.chat_bubble_outline,
-                              color: secondary, size: 22)),
+                  TextButton.icon(
+                      onPressed: widget.onComment,
+                      icon: Icon(Icons.chat_bubble_outline,
+                          color: secondary, size: 20),
+                      label: Text(widget.commentCount == null
+                          ? (widget.publicPost ? 'View post' : 'Comments')
+                          : '${widget.commentCount} ${widget.commentCount == 1 ? 'comment' : 'comments'}'),
+                      style: TextButton.styleFrom(
+                          foregroundColor: context.colors.primaryText,
+                          minimumSize: const Size(44, 44))),
               ])),
           if (widget.saveAction != null) widget.saveAction!,
         ]),

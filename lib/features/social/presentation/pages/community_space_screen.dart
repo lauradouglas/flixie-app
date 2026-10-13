@@ -1,3 +1,4 @@
+import '../widgets/private_community_manage_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
@@ -21,6 +22,8 @@ import '../widgets/community_identity.dart';
 import '../widgets/community_watchlist_button.dart';
 import 'genre_community_feed_screen.dart';
 import 'community_discussion_screen.dart';
+import 'community_poll_composer.dart';
+import '../widgets/discussion/community_poll_preview.dart';
 
 class CommunitySpaceScreen extends StatefulWidget {
   const CommunitySpaceScreen(
@@ -65,6 +68,13 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
   Future<void> _join() async {
     if (_busy || _community == null) return;
     final joined = _community!['joined'] == true;
+    final private = _community!['private'] == true;
+    if (private && _community!['role'] == 'OWNER') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'You own this community. Manage your members from the settings button.')));
+      return;
+    }
     final confirmed = await showFlixiePromptSheet<bool>(
         context: context,
         builder: (context) => FlixiePromptSheetContent(
@@ -73,7 +83,7 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
                     : 'Join ${_community!['name']}?'),
                 content: Text(joined
                     ? 'Your contributions disappear from this community. Original reviews stay intact.'
-                    : 'Your existing and future public reviews can appear here. Private reviews stay private. Discussions you publish are visible to people browsing the community.'),
+                    : 'Your existing and future ratings count towards community scores when public sharing is on. Your public reviews can appear here. Joining does not turn on public sharing. Discussions you publish are visible to people browsing the community.'),
                 actions: [
                   TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -86,6 +96,10 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
     setState(() => _busy = true);
     try {
       await widget.membership.setJoined(widget.communityId, !joined);
+      if (private && mounted) {
+        context.pop();
+        return;
+      }
       if (mounted) {
         setState(() {
           _community!['joined'] = !joined;
@@ -110,6 +124,13 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
             leading: const FlixieBackButton(),
             title: const Text('Communities'),
             actions: [
+              if (_community?['private'] == true &&
+                  const ['OWNER', 'ADMIN'].contains(_community?['role']))
+                IconButton(
+                    tooltip: 'Manage community',
+                    icon: const Icon(Icons.settings_outlined),
+                    onPressed: () => showPrivateCommunityManagement(
+                        context, widget.communityId, _community!['role'])),
               if (_community != null)
                 (_community!['joined'] == true
                     ? IconButton(
@@ -134,6 +155,13 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
                                 child: CommunityIdentityHeader(
                                     id: widget.communityId,
                                     name: _community!['name'])),
+                            if (_community!['private'] == true)
+                              SliverToBoxAdapter(
+                                  child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          20, 0, 20, 16),
+                                      child: Text(
+                                          'Invite-only · ${_community!['description'] ?? ''}'))),
                           ],
                       body: Column(children: [
                         TabBar(
@@ -155,13 +183,17 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
                               communityId: widget.communityId,
                               service: widget.service,
                               section: 'discussions',
-                              joined: _community!['joined'] == true),
+                              joined: _community!['joined'] == true,
+                              canCreatePoll:
+                                  _community!['canCreatePoll'] == true),
                           SpaceCollection(
                               key: ValueKey('discover:$_revision'),
                               communityId: widget.communityId,
                               service: widget.service,
                               section: 'discover',
-                              joined: _community!['joined'] == true),
+                              joined: _community!['joined'] == true,
+                              canCreatePoll:
+                                  _community!['canCreatePoll'] == true),
                           GenreCommunityFeedScreen(
                               key: ValueKey('reviews:$_revision'),
                               genreId: widget.communityId,
@@ -171,7 +203,9 @@ class _CommunitySpaceScreenState extends State<CommunitySpaceScreen> {
                               communityId: widget.communityId,
                               service: widget.service,
                               section: 'people',
-                              joined: _community!['joined'] == true),
+                              joined: _community!['joined'] == true,
+                              canCreatePoll:
+                                  _community!['canCreatePoll'] == true),
                         ])),
                       ])))));
 }
@@ -197,16 +231,19 @@ class SpaceCollection extends StatefulWidget {
       required this.communityId,
       required this.service,
       required this.section,
-      required this.joined});
+      required this.joined,
+      this.canCreatePoll = false});
   final int communityId;
   final CommunitySpaceService service;
   final String section;
   final bool joined;
+  final bool canCreatePoll;
   @override
   State<SpaceCollection> createState() => _SpaceCollectionState();
 }
 
-class _SpaceCollectionState extends State<SpaceCollection> {
+class _SpaceCollectionState extends State<SpaceCollection>
+    with WidgetsBindingObserver {
   final List<Map<String, dynamic>> _items = [];
   bool _loading = true, _more = false, _failedMore = false;
   String? _error;
@@ -226,14 +263,23 @@ class _SpaceCollectionState extends State<SpaceCollection> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SafetyService.changes.addListener(_safetyChanged);
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     SafetyService.changes.removeListener(_safetyChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.section == 'discover') {
+      _load();
+    }
   }
 
   void _safetyChanged() {
@@ -292,6 +338,13 @@ class _SpaceCollectionState extends State<SpaceCollection> {
     if (created == true && mounted) _load();
   }
 
+  Future<void> _poll() async {
+    final created = await Navigator.of(context).push<bool>(MaterialPageRoute(
+        builder: (_) => CommunityPollComposer(
+            communityId: widget.communityId, service: widget.service)));
+    if (created == true && mounted) _load();
+  }
+
   Future<void> _open(Map<String, dynamic> row) async {
     await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => CommunityDiscussionScreen(
@@ -313,7 +366,11 @@ class _SpaceCollectionState extends State<SpaceCollection> {
                 switch (widget.section) {
                   'discussions' => widget.communityId == -1
                       ? 'Talk anime together'
-                      : 'Talk films together',
+                      : widget.communityId == -4
+                          ? 'Talk series together'
+                          : widget.communityId < -1
+                              ? 'Talk films and series together'
+                              : 'Talk films together',
                   'discover' => 'Find your next favourite',
                   _ => 'Find a voice you trust'
                 },
@@ -323,13 +380,14 @@ class _SpaceCollectionState extends State<SpaceCollection> {
                 switch (widget.section) {
                   'discussions' =>
                     'Ask for a recommendation or talk through a title. Respect the spoiler boundary.',
-                  'discover' =>
-                    'Popular movies and shows, boosted by recent high ratings from this community. Member scores and sample sizes are shown.',
+                  'discover' => widget.communityId == -4
+                      ? 'Popular Korean drama series, boosted by recent high ratings from this community. Member scores and sample sizes are shown.'
+                      : 'Popular movies and shows, boosted by recent high ratings from this community. Member scores and sample sizes are shown.',
                   _ =>
                     'Read their reviews before deciding to follow. Joining never follows anyone for you.'
                 },
                 style: TextStyle(color: context.colors.medium)),
-            if (widget.section == 'discover') ...[
+            if (widget.section == 'discover' && widget.communityId != -4) ...[
               const SizedBox(height: 16),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final filter in {
@@ -361,6 +419,12 @@ class _SpaceCollectionState extends State<SpaceCollection> {
                           ? 'Start a discussion'
                           : 'Join to start or reply',
                       textAlign: TextAlign.center)),
+              const SizedBox(height: 8),
+              if (widget.canCreatePoll)
+                OutlinedButton.icon(
+                    onPressed: widget.joined ? _poll : null,
+                    icon: const Icon(Icons.poll_outlined),
+                    label: const Text('Create a poll')),
             ],
             const SizedBox(height: 24),
             if (_loading && _items.isEmpty)
@@ -370,7 +434,7 @@ class _SpaceCollectionState extends State<SpaceCollection> {
                 'discussions' =>
                   'No discussions yet. Start with a question for the community.',
                 'discover' =>
-                  'No public member ratings yet. Titles appear here as members review them.',
+                  'No matching titles yet. Pull to refresh as the catalogue grows.',
                 _ => 'No public members to show yet.'
               }),
             if (widget.section == 'discover') _discoveryGrid(),
@@ -400,15 +464,6 @@ class _SpaceCollectionState extends State<SpaceCollection> {
     final created = DateTime.tryParse(row['createdAt']?.toString() ?? '');
     final content =
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(
-          '${title?['title'] ?? 'Recommendations'} · ${discussionBoundary(row)}',
-          style: TextStyle(
-              color: row['spoiler'] == 'none'
-                  ? context.colors.secondary
-                  : context.colors.warning,
-              fontSize: 12,
-              height: 1.5)),
-      const SizedBox(height: 8),
       TextButton(
           onPressed: () => _open(row),
           style: TextButton.styleFrom(
@@ -418,15 +473,75 @@ class _SpaceCollectionState extends State<SpaceCollection> {
               foregroundColor: context.colors.white),
           child: Text(row['title'],
               style: TextStyle(
-                  fontSize: 20,
-                  height: 1.4,
+                  fontSize: 19,
+                  height: 1.3,
                   fontWeight: FontWeight.w800,
                   color: context.colors.white))),
-      if (row['body'] != null) ...[
+      const SizedBox(height: 8),
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        if (title != null)
+          Text(title['title'],
+              style: TextStyle(
+                  fontSize: 12,
+                  height: 1.8,
+                  fontWeight: FontWeight.w600,
+                  color: context.colors.light)),
+        Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+                color: (row['poll'] != null
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : row['spoiler'] == 'none'
+                        ? Theme.of(context).colorScheme.secondaryContainer
+                        : Theme.of(context).colorScheme.tertiaryContainer),
+                borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(
+                  row['poll'] != null
+                      ? Icons.poll_outlined
+                      : row['spoiler'] == 'none'
+                          ? Icons.check_circle_outline
+                          : Icons.visibility_off_outlined,
+                  size: 14,
+                  color: row['poll'] != null
+                      ? Theme.of(context).colorScheme.onPrimaryContainer
+                      : row['spoiler'] == 'none'
+                          ? Theme.of(context).colorScheme.onSecondaryContainer
+                          : Theme.of(context).colorScheme.onTertiaryContainer),
+              const SizedBox(width: 5),
+              Flexible(
+                  child: Text(
+                      row['poll'] != null
+                          ? (row['poll']['closedAt'] != null
+                              ? 'Voting closed'
+                              : 'Poll')
+                          : discussionBoundary(row),
+                      style: TextStyle(
+                          fontSize: 11,
+                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                          color: row['poll'] != null
+                              ? Theme.of(context).colorScheme.onPrimaryContainer
+                              : row['spoiler'] == 'none'
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .onSecondaryContainer
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onTertiaryContainer)))
+            ])),
+      ]),
+      if (row['poll'] != null) ...[
+        const SizedBox(height: 12),
+        CommunityPollPreview(
+            poll: Map<String, dynamic>.from(row['poll']),
+            onOpen: () => _open(row)),
+      ],
+      if (row['body'] != null && row['poll'] == null) ...[
         const SizedBox(height: 10),
         Text(row['body'],
             style: TextStyle(
-                fontSize: 15, height: 1.6, color: context.colors.light)),
+                fontSize: 14, height: 1.5, color: context.colors.light)),
       ],
     ]);
     final replies = TextButton(
@@ -435,8 +550,8 @@ class _SpaceCollectionState extends State<SpaceCollection> {
           foregroundColor: context.colors.primaryText,
           padding: const EdgeInsets.symmetric(horizontal: 8)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Text('${row['replyCount'] ?? 0} replies',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400)),
+        Text('${row['replyCount'] ?? 0} replies${(row['unreadReplyCount'] as num? ?? 0) > 0 ? ' · ${row['unreadReplyCount']} new' : ''}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(width: 8),
         const Icon(Icons.chat_bubble_outline, size: 19),
       ]),
@@ -456,10 +571,10 @@ class _SpaceCollectionState extends State<SpaceCollection> {
         return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           ExcludeSemantics(
               child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                   child: SizedBox(
-                    width: 58,
-                    height: 87,
+                    width: 64,
+                    height: 96,
                     child: poster == null || poster.isEmpty
                         ? ColoredBox(
                             color: context.colors.surface,

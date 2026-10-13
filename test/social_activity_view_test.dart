@@ -21,20 +21,21 @@ void main() {
             SizedBox(height: 60, child: Text('feed $i post $j'))
         ]),
     ]))));
-    expect(controllers[0].hasClients, isTrue);
+    expect(controllers[2].hasClients, isTrue);
+    expect(controllers[0].hasClients, isFalse);
     expect(controllers[1].hasClients, isFalse);
     await tester.drag(find.byType(ListView), const Offset(0, -300));
     await tester.pumpAndSettle();
-    final offset = controllers[0].offset;
+    final offset = controllers[2].offset;
     await tester.tap(find.text('Friends'));
     await tester.pumpAndSettle();
     expect(find.text('feed 1 post 0'), findsOneWidget);
     await tester.tap(find.text('Around Flixie'));
     await tester.pumpAndSettle();
-    expect(find.text('feed 2 post 0'), findsOneWidget);
+    expect(controllers[2].offset, offset);
     await tester.tap(find.text('Following'));
     await tester.pumpAndSettle();
-    expect(controllers[0].offset, offset);
+    expect(find.text('feed 0 post 0'), findsOneWidget);
     tester.view.physicalSize = const Size(320, 700);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;

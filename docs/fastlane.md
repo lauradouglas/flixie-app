@@ -368,3 +368,82 @@ IPA passed signed release entitlement validation; App Store precheck passed and
 Fastlane confirmed successful submission. Manual release after approval remains
 selected. No duplicate binary upload, screenshot changes or backend deployment
 was performed.
+
+## TestFlight build 104 — 12 October 2026
+
+At the user’s request, built/uploaded 2.0.2 (104) from the current working tree,
+including recent milestone trophy shields, full Milestones-page trophies and
+external movie/show HTTPS sharing. Production `lib/main.dart` and HTTPS API
+selected explicitly; release guard and signed IPA capability checks pass. Relevant
+focused regressions and four dedicated native sharing journeys passed before upload.
+Apple processing completed and Fastlane distributed to internal testers. Independent
+API check confirms VALID and membership in the existing all-builds Flixie group.
+No App Review submission, Android release, backend or website publication. Shared
+links/install redirects still require publishing the prepared website association
+files and title routes.
+
+Retained IPA: `build/releases/ios/2.0.2-104/flixie_app.ipa`. SHA-256:
+`2196f8c92d079772c06454d9d28d5b08b9f40858d0fc6ca76cb528438fef778b`.
+Apple build ID: `4b6267c6-59b8-41b9-8f7e-0a47fcde4e46`.
+
+## TestFlight 2.0.2 (105) — 12 October 2026
+
+User authorised shipping the exclusive Pip-in-3D alternate icon. Existing beta
+lane built the current working tree with production Firebase/API, validated the
+signed IPA, uploaded it and waited for Apple processing. Apple confirmed processing
+and internal tester distribution at 21:41 London. PipGlasses is present in the
+release IPA alternate icon dictionary. No App Store review submission performed.
+Retained binary and SHA-256 manifest: build/releases/ios/2.0.2-105/.
+SHA-256: df32487cc362b0537051649ecd44f8896a1286858faaaadc92daf3518ea0fa4d.
+Future Pip artwork variants remain design assets, not selectable icons in this build.
+
+## TestFlight 2.0.2 (106) — 12 October 2026
+
+User authorised deploying the cold-start shared-title routing fix. Built the
+current working tree using the existing production main/Firebase/API beta lane;
+signed IPA validation and release guard passed. Apple finished processing and
+internal tester distribution at 22:10 London. Focused startup routing checks:
+21 pass; analysis clean. Signed simulator checks verified terminated-app HTTPS
+movie/show links open Alien and Game of Thrones directly.
+
+Retained IPA and manifest: build/releases/ios/2.0.2-106/.
+SHA-256: a107c5eace4aa60c4c37e20c459f530d5e959a02bb058e98912829a638d15449.
+PipGlasses remains bundled. No App Store review, Android, backend or website
+release performed. Physical Messages/WhatsApp validation remains for user testing.
+
+## Release 2.0.2 (107) — 12 October 2026
+
+User authorised TestFlight upload, Apple production review submission and the
+required backend reaction deployment. Last released Apple version independently
+verified as 2.0.1 (101). Release notes saved at
+`fastlane/release-metadata/ios/2.0.2/en-GB/release_notes.txt`; submission accepts an
+explicit `notes_file` rather than replacing them with the old generic notes.
+
+Current working tree built with production main/API. Signed IPA capability
+validation passed; all 12 Pip reaction PNGs and PipGlasses alternate icon verified.
+32 focused app checks, 19 Fastlane checks and iOS release guards passed. Backend
+TypeScript checking and all 613 regressions passed on final commit d32441f.
+Retained IPA/hash manifest: `build/releases/ios/2.0.2-107/`.
+Apple accepted the binary at 23:53 London; processing and internal TestFlight
+distribution completed at 23:58. Independent API confirms VALID, IN_BETA_TESTING
+and membership in the Flixie group. App Store precheck passed; build 107 was
+selected and successfully submitted for review at 23:59 London. Backend deployment succeeded and live `/healthcheck` returned App Healthy.
+Production pipeline: https://github.com/lauradouglas/FlixieBE/actions/runs/38318691410.
+Submission must reuse this uploaded binary and retain manual release after approval.
+
+```bash
+SLACK_RELEASES_WEBHOOK_URL='' RELEASE_VERSION=2.0.2 bundle exec fastlane ios submit build_number:107 ipa:build/releases/ios/2.0.2-107/flixie_app.ipa uploaded:true notes_file:fastlane/release-metadata/ios/2.0.2/en-GB/release_notes.txt
+```
+
+## Android production 2.0.2 (107) — 13 October 2026
+
+User explicitly authorised Android production release. Google Play baseline
+verified as production code 101. Built current app with production main/API,
+Google OAuth preflight passed, all 35 focused Flutter checks passed. Signed AAB
+contains all 12 Pip reaction assets. Retained binary/hash manifest under
+`build/releases/android/2.0.2-107/`. Uploaded that exact bundle using the Fastlane
+Play action with the production lane's settings (completed release, changes sent
+for review, no fallback to an unsubmitted edit). Upload/commit succeeded at
+00:06 London. Existing listing screenshots/metadata preserved; en-GB notes at
+`fastlane/release-metadata/android/en-GB/changelogs/107.txt`. Google review and
+public availability remain separate from successful submission.

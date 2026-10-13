@@ -128,12 +128,18 @@ class HomeCommunitySectionState extends State<HomeCommunitySection> {
                       onOptions: item.userId == widget.userId
                           ? null
                           : () => SafetyActions.contentMenu(context,
-                              targetType:
-                                  item.type == ActivityListType.movieReview
-                                      ? 'MOVIE_REVIEW'
-                                      : item.type == ActivityListType.showReview
-                                          ? 'SHOW_REVIEW'
-                                          : 'MOVIE_LIST',
+                              targetType: item.type ==
+                                      ActivityListType.movieReview
+                                  ? 'MOVIE_REVIEW'
+                                  : item.type == ActivityListType.showReview
+                                      ? 'SHOW_REVIEW'
+                                      : item.type ==
+                                              ActivityListType.movieRating
+                                          ? 'MOVIE_RATING'
+                                          : item.type ==
+                                                  ActivityListType.showRating
+                                              ? 'SHOW_RATING'
+                                              : 'MOVIE_LIST',
                               targetId: item.id,
                               reportedUserId: item.userId,
                               username: item.username,

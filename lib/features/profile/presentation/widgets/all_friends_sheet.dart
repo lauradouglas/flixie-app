@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -26,10 +27,11 @@ class AllFriendsSheet extends StatefulWidget {
 }
 
 class _AllFriendsSheetState extends State<AllFriendsSheet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, StarredFriendsState<AllFriendsSheet> {
   late TabController _tabController;
   late List<Friendship> _pendingFriends;
   late List<FriendshipUser> _sentUsers;
+  String _query = '';
   late List<Friendship> _friends;
 
   @override
@@ -120,6 +122,10 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final friends = orderedFriends(_friends, (f) => f.friendUser, _query);
+    final pending =
+        orderedFriends(_pendingFriends, (f) => f.friendUser, _query);
+    final sent = orderedFriends(_sentUsers, (f) => f, _query);
 
     return DefaultTabController(
       length: 3,
@@ -199,18 +205,28 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
                 ),
               ],
             ),
+            Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: TextField(
+                    onChanged: (value) => setState(() => _query = value),
+                    decoration: const InputDecoration(
+                        hintText: 'Search friends',
+                        prefixIcon: Icon(Icons.search_rounded)))),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
                   // Friends tab
-                  _friends.isEmpty
-                      ? const _EmptyTab(message: 'No friends yet.')
+                  friends.isEmpty
+                      ? _EmptyTab(
+                          message: _query.trim().isEmpty
+                              ? 'No friends yet.'
+                              : 'No friends match your search.')
                       : ListView.builder(
                           padding: const EdgeInsets.all(20),
-                          itemCount: _friends.length,
+                          itemCount: friends.length,
                           itemBuilder: (_, i) {
-                            final user = _friends[i].friendUser;
+                            final user = friends[i].friendUser;
                             if (user == null) return const SizedBox.shrink();
                             return _FriendListTile(
                               user: user,
@@ -226,13 +242,13 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
                         ),
 
                   // Pending tab (incoming requests)
-                  _pendingFriends.isEmpty
+                  pending.isEmpty
                       ? const _EmptyTab(message: 'No pending friend requests.')
                       : ListView.builder(
                           padding: const EdgeInsets.all(20),
-                          itemCount: _pendingFriends.length,
+                          itemCount: pending.length,
                           itemBuilder: (_, i) {
-                            final friendship = _pendingFriends[i];
+                            final friendship = pending[i];
                             final user = friendship.friendUser;
                             if (user == null) return const SizedBox.shrink();
                             return _PendingRequestTile(
@@ -245,13 +261,13 @@ class _AllFriendsSheetState extends State<AllFriendsSheet>
                         ),
 
                   // Sent tab
-                  _sentUsers.isEmpty
+                  sent.isEmpty
                       ? const _EmptyTab(message: 'No sent friend requests.')
                       : ListView.builder(
                           padding: const EdgeInsets.all(20),
-                          itemCount: _sentUsers.length,
+                          itemCount: sent.length,
                           itemBuilder: (_, i) {
-                            final user = _sentUsers[i];
+                            final user = sent[i];
                             return _FriendListTile(
                               user: user,
                               subtitle: 'Request sent',

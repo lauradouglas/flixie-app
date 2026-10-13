@@ -53,8 +53,38 @@ class _FriendProfileContent {
   List<Widget> build(BuildContext context) => switch (controller.selectedTab) {
         1 => _activityContent(context, controller.user!),
         2 => _reviewsContent(context),
-        _ => _overviewContent(context, controller.user!),
+        _ => _adaptiveOverview(context, controller.user!),
       };
+  List<Widget> _adaptiveOverview(BuildContext context, User user) {
+    final children = _overviewContent(context, user);
+    return [
+      LayoutBuilder(builder: (context, constraints) {
+        if (constraints.maxWidth < 900 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.4) {
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: children);
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+              flex: 3,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children
+                      .where((child) => child is! ListsPreviewSection)
+                      .toList())),
+          const SizedBox(width: 32),
+          Expanded(
+              flex: 2,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children:
+                      children.whereType<ListsPreviewSection>().toList())),
+        ]);
+      })
+    ];
+  }
+
   List<Widget> _sharedWatchlist(BuildContext context, User user) {
     if (controller.isSelf ||
         controller.friendshipStatus != FriendshipStatus.friends) {

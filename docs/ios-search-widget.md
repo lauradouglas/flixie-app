@@ -97,3 +97,21 @@ dictionaries for validation.
 TestFlight upload succeeded on 5 October at 12:05:41 UTC. App Store Connect
 visibly lists version 1.0.1 build 92 as Processing; install availability awaits
 Apple processing. No external beta review or App Store submission was made.
+
+### Pip artwork — 12 October 2026
+
+Search and Watchlist small/medium widgets now include a 32-point static popcorn
+Pip beside the existing wordmark. `FlixieSearchWidget/Artwork/widget-pip.png`
+is a 160px native copy of the approved startup artwork, registered only in the
+widget extension resources. It is decorative and excluded from accessibility
+announcements. No new timeline refresh, account field, App Group or permission
+is needed. Native extension compilation and resource-bundle verification pass.
+A new app build/install is required; widget-gallery rendering on physical iPhone
+is still unverified. No release is requested by this artwork change.
+
+Following the user’s reload request, rebuilt and installed the normal development
+app on the iPhone 17 Pro simulator and visually verified Pip in the existing
+Home Screen Search widget. Fixed artwork loading to decode the bundled PNG with
+`UIImage(contentsOfFile:)`; SwiftUI’s named image lookup expected an asset catalog
+and left the standalone PNG invisible. The corrected native app build passes.
+Physical iPhone rendering remains unverified; no release or deployment was made.

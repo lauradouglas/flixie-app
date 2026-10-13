@@ -1,3 +1,6 @@
+import '../models/home_watch_plan_layout.dart';
+import '../widgets/home_watch_plan_column.dart';
+import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
 import 'package:flixie_app/features/guest/presentation/guest_home_screen.dart';
 import '../widgets/trending_carousel_skeleton.dart';
 import '../widgets/in_cinemas_section.dart';
@@ -583,6 +586,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         context.select<AuthProvider, String?>((auth) => auth.dbUser?.id);
     if (userId == null) return const GuestHomeScreen();
     return FlixiePageScaffold(
+      adaptiveContent: true,
       backgroundColor: context.colors.background,
       appBar: AppBar(
         backgroundColor: context.colors.background,
@@ -590,7 +594,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: context.colors.light),
         actionsIconTheme: IconThemeData(color: context.colors.light),
-        title: const FlixieWordmark(),
+        title: MediaQuery.sizeOf(context).width >= 1000
+            ? const Text('Home')
+            : const FlixieWordmark(),
         actions: [
           HomeWatchlistAction(onPressed: () => context.push('/watchlist')),
           const HomeNotificationAction(),
@@ -614,8 +620,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     if (mounted) await _refreshAll();
                   }),
               const HomeUnreadUpdates(),
-              _buildGreetingAndPlans(),
-              _buildTrendingSection(),
+              LayoutBuilder(builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 900 &&
+                    MediaQuery.textScalerOf(context).scale(1) <= 1.4;
+                if (!wide) {
+                  return Column(children: [
+                    _buildGreetingAndPlans(),
+                    _buildTrendingSection(),
+                  ]);
+                }
+                return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildGreetingAndPlans(showPlans: false),
+                      const SizedBox(height: 12),
+                      FlixieAdaptiveColumns(
+                        primaryFlex: 7,
+                        secondaryFlex: 3,
+                        primary: _buildTrendingSection(),
+                        secondary: _buildTabletPlans(),
+                      ),
+                    ]);
+              }),
               _buildInCinemasSection(),
               FindTonightsFilmSection(onPick: () async {
                 await context.push('/pick-for-us');
@@ -645,7 +671,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   onSave: (movie) => _toggleHeroWatchlist(context, movie),
                   onTrailer: (movie) => _openHeroTrailer(context, movie)))));
 
-  Widget _buildGreetingAndPlans() => Selector<AuthProvider, models.User?>(
+  Widget _buildGreetingAndPlans({bool showPlans = true}) =>
+      Selector<AuthProvider, models.User?>(
         selector: (_, auth) => auth.dbUser,
         builder: (context, user, _) => ListenableBuilder(
           listenable: _home.watchPlans,
@@ -686,12 +713,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 onDismiss: _dismissWatchPlansIntroduction)
                             : null,
                       )),
-                  _buildUpcomingWatchPlanSection(context, user,
-                      selectedState: selected, suppressEmptyState: showIntro),
+                  if (showPlans)
+                    _buildUpcomingWatchPlanSection(context, user,
+                        selectedState: selected, suppressEmptyState: showIntro),
                 ]);
           },
         ),
       );
+
+  Widget _buildTabletPlans() => ListenableBuilder(
+      listenable: _home.watchPlans,
+      builder: (context, _) {
+        final user = context.watch<AuthProvider>().dbUser;
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildUpcomingWatchPlanSection(context, user,
+                  selectedState: user == null
+                      ? null
+                      : selectHomeWatchPlanState(_watchPlansToShow, user.id),
+                  suppressEmptyState: false),
+              Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: OutlinedButton.icon(
+                      onPressed: _openWatchPlanCreation,
+                      icon: const Icon(Icons.group_add_outlined),
+                      label: const Text('Make a Watch Plan'))),
+            ]);
+      });
 
   Widget _buildTrendingSection() => ListenableBuilder(
         listenable: _home.trending,
@@ -788,7 +837,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ListenableBuilder(
           listenable: _home.watchlist,
           builder: (context, _) => TrendingCarousel(
+              key: ValueKey(_home.userId),
               movies: movies,
+              friendActivity:
+                  _home.userId == null ? null : _home.friendActivity,
+              onPageChanged: (index) => unawaited(_home.showHeroPage(index)),
+              onFriendsRetry: (movie) =>
+                  unawaited(_home.retryFriendActivity(movie)),
               savedIds: _watchlistMovieIds,
               pendingIds: _watchlistUpdatesInFlight,
               onDetails: (movie) => context.push(
@@ -1034,13 +1089,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         const SizedBox(height: 8),
         LayoutBuilder(
           builder: (context, constraints) {
+            final layout = HomeWatchPlanLayout(
+              screen: MediaQuery.sizeOf(context), width: constraints.maxWidth,
+              count: carouselStates.length);
+            if (layout.stacked) {
+              return HomeWatchPlanColumn(
+                states: carouselStates,
+                onOpen: (state) => _openHomeWatchPlan(state, user),
+              );
+            }
             // Every plan uses the current contextual card, with a next-card
             // preview that makes the horizontal carousel discoverable.
-            final cardWidth = carouselStates.length == 1
-                ? constraints.maxWidth - 32
-                : constraints.maxWidth >= 600
-                    ? 460.0
-                    : constraints.maxWidth * .90;
+            final cardWidth = layout.cardWidth;
             final heightSignature = [
               cardWidth.toStringAsFixed(1),
               MediaQuery.textScalerOf(context).scale(1).toStringAsFixed(2),
@@ -1068,9 +1128,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       if (notification is ScrollUpdateNotification &&
                           carouselStates.length > 1) {
                         final page =
-                            (notification.metrics.pixels / (cardWidth + 12))
+                            (notification.metrics.pixels / layout.itemExtent)
                                 .round()
-                                .clamp(0, carouselStates.length - 1);
+                                .clamp(0, layout.pageCount - 1);
                         if (_watchPlansPage.value != page) {
                           _watchPlansPage.value = page;
                         }
@@ -1079,10 +1139,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     },
                     child: SingleChildScrollView(
                       controller: _watchPlansScrollController,
-                      physics: WatchPlanSnapPhysics(itemExtent: cardWidth + 12),
+                      physics: WatchPlanSnapPhysics(itemExtent: layout.itemExtent),
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(
-                          horizontal: (constraints.maxWidth - cardWidth) / 2),
+                          horizontal: layout.padding),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1110,18 +1170,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               ),
                             ),
                           ],
+                          if (layout.trailingSpace > 0) SizedBox(width: layout.trailingSpace),
                         ],
                       ),
                     ),
                   ),
-                  if (carouselStates.length > 1) ...[
+                  if (layout.pageCount > 1) ...[
                     const SizedBox(height: 10),
                     ValueListenableBuilder<int>(
                       valueListenable: _watchPlansPage,
                       builder: (context, page, _) => Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
-                          carouselStates.length,
+                          layout.pageCount,
                           (index) => AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             width: index == page ? 20 : 7,

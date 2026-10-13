@@ -62,18 +62,28 @@ class GroupPlanList extends StatelessWidget {
             onTap: controller.past ? null : actions.create,
           )
         else
-          ...plans.map(
-            (plan) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: GroupPlanCard(
-                view: controller.view(plan),
-                onOpen: () {
-                  controller.select(plan.id);
-                  controller.load();
-                },
-              ),
-            ),
-          ),
+          LayoutBuilder(builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 760 &&
+                    MediaQuery.textScalerOf(context).scale(1) <= 1.4
+                ? 2
+                : 1;
+            final width = (constraints.maxWidth - (columns - 1) * 20) / columns;
+            return Wrap(
+                spacing: 20,
+                runSpacing: columns == 1 ? 12 : 16,
+                children: [
+                  for (final plan in plans)
+                    SizedBox(
+                        width: width,
+                        child: GroupPlanCard(
+                          view: controller.view(plan),
+                          onOpen: () {
+                            controller.select(plan.id);
+                            controller.load();
+                          },
+                        )),
+                ]);
+          }),
       ],
     );
   }

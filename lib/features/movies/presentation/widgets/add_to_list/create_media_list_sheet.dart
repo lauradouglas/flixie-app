@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -188,26 +189,32 @@ class CreateMediaListSheetState extends State<CreateMediaListSheet> {
                     style: TextStyle(color: context.colors.medium),
                   )
                 else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 7,
-                    children: _friends
-                        .map(
-                          (friend) => FlixiePill.filter(
-                              label: Text('@${friend.username}'),
-                              selected: _selectedFriendIds.contains(friend.id),
-                              onSelected: _submitting
-                                  ? null
-                                  : (selected) => setState(() {
-                                        if (selected) {
-                                          _selectedFriendIds.add(friend.id);
-                                        } else {
-                                          _selectedFriendIds.remove(friend.id);
-                                        }
-                                      })),
-                        )
-                        .toList(growable: false),
-                  ),
+                  FriendSearchScope<FriendshipUser>(
+                      items: _friends,
+                      userOf: (f) => f,
+                      builder: (context, visible) => Wrap(
+                            spacing: 8,
+                            runSpacing: 7,
+                            children: visible
+                                .map(
+                                  (friend) => FlixiePill.filter(
+                                      label: Text('@${friend.username}'),
+                                      selected: _selectedFriendIds
+                                          .contains(friend.id),
+                                      onSelected: _submitting
+                                          ? null
+                                          : (selected) => setState(() {
+                                                if (selected) {
+                                                  _selectedFriendIds
+                                                      .add(friend.id);
+                                                } else {
+                                                  _selectedFriendIds
+                                                      .remove(friend.id);
+                                                }
+                                              })),
+                                )
+                                .toList(growable: false),
+                          )),
               ],
               if (_submitting) ...[
                 const SizedBox(height: 16),

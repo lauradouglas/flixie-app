@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -79,9 +80,17 @@ void main() {
     await tester.tap(find.text('Spoiler review · Reveal'));
     await tester.pumpAndSettle();
     expect(find.text('Protected review text'), findsOneWidget);
-    await tester.ensureVisible(find.text('👎'));
-    expect(find.text('👀'), findsOneWidget);
-    expect(find.text('💯'), findsOneWidget);
+    await tester.ensureVisible(find.byWidgetPredicate(
+        (widget) => widget is PipReaction && widget.value == '👎'));
+    expect(
+        find.byWidgetPredicate(
+            (widget) => widget is PipReaction && widget.value == '👀'),
+        findsNothing);
+    expect(find.byType(PipReaction), findsWidgets);
+    expect(
+        find.byWidgetPredicate(
+            (widget) => widget is PipReaction && widget.value == '💯'),
+        findsOneWidget);
     expect(find.text('0'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byTooltip('Close review'));

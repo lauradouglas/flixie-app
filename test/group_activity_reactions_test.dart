@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -60,7 +61,7 @@ void main() {
     expect(original.counts['❤️'], 2);
   });
   testWidgets(
-      'seven reactions save, change and remove through the activity API',
+      'ten Pip reactions save, change and remove through the activity API',
       (tester) async {
     final auth = _Auth();
     addTearDown(auth.dispose);
@@ -83,8 +84,11 @@ void main() {
                       onRefresh: () async {})))));
       await tester.pumpAndSettle();
       expect(find.text('Latest activity'), findsOneWidget);
-      expect(find.text('❤️ 1'), findsOneWidget);
-      for (final emoji in ['❤️', '👀', '🔥', '😂', '😮', '💯', '👎', '👎']) {
+      expect(find.byType(PipReactionCount), findsOneWidget);
+      for (final emoji in [
+        ...ActivityReaction.selectable.map((reaction) => reaction.emoji),
+        '💯'
+      ]) {
         final react = find.byTooltip('Add reaction');
         await tester.ensureVisible(react);
         if (sent.isEmpty) {
@@ -97,10 +101,14 @@ void main() {
             .firstWhere((value) => value.emoji == emoji)
             .label);
         expect(find.text('Reply in chat'), findsOneWidget);
+        await tester.ensureVisible(option.last);
         await tester.tap(option.last);
         await tester.pumpAndSettle();
       }
-      expect(sent, ['❤️', '👀', '🔥', '😂', '😮', '💯', '👎', null]);
+      expect(sent, [
+        ...ActivityReaction.selectable.map((reaction) => reaction.emoji),
+        null
+      ]);
       expect(find.byTooltip('Add reaction'), findsOneWidget);
       failNext = true;
       await tester.tap(find.byTooltip('Add reaction'));
@@ -113,10 +121,15 @@ void main() {
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
       expect(find.byTooltip('Add reaction'), findsOneWidget);
-      expect(find.text('❤️ 2'), findsOneWidget);
-      await tester.tap(find.text('❤️ 2'));
+      expect(
+          find.byWidgetPredicate(
+              (widget) => widget is PipReaction && widget.value == '❤️'),
+          findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      await tester.tap(find.byWidgetPredicate(
+          (widget) => widget is PipReaction && widget.value == '❤️'));
       await tester.pumpAndSettle();
-      expect(find.text('❤️ 1'), findsOneWidget);
+      expect(find.byType(PipReactionCount), findsOneWidget);
       expect(find.byTooltip('Add reaction'), findsOneWidget);
       expect(find.text('Reply in chat'), findsNothing);
       expect(sent.last, isNull);
@@ -175,8 +188,11 @@ void main() {
               theme: AppTheme.darkTheme,
               home: const Scaffold(body: ActivityTile(item: item)))));
       await tester.pumpAndSettle();
-      expect(find.text('❤️ 1'), findsOneWidget);
-      for (final emoji in ['❤️', '👀', '🔥', '😂', '😮', '💯', '👎', '👎']) {
+      expect(find.byType(PipReactionCount), findsOneWidget);
+      for (final emoji in [
+        ...ActivityReaction.selectable.map((reaction) => reaction.emoji),
+        '💯'
+      ]) {
         final react = find.byTooltip('Add reaction');
         await tester.ensureVisible(react);
         if (sent.isEmpty) {
@@ -189,10 +205,14 @@ void main() {
             .firstWhere((value) => value.emoji == emoji)
             .label);
         expect(find.text('Reply in chat'), findsOneWidget);
+        await tester.ensureVisible(option.last);
         await tester.tap(option.last);
         await tester.pumpAndSettle();
       }
-      expect(sent, ['❤️', '👀', '🔥', '😂', '😮', '💯', '👎', null]);
+      expect(sent, [
+        ...ActivityReaction.selectable.map((reaction) => reaction.emoji),
+        null
+      ]);
       expect(find.byTooltip('Add reaction'), findsOneWidget);
       failNext = true;
       await tester.tap(find.byTooltip('Add reaction'));
@@ -205,10 +225,15 @@ void main() {
       await tester.tap(find.text('Retry'));
       await tester.pumpAndSettle();
       expect(find.byTooltip('Add reaction'), findsOneWidget);
-      expect(find.text('❤️ 2'), findsOneWidget);
-      await tester.tap(find.text('❤️ 2'));
+      expect(
+          find.byWidgetPredicate(
+              (widget) => widget is PipReaction && widget.value == '❤️'),
+          findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      await tester.tap(find.byWidgetPredicate(
+          (widget) => widget is PipReaction && widget.value == '❤️'));
       await tester.pumpAndSettle();
-      expect(find.text('❤️ 1'), findsOneWidget);
+      expect(find.byType(PipReactionCount), findsOneWidget);
       expect(find.byTooltip('Add reaction'), findsOneWidget);
       expect(find.text('Reply in chat'), findsNothing);
       expect(sent.last, isNull);
@@ -282,10 +307,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('React'), findsNothing);
       if (layout == 'compact') {
-        expect(find.text('❤️'), findsOneWidget);
+        expect(
+            find.byWidgetPredicate(
+                (widget) => widget is PipReaction && widget.value == '❤️'),
+            findsOneWidget);
         expect(find.text('2'), findsOneWidget);
       } else {
-        expect(find.text('❤️ 2'), findsOneWidget);
+        expect(
+            find.byWidgetPredicate(
+                (widget) => widget is PipReaction && widget.value == '❤️'),
+            findsOneWidget);
+        expect(find.text('2'), findsOneWidget);
       }
       expect(tester.takeException(), isNull);
     }
@@ -316,7 +348,11 @@ void main() {
                       onRefresh: () async {})))));
       await tester.pumpAndSettle();
       expect(find.text('React'), findsNothing);
-      expect(find.text('❤️ 2'), findsOneWidget);
+      expect(
+          find.byWidgetPredicate(
+              (widget) => widget is PipReaction && widget.value == '❤️'),
+          findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
         () => MockClient((request) async => http.Response(

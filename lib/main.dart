@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/app_icon/app_icon_service.dart';
 import 'package:flixie_app/features/library_import/data/library_import_session.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
@@ -211,6 +212,12 @@ class FlixieApp extends StatefulWidget {
 
 class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
   late final GoRouter _router;
+  late final AuthProvider _iconAuth;
+  void _syncAppIcon() {
+    if (_iconAuth.status == AuthStatus.unknown) return;
+    AppIconService.instance.updateUser(_iconAuth.dbUser);
+  }
+
   final ReferralAttributionStore _referralStore =
       SharedPreferencesReferralAttributionStore();
 
@@ -220,6 +227,9 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // Create router once - it will refresh via authStatusListenable, not by rebuilding this widget
     final authProvider = context.read<AuthProvider>();
+    _iconAuth = authProvider;
+    _iconAuth.addListener(_syncAppIcon);
+    _syncAppIcon();
     _router = buildRouter(
       authProvider,
       context.read<AnalyticsController>(),
@@ -233,6 +243,7 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _syncAppIcon();
       final unread = context.read<AuthProvider>().unreadNotificationCount;
       AppIconBadgeService.setCount(unread);
     }
@@ -241,6 +252,7 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _iconAuth.removeListener(_syncAppIcon);
     PushNotificationService.detachRouter(_router);
     _router.dispose();
     super.dispose();

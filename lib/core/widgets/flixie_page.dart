@@ -1,3 +1,4 @@
+import 'flixie_adaptive_content.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -10,6 +11,7 @@ class FlixiePageScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.backgroundColor = Colors.transparent,
     this.extendBodyBehindAppBar = false,
+    this.adaptiveContent = false,
   });
 
   final PreferredSizeWidget? appBar;
@@ -17,6 +19,7 @@ class FlixiePageScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final Color backgroundColor;
   final bool extendBodyBehindAppBar;
+  final bool adaptiveContent;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +27,7 @@ class FlixiePageScaffold extends StatelessWidget {
       extendBodyBehindAppBar: extendBodyBehindAppBar,
       backgroundColor: backgroundColor,
       appBar: appBar,
-      body: body,
+      body: adaptiveContent ? FlixieAdaptiveContent(child: body) : body,
       floatingActionButton: floatingActionButton,
     );
   }

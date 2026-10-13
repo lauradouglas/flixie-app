@@ -21,6 +21,7 @@ import 'community_space_screen.dart';
 import '../widgets/community_mention_suggestions.dart';
 import '../widgets/community_mention_text.dart';
 import '../widgets/discussion/discussion_author.dart';
+import '../widgets/discussion/community_poll.dart';
 
 class CommunityDiscussionScreen extends StatefulWidget {
   const CommunityDiscussionScreen(
@@ -444,11 +445,14 @@ class _CommunityDiscussionScreenState extends State<CommunityDiscussionScreen> {
                                               Text(discussionBoundary(_thread!),
                                                   style: TextStyle(
                                                       fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w700,
                                                       color: _hidden
-                                                          ? const Color(
-                                                              0xffefcd88)
-                                                          : const Color(
-                                                              0xff80ddcc))),
+                                                          ? context
+                                                              .colors.warning
+                                                          : Theme.of(context)
+                                                              .colorScheme
+                                                              .secondary)),
                                             ])),
                                       ]),
                                       const SizedBox(height: 18),
@@ -483,6 +487,15 @@ class _CommunityDiscussionScreenState extends State<CommunityDiscussionScreen> {
                                             _thread!['body'] ?? '',
                                             style:
                                                 discussionBodyStyle(context)),
+                                        if (_thread!['poll'] != null)
+                                          CommunityPoll(
+                                              poll: Map<String, dynamic>.from(
+                                                  _thread!['poll']),
+                                              communityId: widget.communityId,
+                                              discussionId: widget.discussionId,
+                                              service: widget.service,
+                                              member: _member,
+                                              onChanged: _load),
                                         const SizedBox(height: 24),
                                         _line(),
                                         const SizedBox(height: 20),

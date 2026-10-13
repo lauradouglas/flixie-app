@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
@@ -100,26 +101,34 @@ class _CommunityListEditorsState extends State<CommunityListEditors> {
                       ? null
                       : () => _action(entry['user']['id'] as String, 'remove'),
                   child: const Text('Remove'))),
-        for (final user in _friends
-            .where((f) => !_editors.any((e) => e['user']['id'] == f.id)))
-          ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Center(
-                      child: ProfileAvatarView(
-                          avatar: user.avatar,
-                          profileBadges: user.profileBadges,
-                          size: 32,
-                          fallbackText:
-                              user.username.isEmpty ? '?' : user.username[0],
-                          fallbackColor:
-                              Theme.of(context).colorScheme.primary))),
-              title: Text(user.username),
-              trailing: TextButton(
-                  onPressed: _busy ? null : () => _action(user.id, 'invite'),
-                  child: const Text('Invite'))),
+        FriendSearchScope<FriendshipUser>(
+            items: _friends
+                .where((f) => !_editors.any((e) => e['user']['id'] == f.id)),
+            userOf: (f) => f,
+            builder: (context, visible) => Column(children: [
+                  for (final user in visible)
+                    ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: Center(
+                                child: ProfileAvatarView(
+                                    avatar: user.avatar,
+                                    profileBadges: user.profileBadges,
+                                    size: 32,
+                                    fallbackText: user.username.isEmpty
+                                        ? '?'
+                                        : user.username[0],
+                                    fallbackColor: Theme.of(context)
+                                        .colorScheme
+                                        .primary))),
+                        title: Text(user.username),
+                        trailing: TextButton(
+                            onPressed:
+                                _busy ? null : () => _action(user.id, 'invite'),
+                            child: const Text('Invite'))),
+                ])),
         if (!_loading && _friends.isEmpty)
           const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),

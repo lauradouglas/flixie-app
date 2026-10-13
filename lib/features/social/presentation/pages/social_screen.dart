@@ -1,3 +1,4 @@
+import '../widgets/social_tablet_companion.dart';
 import 'genre_communities_screen.dart';
 import '../widgets/social_activity_view.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,7 @@ class _SocialScreenState extends State<SocialScreen> {
   int _selectedTab =
       1; // Legacy IDs: People 0, Activity 1, Groups 3, Communities 4
   final _visited = <int>{};
+  final _feedKey = GlobalKey();
   String? _viewer;
   int _refreshRevision = 0;
 
@@ -82,6 +84,7 @@ class _SocialScreenState extends State<SocialScreen> {
         ..add(_selectedTab);
     }
     return FlixiePageScaffold(
+      adaptiveContent: true,
       appBar: FlixieTitleAppBar(
         title: Text(
           'Social',
@@ -128,35 +131,52 @@ class _SocialScreenState extends State<SocialScreen> {
                     ],
                   ]))),
           Expanded(
-            child: ClipRect(
-              child: Material(
-                type: MaterialType.transparency,
-                child: IndexedStack(
-                  key: ValueKey('social:$viewer'),
-                  index: _selectedTab,
-                  children: [
-                    _visited.contains(0)
-                        ? SocialPeopleView(
-                            key: ValueKey('people:$_refreshRevision'),
-                            active: _selectedTab == 0)
-                        : const SizedBox.shrink(),
-                    _visited.contains(1)
-                        ? SocialActivityView(active: _selectedTab == 1)
-                        : const SizedBox.shrink(),
-                    const SizedBox.shrink(),
-                    _visited.contains(3)
-                        ? SocialGroupsView(
-                            key: ValueKey('groups:$_refreshRevision'))
-                        : const SizedBox.shrink(),
-                    _visited.contains(4)
-                        ? GenreCommunitiesView(
-                            key: ValueKey(
-                                'communities:${context.watch<AuthProvider>().dbUser?.id}'))
-                        : const SizedBox.shrink(),
-                  ],
+            child: LayoutBuilder(builder: (context, constraints) {
+              final feed = ClipRect(
+                key: _feedKey,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: IndexedStack(
+                    key: ValueKey('social:$viewer'),
+                    index: _selectedTab,
+                    children: [
+                      _visited.contains(0)
+                          ? SocialPeopleView(
+                              key: ValueKey('people:$_refreshRevision'),
+                              active: _selectedTab == 0)
+                          : const SizedBox.shrink(),
+                      _visited.contains(1)
+                          ? SocialActivityView(active: _selectedTab == 1)
+                          : const SizedBox.shrink(),
+                      const SizedBox.shrink(),
+                      _visited.contains(3)
+                          ? SocialGroupsView(
+                              key: ValueKey('groups:$_refreshRevision'))
+                          : const SizedBox.shrink(),
+                      _visited.contains(4)
+                          ? GenreCommunitiesView(
+                              key: ValueKey(
+                                  'communities:${context.watch<AuthProvider>().dbUser?.id}'))
+                          : const SizedBox.shrink(),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+              if (constraints.maxWidth < 900 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.4 ||
+                  _selectedTab != 1) {
+                return feed;
+              }
+              return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(flex: 2, child: feed),
+                    const SizedBox(width: 16),
+                    Expanded(
+                        child: SocialTabletCompanion(
+                            key: ValueKey('social-plans:$viewer'))),
+                  ]);
+            }),
           ),
         ],
       ),

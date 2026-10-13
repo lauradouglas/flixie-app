@@ -69,6 +69,7 @@ class ActivityListItem {
   final List<String> listPreviewPosterPaths;
   final String? listOwnerId;
   final int? listAdditionCount;
+  final int? commentCount;
 
   String get timestamp {
     if (watchedAt != null && watchedAt!.isNotEmpty) return watchedAt!;
@@ -109,6 +110,7 @@ class ActivityListItem {
     this.listPreviewPosterPaths = const [],
     this.listOwnerId,
     this.listAdditionCount,
+    this.commentCount,
   });
 
   ActivityListItem copyWith({ProfileAvatar? avatar}) => ActivityListItem(
@@ -144,6 +146,7 @@ class ActivityListItem {
         listPreviewPosterPaths: listPreviewPosterPaths,
         listOwnerId: listOwnerId,
         listAdditionCount: listAdditionCount,
+        commentCount: commentCount,
       );
 
   factory ActivityListItem.fromJson(Map<String, dynamic> json) {
@@ -262,6 +265,7 @@ class ActivityListItem {
               .toList(),
       listOwnerId: json['listOwnerId']?.toString(),
       listAdditionCount: _parseInt(json['listAdditionCount']),
+      commentCount: _parseInt(json['commentCount']),
     );
   }
 }

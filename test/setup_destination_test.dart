@@ -14,6 +14,8 @@ void main() {
       '/watch-requests/plan-1',
       '/friends/ellis',
       '/genre-communities/-1/discussions/thread-1?reply=reply-2',
+      '/private-communities',
+      '/community-invites/${'a' * 43}',
       '/notifications'
     ]) {
       expect(setupDestination(route), route);

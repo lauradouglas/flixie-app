@@ -182,7 +182,9 @@ class _GenreCommunityFeedScreenState extends State<GenreCommunityFeedScreen> {
                                             : _community!.joined
                                                 ? 'Leave community'
                                                 : 'Join community')),
-                                  if (widget.genreId == -1)
+                                  if (communityTopicSlug(widget.genreId) !=
+                                          null &&
+                                      widget.genreId != -4)
                                     for (final filter in [
                                       'all',
                                       'movie',

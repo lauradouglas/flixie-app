@@ -1,3 +1,5 @@
+import 'widgets/guest_signup_section.dart';
+import 'guest_community_feed.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/home/presentation/widgets/trending_carousel_skeleton.dart';
 import 'package:flixie_app/features/home/presentation/widgets/in_cinemas_section.dart';
@@ -13,8 +15,6 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/features/home/data/trending_service.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
-import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'guest_access.dart';
 
@@ -25,6 +25,7 @@ class GuestHomeScreen extends StatefulWidget {
 }
 
 class _GuestHomeScreenState extends State<GuestHomeScreen> {
+  final _communityKey = GlobalKey<GuestCommunityFeedState>();
   final _cinemasKey = GlobalKey<InCinemasSectionState>();
   late Future<(List<MovieShort>, Map<String, dynamic>)> _content = _load();
   Future<(List<MovieShort>, Map<String, dynamic>)> _load() async {
@@ -43,6 +44,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
     try {
       await Future.wait([
         _content,
+        if (_communityKey.currentState != null) _communityKey.currentState!.refresh(),
         if (_cinemasKey.currentState != null)
           _cinemasKey.currentState!.refresh()
       ]);
@@ -85,6 +87,17 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                         icon: const Icon(Icons.search),
                         label: const Text('Search movies, shows and people')),
                     const SizedBox(height: 24),
+                    GuestSignupSection(
+                      onSignup: () {
+                        GuestAccess.clear();
+                        context.push('/auth/signup');
+                      },
+                      onSignin: () {
+                        GuestAccess.clear();
+                        context.push('/auth/login');
+                      },
+                    ),
+                    const SizedBox(height: 24),
                     Text('Trending now',
                         style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 14),
@@ -114,15 +127,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                             path: '/movies/${movie.id}',
                             intent: 'watchlist'),
                         onTrailer: _openTrailer),
-                    Text('Around Flixie',
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 8),
-                    const Text('See what the community is talking about.'),
-                    const SizedBox(height: 12),
-                    if ((community['activity'] as List).isEmpty)
-                      const Text('Fresh film conversations will appear here.'),
-                    for (final row in community['activity'] as List)
-                      _activity(context, row as Map<String, dynamic>),
+                    GuestCommunityFeed(key: _communityKey, preview: true),
                     const SizedBox(height: 28),
                     Text('Find your film people',
                         style: Theme.of(context).textTheme.titleLarge),
@@ -164,24 +169,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
     }
   }
 
-  Widget _activity(BuildContext context, Map<String, dynamic> row) {
-    final user = row['user'] as Map<String, dynamic>;
-    final movie = row['movie'] as Map<String, dynamic>;
-    return ListTile(
-        contentPadding: const EdgeInsets.symmetric(vertical: 6),
-        leading: ProfileAvatarView(
-            avatar: user['avatar'] == null
-                ? null
-                : ProfileAvatar.fromJson(user['avatar']),
-            fallbackText:
-                (user['username'] as String).characters.firstOrNull ?? '?',
-            fallbackColor: FlixieColors.primary,
-            profileBadges: (user['profileBadges'] as List).cast<String>()),
-        title: Text('${user['username']} reviewed ${movie['title']}'),
-        subtitle: const Text('Explore this film'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push('/movies/${movie['id']}'));
-  }
+
 }
 
 class GuestWelcomeScreen extends StatelessWidget {

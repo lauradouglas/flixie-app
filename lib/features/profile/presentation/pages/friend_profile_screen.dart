@@ -84,6 +84,20 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     final favourites =
         (user.favoriteMovies?.length ?? 0) + (user.favoriteShows?.length ?? 0);
 
+    final tablet = MediaQuery.sizeOf(context).width >= 700 &&
+        MediaQuery.textScalerOf(context).scale(1) <= 1.4;
+    Widget profileHeader() => LayoutBuilder(builder: (context, constraints) {
+          final header = FriendProfileHeader(controller: controller);
+          if (!tablet || constraints.maxWidth < 600) return header;
+          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: header),
+            const SizedBox(width: 32),
+            if (watched + watchlist + favourites > 0)
+              SizedBox(
+                  width: 280,
+                  child: FriendProfileTotals(user: user, tablet: true)),
+          ]);
+        });
     final coverUrl = user.creatorProfile?.coverUrl;
     final hasCover = coverUrl != null;
     final toolbar = AppBar(
@@ -169,109 +183,119 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       appBar: hasCover ? null : toolbar,
       body: RefreshIndicator(
         onRefresh: controller.loadAll,
-        child: ListView(
-          padding: EdgeInsets.only(top: hasCover ? 0 : 8, bottom: 32),
-          children: [
-            if (hasCover)
-              LayoutBuilder(
-                key: const ValueKey('profile-cover'),
-                builder: (context, constraints) {
-                  final top =
-                      MediaQuery.paddingOf(context).top + kToolbarHeight;
-                  final imageSpace =
-                      (constraints.maxWidth * .36).clamp(100.0, 200.0);
-                  return Stack(children: [
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: top + imageSpace + 88,
-                      child: Stack(fit: StackFit.expand, children: [
-                        CachedNetworkImage(
-                          imageUrl: coverUrl,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: ListView(
+              padding: EdgeInsets.only(top: hasCover ? 0 : 8, bottom: 32),
+              children: [
+                if (hasCover)
+                  LayoutBuilder(
+                    key: const ValueKey('profile-cover'),
+                    builder: (context, constraints) {
+                      final top =
+                          MediaQuery.paddingOf(context).top + kToolbarHeight;
+                      final imageSpace =
+                          (constraints.maxWidth * .36).clamp(100.0, 200.0);
+                      return Stack(children: [
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: top + imageSpace + 88,
+                          child: Stack(fit: StackFit.expand, children: [
+                            CachedNetworkImage(
+                              imageUrl: coverUrl,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                            DecoratedBox(
+                                decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                stops: const [0, .4, 1],
+                                colors: [
+                                  Colors.black.withValues(alpha: .45),
+                                  context.colors.background
+                                      .withValues(alpha: .3),
+                                  context.colors.background
+                                ],
+                              ),
+                            )),
+                          ]),
                         ),
-                        DecoratedBox(
-                            decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            stops: const [0, .4, 1],
-                            colors: [
-                              Colors.black.withValues(alpha: .45),
-                              context.colors.background.withValues(alpha: .3),
-                              context.colors.background
-                            ],
+                        Column(children: [
+                          SizedBox(height: top, child: toolbar),
+                          SizedBox(height: imageSpace),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: profileHeader(),
                           ),
-                        )),
-                      ]),
-                    ),
-                    Column(children: [
-                      SizedBox(height: top, child: toolbar),
-                      SizedBox(height: imageSpace),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: FriendProfileHeader(controller: controller),
-                      ),
-                    ]),
-                  ]);
-                },
-              )
-            else
-              FriendProfileHeader(controller: controller),
-            // Notification deep links use preview mode to suppress ordinary
-            // profile actions. An incoming friend request is an exception:
-            // its recipient still needs the Accept / Decline decision here.
-            if (!controller.isSelf &&
-                (!widget.previewMode ||
+                        ]),
+                      ]);
+                    },
+                  )
+                else
+                  profileHeader(),
+                // Notification deep links use preview mode to suppress ordinary
+                // profile actions. An incoming friend request is an exception:
+                // its recipient still needs the Accept / Decline decision here.
+                if (!controller.isSelf &&
+                    (!widget.previewMode ||
+                        controller.friendshipStatus ==
+                            FriendshipStatus.pending)) ...[
+                  const SizedBox(height: 18),
+                  FriendProfileActions(
+                      controller: controller,
+                      flow: flow,
+                      showCommunityFollow: widget.showCommunityFollow),
+                ],
+                const SizedBox(height: 20),
+                if (!tablet && watched + watchlist + favourites > 0)
+                  FriendProfileTotals(
+                      key: const ValueKey("profile-totals"), user: user),
+                const SizedBox(height: 12),
+                if (controller.activity.isNotEmpty ||
+                    controller.reviews.isNotEmpty ||
+                    controller.activityFailed ||
+                    controller.reviewsFailed ||
+                    controller.selectedTab != 0)
+                  FriendProfileTabs(controller: controller),
+                const SizedBox(height: 18),
+                ...buildFriendProfileContent(context,
+                    controller: controller, previewMode: widget.previewMode),
+                if (controller.isSelf ||
                     controller.friendshipStatus ==
-                        FriendshipStatus.pending)) ...[
-              const SizedBox(height: 18),
-              FriendProfileActions(
-                  controller: controller,
-                  flow: flow,
-                  showCommunityFollow: widget.showCommunityFollow),
-            ],
-            const SizedBox(height: 20),
-            if (watched + watchlist + favourites > 0)
-              FriendProfileTotals(
-                  key: const ValueKey("profile-totals"), user: user),
-            const SizedBox(height: 12),
-            if (controller.activity.isNotEmpty ||
-                controller.reviews.isNotEmpty ||
-                controller.activityFailed ||
-                controller.reviewsFailed ||
-                controller.selectedTab != 0)
-              FriendProfileTabs(controller: controller),
-            const SizedBox(height: 18),
-            ...buildFriendProfileContent(context,
-                controller: controller, previewMode: widget.previewMode),
-            if (controller.isSelf ||
-                controller.friendshipStatus == FriendshipStatus.friends) ...[
-              const SizedBox(height: 20),
-              TextButton.icon(
-                icon: const Icon(Icons.workspace_premium_outlined, size: 20),
-                label: const Text('View earned milestones'),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => MilestonesScreen(
-                          userId: controller.subjectId,
-                          displayName: controller.user?.username,
-                          earnedOnly: true,
-                        ))),
-              ),
-            ],
-          ]
-              .map((child) => child.key == const ValueKey('profile-cover')
-                  ? child
-                  : Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal:
-                              child.key == const ValueKey('profile-totals')
-                                  ? 8
-                                  : 20),
-                      child: child))
-              .toList(),
+                        FriendshipStatus.friends) ...[
+                  const SizedBox(height: 20),
+                  TextButton.icon(
+                    icon:
+                        const Icon(Icons.workspace_premium_outlined, size: 20),
+                    label: const Text('View earned milestones'),
+                    onPressed: () =>
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => MilestonesScreen(
+                                  userId: controller.subjectId,
+                                  displayName: controller.user?.username,
+                                  earnedOnly: true,
+                                ))),
+                  ),
+                ],
+              ]
+                  .map((child) => child.key == const ValueKey('profile-cover')
+                      ? child
+                      : Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal:
+                                  child.key == const ValueKey('profile-totals')
+                                      ? 8
+                                      : 20),
+                          child: child))
+                  .toList(),
+            ),
+          ),
         ),
       ),
     );

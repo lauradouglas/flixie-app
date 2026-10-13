@@ -1,0 +1,9 @@
+A little more Pip, and more ways to share your movie life.
+
+• React to reviews and activity with new Pip reactions, including hand hearts, laughs, hot takes and more.
+• Celebrate your progress with trophy badges and your three most recent milestones on Profile Stats.
+• Share movie and TV links outside Flixie, with improved navigation straight to the title when opening the app.
+• Founders and our first 100 members can choose the exclusive Pip in 3D app icon in Appearance settings.
+• See review counts at a glance on movie and TV pages.
+• Meet Pip on startup and Home Screen widgets, with friendlier help when a link cannot be opened.
+• Improved tablet layouts, navigation and reliability.

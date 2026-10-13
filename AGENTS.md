@@ -34,6 +34,10 @@ its own AGENTS.md, including supported-client compatibility requirements.
 
 ## Bottom sheets
 
+Use bottom sheets for app confirmations and choices rather than centred modal
+dialogs, per the user's explicit preference on 11 October 2026. Reuse
+`showFlixiePromptSheet` for confirmation prompts.
+
 Bottom sheets must be presented with `useRootNavigator: true` and
 `useSafeArea: true`. For sheets that can grow beyond a small viewport, use a
 viewport-relative bounded height and make the body scrollable. This prevents

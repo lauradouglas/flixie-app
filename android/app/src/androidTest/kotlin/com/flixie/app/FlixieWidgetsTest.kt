@@ -27,6 +27,23 @@ class FlixieWidgetsTest {
     }
     @After fun clear() { FlixieWidgetStore.sync(context, payload(null, 0)) }
 
+    @Test fun pipArtworkIsVisibleWithoutReplacingTheWordmark() {
+        instrumentation.runOnMainSync {
+            val views = listOf(
+                FlixieSearchWidget().views(context),
+                FlixieWatchlistWidget().views(context, options(130, 130)),
+                FlixieWatchlistWidget().views(context, options(300)))
+            for (remote in views) {
+                val view = remote.apply(context, FrameLayout(context))
+                val pip = view.findViewById<ImageView>(R.id.widget_pip)
+                assertEquals(View.VISIBLE, pip.visibility)
+                assertNotNull(pip.drawable)
+                assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, pip.importantForAccessibility)
+                assertEquals("flixie", view.findViewById<TextView>(R.id.widget_wordmark).text.toString())
+            }
+        }
+    }
+
     @Test fun storesOnlyFourTitlesAndNoCredentials() {
         FlixieWidgetStore.sync(context, payload(count = 5) + ("token" to "fixture-secret"))
         val snapshot = FlixieWidgetStore.read(context)

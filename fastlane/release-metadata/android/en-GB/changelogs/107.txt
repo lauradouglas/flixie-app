@@ -1,0 +1,8 @@
+New in Flixie:
+• Pip reactions for reviews and activity.
+• Milestone trophy badges and three recent milestones on Profile Stats.
+• Share movie and TV links outside Flixie, with improved direct navigation.
+• Exclusive Pip in 3D icon for founders and our first 100 members.
+• Review-count pills on movie and TV pages.
+• Pip on startup and Home Screen widgets.
+• Friendlier link errors, improved tablet layouts and reliability.

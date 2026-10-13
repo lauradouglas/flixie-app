@@ -15,6 +15,23 @@ private struct SearchProvider: TimelineProvider {
     }
 }
 
+private struct WidgetPip: View {
+    private var artwork: UIImage? {
+        guard let url = Bundle.main.url(forResource: "widget-pip", withExtension: "png") else { return nil }
+        return UIImage(contentsOfFile: url.path)
+    }
+
+    var body: some View {
+        Group {
+            if let image = artwork {
+                Image(uiImage: image).resizable().scaledToFit()
+            }
+        }
+        .frame(width: 32, height: 32)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct SearchWidgetView: View {
     @Environment(\.widgetFamily) private var family
     private let purple = Color(red: 124 / 255, green: 77 / 255, blue: 1)
@@ -22,10 +39,14 @@ private struct SearchWidgetView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
-            (Text("flix").foregroundColor(.white) + Text("ie").foregroundColor(purple))
-                .font(.system(size: 28, weight: .heavy))
-                .tracking(-0.5)
-                .accessibilityLabel("Flixie")
+            HStack(spacing: 8) {
+                (Text("flix").foregroundColor(.white) + Text("ie").foregroundColor(purple))
+                    .font(.system(size: 28, weight: .heavy))
+                    .tracking(-0.5)
+                    .accessibilityLabel("Flixie")
+                Spacer(minLength: 0)
+                WidgetPip()
+            }
             Spacer(minLength: 0)
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
@@ -108,6 +129,7 @@ private struct WatchlistWidgetView: View {
             HStack {
                 (Text("flix").foregroundColor(.white) + Text("ie").foregroundColor(purple))
                     .font(.system(size: 24, weight: .heavy)).accessibilityLabel("Flixie")
+                WidgetPip()
                 Spacer(minLength: 4)
                 if family == .systemMedium {
                     Label("Watchlist", systemImage: "bookmark.fill")

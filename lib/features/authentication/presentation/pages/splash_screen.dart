@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/core/widgets/pip_startup_brand.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 
@@ -38,18 +39,14 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       backgroundColor: context.colors.background,
       body: FadeTransition(
-        opacity: _fadeIn,
+        opacity: MediaQuery.disableAnimationsOf(context)
+            ? const AlwaysStoppedAnimation(1.0)
+            : _fadeIn,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(
-              child: Image.asset(
-                'assets/icon/flixie_f_transparent.png',
-                width: 192,
-                height: 192,
-                fit: BoxFit.contain,
-                semanticLabel: 'Flixie',
-              ),
+            const Center(
+              child: PipStartupBrand(),
             ),
             SafeArea(
               child: Padding(

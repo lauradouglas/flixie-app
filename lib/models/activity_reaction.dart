@@ -1,14 +1,38 @@
 enum ActivityReaction {
-  love('❤️', 'Love this'),
-  interested('👀', 'Interested / want to watch'),
-  greatPick('🔥', 'Great pick'),
-  laugh('😂', 'That made me laugh'),
-  surprised('😮', 'Surprised'),
-  agree('💯', 'Strongly agree'),
-  dislike('👎', 'Not for me');
+  love('❤️', 'Love', 'hand_heart'),
+  like('👍', 'Thumbs up', 'thumbs_up'),
+  dislike('👎', 'Thumbs down', 'thumbs_down'),
+  angry('😡', 'Angry', 'angry'),
+  hotTake('🌶️', 'Hot take', 'hot_take'),
+  crying('😭', 'Crying', 'crying'),
+  laugh('😂', 'Laughing', 'laughing'),
+  sus('🤨', 'Sus', 'sus'),
+  greatPick('🔥', 'Flames', 'flames'),
+  agree('💯', '100%', '100_percent'),
+  interested('👀', 'Interested / want to watch', 'interested'),
+  surprised('😮', 'Surprised', 'surprised');
 
-  const ActivityReaction(this.emoji, this.label);
-  final String emoji, label;
+  const ActivityReaction(this.emoji, this.label, this.assetName);
+  final String emoji, label, assetName;
+  String get asset => 'assets/icon/pip_emote_$assetName.png';
+  static const selectable = [
+    love,
+    like,
+    dislike,
+    angry,
+    hotTake,
+    crying,
+    laugh,
+    sus,
+    greatPick,
+    agree,
+  ];
+  static ActivityReaction? fromEmoji(String value) {
+    for (final reaction in values) {
+      if (reaction.emoji == value) return reaction;
+    }
+    return null;
+  }
 }
 
 class ActivityReactionSummary {
@@ -31,16 +55,21 @@ class ActivityReactionSummary {
   }
 }
 
-// Review API keys retain existing reactions while sharing activity's emoji set.
+// Existing API values remain readable; no stored-reaction migration is needed.
 const reviewActivityReactions = {
   'love': ActivityReaction.love,
-  'interested': ActivityReaction.interested,
-  'hot_take': ActivityReaction.greatPick,
-  'funny': ActivityReaction.laugh,
-  'surprised': ActivityReaction.surprised,
-  'agree': ActivityReaction.agree,
+  'like': ActivityReaction.like,
   'dislike': ActivityReaction.dislike,
+  'angry': ActivityReaction.angry,
+  'hot_take': ActivityReaction.hotTake,
+  'crying': ActivityReaction.crying,
+  'funny': ActivityReaction.laugh,
+  'hmm': ActivityReaction.sus,
+  'fire': ActivityReaction.greatPick,
+  'agree': ActivityReaction.agree,
+  'interested': ActivityReaction.interested,
+  'surprised': ActivityReaction.surprised,
 };
 
 String reviewReactionEmoji(String key) =>
-    reviewActivityReactions[key]?.emoji ?? (key == 'hmm' ? '🤔' : key);
+    reviewActivityReactions[key]?.emoji ?? key;

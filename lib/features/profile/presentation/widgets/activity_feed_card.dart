@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'activity_post_detail.dart';
 import 'compact_activity_post.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
@@ -20,6 +21,7 @@ class ActivityFeedCard extends StatefulWidget {
       required this.onProfile,
       this.onReply,
       this.onComment,
+      this.commentCount,
       this.onReview,
       this.onOpenList,
       this.busy = false,
@@ -31,6 +33,7 @@ class ActivityFeedCard extends StatefulWidget {
       this.headerAction,
       this.saveAction,
       this.onOptions});
+  final int? commentCount;
   final ActivityListItem item;
   final ActivityReactionSummary reactions;
   final ValueChanged<BuildContext>? onReact;
@@ -141,6 +144,7 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
           onOpenList: widget.onOpenList,
           onReview: widget.onReview,
           onComment: widget.onComment,
+          commentCount: widget.commentCount,
           onReply: widget.onReply,
           onReact: widget.onReact,
           busy: widget.busy,
@@ -319,18 +323,17 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                                       },
                                 tooltip:
                                     '${reaction.label}${widget.reactions.mine == reaction.emoji ? ' · Tap to remove' : ''}',
-                                label: Text(
-                                    '${reaction.emoji} ${widget.reactions.counts[reaction.emoji]}')),
+                                label: PipReactionCount(reaction.emoji,
+                                    widget.reactions.counts[reaction.emoji]!)),
                         if (widget.onReact != null)
                           Tooltip(
                               message: 'Add reaction',
-                              child: TextButton.icon(
+                              child: IconButton(
                                   key: _reactButtonKey,
-                                  label: const Text('React'),
                                   onPressed:
                                       widget.busy ? null : _openReactions,
                                   icon: const Icon(Icons.add_reaction_outlined),
-                                  style: TextButton.styleFrom(
+                                  style: IconButton.styleFrom(
                                       foregroundColor: context.colors.light))),
                       ])),
                   if (widget.onReply != null) ...[
@@ -348,7 +351,9 @@ class _ActivityFeedCardState extends State<ActivityFeedCard> {
                 TextButton.icon(
                     onPressed: widget.onComment,
                     icon: const Icon(Icons.forum_outlined),
-                    label: const Text('Comments')),
+                    label: Text(widget.commentCount == null
+                        ? 'Comments'
+                        : '${widget.commentCount} ${widget.commentCount == 1 ? 'comment' : 'comments'}')),
             ])));
   }
 }

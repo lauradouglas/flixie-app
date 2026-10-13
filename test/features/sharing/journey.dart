@@ -118,7 +118,7 @@ Future<void> dismissJourney(WidgetTester tester) async {
   await tester.ensureVisible(find.text('Share in direct chat'));
   await tester.tap(find.text('Share in direct chat'));
   await tester.pump();
-  final context = tester.element(find.byType(TextField));
+  final context = tester.element(find.byType(TextField).last);
   Navigator.of(context).pop();
   await tester.pumpAndSettle();
   pending.complete(http.Response('{"id":"conversation"}', 200));

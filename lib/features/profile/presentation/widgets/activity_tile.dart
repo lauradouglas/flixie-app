@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
+import 'dart:async';
 import 'package:flixie_app/features/social/data/activity_state_batch.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -42,7 +44,8 @@ class ActivityTile extends StatefulWidget {
   final bool openPostOnContent;
   final Widget? secondaryAction;
   final Widget? headerAction, saveAction;
-  final VoidCallback? onOptions, onDiscussion;
+  final VoidCallback? onOptions;
+  final FutureOr<void> Function()? onDiscussion;
   final bool embedded;
   final bool community;
   final bool showComments;
@@ -59,6 +62,7 @@ class _ActivityTileState extends State<ActivityTile>
   ActivityListItem get item => widget.item;
   DetailSource get detailSource => widget.detailSource;
   ActivityReactionSummary _reactions = const ActivityReactionSummary();
+  int? _commentCount;
   bool _saving = false;
   int _generation = 0;
   static final _reactionChanges = ValueNotifier<
@@ -106,6 +110,7 @@ class _ActivityTileState extends State<ActivityTile>
         ++_generation;
         _reactions = const ActivityReactionSummary();
         _saving = false;
+        _commentCount = null;
       }
       _load();
     }
@@ -139,8 +144,11 @@ class _ActivityTileState extends State<ActivityTile>
           generation == _generation &&
           !_saving &&
           actor == context.read<AuthProvider?>()?.dbUser?.id) {
-        setState(() => _reactions = ActivityReactionSummary.fromJson(
-            Map<String, dynamic>.from(data['reactions'] as Map)));
+        setState(() {
+          _reactions = ActivityReactionSummary.fromJson(
+              Map<String, dynamic>.from(data['reactions'] as Map));
+          _commentCount = (data['commentCount'] as num?)?.toInt();
+        });
       }
     } catch (_) {
       // Reaction failures do not hide an otherwise available activity card.
@@ -238,7 +246,9 @@ class _ActivityTileState extends State<ActivityTile>
   void _navigate(String route, {Object? extra}) {
     final router = GoRouter.of(context);
     if (widget.dismissSheetOnNavigate) Navigator.of(context).pop();
-    router.push(route, extra: extra);
+    router.push(route, extra: extra).then((_) {
+      if (mounted) _load(force: true);
+    });
   }
 
   @override
@@ -246,6 +256,12 @@ class _ActivityTileState extends State<ActivityTile>
     final currentUserId = context.read<AuthProvider?>()?.dbUser?.id;
     final route = _mediaRoute();
     final payload = ActivityReplyPayload.fromActivity(item);
+    final VoidCallback? openDiscussion = widget.onDiscussion == null
+        ? null
+        : () async {
+            await widget.onDiscussion!();
+            if (mounted) await _load(force: true);
+          };
     if (widget.compact) {
       final label = item.watchLogged &&
               item.mediaRating != null &&
@@ -274,6 +290,8 @@ class _ActivityTileState extends State<ActivityTile>
       return InkWell(
         onTap: () => showModalBottomSheet<void>(
             context: context,
+            sheetAnimationStyle: const AnimationStyle(
+                reverseDuration: Duration(milliseconds: 180)),
             useRootNavigator: true,
             useSafeArea: true,
             isScrollControlled: true,
@@ -354,7 +372,7 @@ class _ActivityTileState extends State<ActivityTile>
                             style: TextStyle(color: context.colors.success)),
                       for (final reaction in _reactions.counts.entries
                           .where((entry) => entry.value > 0))
-                        Text('${reaction.key} ${reaction.value}'),
+                        PipReactionCount(reaction.key, reaction.value),
                     ]),
                   ])),
               const Icon(Icons.chevron_right, size: 20),
@@ -363,6 +381,7 @@ class _ActivityTileState extends State<ActivityTile>
     }
     return ActivityFeedCard(
       item: item,
+      commentCount: _commentCount ?? item.commentCount,
       feedStyle: widget.feedStyle,
       postDetail: widget.postDetail,
       secondaryAction: widget.secondaryAction,
@@ -373,10 +392,12 @@ class _ActivityTileState extends State<ActivityTile>
       embedded: widget.embedded,
       reactions: _reactions,
       busy: _saving,
-      onReact: item.userId == currentUserId ? null : _react,
-      onReactionSelected: item.userId == currentUserId ? null : _save,
+      onReact:
+          currentUserId == null || item.userId == currentUserId ? null : _react,
+      onReactionSelected:
+          currentUserId == null || item.userId == currentUserId ? null : _save,
       onOpen: widget.openPostOnContent
-          ? widget.onDiscussion
+          ? openDiscussion
           : route == null
               ? null
               : () => _navigate(route),
@@ -385,7 +406,7 @@ class _ActivityTileState extends State<ActivityTile>
           : () => _navigate(item.userId == currentUserId
               ? '/profile'
               : '/friends/${item.userId}'),
-      onComment: widget.onDiscussion ??
+      onComment: openDiscussion ??
           (widget.community || !widget.showComments || item.userId.isEmpty
               ? null
               : () => _navigate(
@@ -397,7 +418,7 @@ class _ActivityTileState extends State<ActivityTile>
           : () => _navigate('/chat/${item.userId}',
               extra: payload.isUsable ? payload : null),
       onOpenList: widget.openPostOnContent
-          ? widget.onDiscussion
+          ? openDiscussion
           : item.listId == null || item.listOwnerId == null
               ? null
               : () => _openList(context),

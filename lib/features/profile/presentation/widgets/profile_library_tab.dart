@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_poster_rail.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -59,74 +60,55 @@ class ProfileLibraryTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userId = this.userId;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ProfileFavouritesLibrary(
-          movies: favoriteMovies,
-          people: favoritePeople,
-          shows: favoriteShows,
-        ),
-        const SizedBox(height: 20),
-        if (loadingExtras) ...[
-          const _ProfileExtrasLoadingIndicator(),
-          const SizedBox(height: 20),
-        ],
-        if (failedExtras)
-          TextButton.icon(
-              onPressed: onRetryExtras,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Couldn’t load profile details · Retry')),
-        _libraryRow(context,
-            icon: Icons.bookmark_outline,
-            label: 'Watchlist',
-            onPressed: () => context.push('/watchlist')),
-        const SizedBox(height: 20),
-        if (userId != null) ...[
-          ListsPreviewSection(
-            userId: userId,
-            title: 'Your lists',
-            emptyMessage:
-                'Keep a little collection of your own. Rainy-day films? A director you love?',
-            allowManage: true,
-            embedded: true,
-          ),
-          const SizedBox(height: 20),
-        ],
-        if (loadingActivity && activity.isEmpty)
-          const ContentPlaceholder(
-              label: 'Loading recently watched',
-              style: ContentPlaceholderStyle.posters)
-        else
-          _recentlyWatched(context),
-        const SizedBox(height: 20),
-        if (continueWatching.isNotEmpty) ...[
-          _ProfileContinueWatching(
-            shows: continueWatching,
-            onRemove: onRemoveShow,
-          ),
-          const SizedBox(height: 20),
-        ],
-        _libraryRow(
-          context,
-          icon: Icons.rate_review_outlined,
-          label: 'Reviews',
-          onPressed: () => context.push('/my-reviews'),
-        ),
-        _libraryRow(
-          context,
-          icon: Icons.star_outline,
-          label: 'Ratings',
-          onPressed: onRatings,
-        ),
-        const SizedBox(height: 20),
-        _WatchProvidersSummary(
-          providers: watchProviders,
-          onManage: onManageProviders,
-        ),
-        const SizedBox(height: 16),
+    final favourites = ProfileFavouritesLibrary(
+      movies: favoriteMovies, people: favoritePeople, shows: favoriteShows);
+    final extrasAndLists = <Widget>[
+      const SizedBox(height: 20),
+      if (loadingExtras) ...[
+        const _ProfileExtrasLoadingIndicator(), const SizedBox(height: 20),
       ],
-    );
+      if (failedExtras) TextButton.icon(onPressed: onRetryExtras,
+        icon: const Icon(Icons.refresh), label: const Text('Couldn’t load profile details · Retry')),
+      _libraryRow(context, icon: Icons.bookmark_outline, label: 'Watchlist',
+        onPressed: () => context.push('/watchlist')),
+      const SizedBox(height: 20),
+      if (userId != null) ...[
+        ListsPreviewSection(userId: userId, title: 'Your lists',
+          emptyMessage: 'Keep a little collection of your own. Rainy-day films? A director you love?',
+          allowManage: true, embedded: true),
+        const SizedBox(height: 20),
+      ],
+    ];
+    final recent = <Widget>[
+      if (loadingActivity && activity.isEmpty)
+        const ContentPlaceholder(label: 'Loading recently watched', style: ContentPlaceholderStyle.posters)
+      else _recentlyWatched(context),
+      const SizedBox(height: 20),
+      if (continueWatching.isNotEmpty) ...[
+        _ProfileContinueWatching(shows: continueWatching, onRemove: onRemoveShow),
+        const SizedBox(height: 20),
+      ],
+    ];
+    final libraryActions = <Widget>[
+      _libraryRow(context, icon: Icons.rate_review_outlined, label: 'Reviews',
+        onPressed: () => context.push('/my-reviews')),
+      _libraryRow(context, icon: Icons.star_outline, label: 'Ratings', onPressed: onRatings),
+      const SizedBox(height: 20),
+      _WatchProvidersSummary(providers: watchProviders, onManage: onManageProviders),
+      const SizedBox(height: 16),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth < 900 || MediaQuery.textScalerOf(context).scale(1) > 1.4) {
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [favourites, ...extrasAndLists, ...recent, ...libraryActions]);
+      }
+      return FlixieAdaptiveColumns(
+        primary: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [favourites, const SizedBox(height: 24), ...recent]),
+        secondary: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [...extrasAndLists, ...libraryActions]),
+      );
+    });
   }
 
   Widget _recentlyWatched(BuildContext context) {

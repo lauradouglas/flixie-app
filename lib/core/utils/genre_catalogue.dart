@@ -6,6 +6,12 @@ bool isVisibleGenre(String name, {int? id}) =>
 
 int? genreIconId(String name) => const <String, int>{
       'anime': -1,
+      'superheroes / marvel & dc': -2,
+      'true crime': -3,
+      'k-drama': -4,
+      'star wars': -5,
+      'studio ghibli': -6,
+      'cult classics': -7,
       'action': 28,
       'adventure': 12,
       'action & adventure': 28,

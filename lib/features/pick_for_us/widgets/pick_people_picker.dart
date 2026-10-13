@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -28,7 +29,8 @@ class PickPeoplePicker extends StatefulWidget {
   State<PickPeoplePicker> createState() => _PickPeoplePickerState();
 }
 
-class _PickPeoplePickerState extends State<PickPeoplePicker> {
+class _PickPeoplePickerState extends State<PickPeoplePicker>
+    with StarredFriendsState<PickPeoplePicker> {
   final _search = TextEditingController();
   @override
   void dispose() {
@@ -41,11 +43,10 @@ class _PickPeoplePickerState extends State<PickPeoplePicker> {
   @override
   Widget build(BuildContext context) {
     final query = _search.text.trim().toLowerCase();
-    final friends = widget.friends
-        .map((f) => f.friendUser)
-        .whereType<FriendshipUser>()
-        .where((f) => f.displayName.toLowerCase().contains(query))
-        .toList();
+    final friends = orderedFriends(
+        widget.friends.map((f) => f.friendUser).whereType<FriendshipUser>(),
+        (f) => f,
+        query);
     final groups = widget.groups
         .where((g) => g.name.toLowerCase().contains(query))
         .toList();

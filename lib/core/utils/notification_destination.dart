@@ -2,6 +2,14 @@ import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/core/auth/notification_deep_link.dart';
 
 String notificationDestination(FlixieNotification n) {
+  if (n.type == FlixieNotification.communityInvite && n.closed == true) {
+    final community = int.tryParse(n.data?['communityId']?.toString() ?? '');
+    return n.action == FlixieNotification.actionAccepted &&
+            community != null &&
+            community <= -1000
+        ? '/genre-communities/$community'
+        : '/private-communities';
+  }
   String? destination;
   if (n.type == FlixieNotification.groupInvite &&
       n.linkedRequestId != null &&

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'community_pip.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 
@@ -8,6 +9,18 @@ class CommunityIdentity {
   final String blurb;
 
   static const all = <int, CommunityIdentity>{
+    -2: CommunityIdentity(
+        'Marvel, DC and beyond. Favourite heroes. Big theories.'),
+    -3: CommunityIdentity(
+        'Real cases. Thoughtful documentaries. Respectful discussion.'),
+    -4: CommunityIdentity(
+        'Korean dramas. Favourite characters. One more episode.'),
+    -5: CommunityIdentity(
+        'A galaxy of stories. Find your people across films and series.'),
+    -6: CommunityIdentity(
+        'Ghibli worlds. Quiet wonder. Stories that stay with you.'),
+    -7: CommunityIdentity(
+        'Cult favourites. Unusual discoveries. Worth another watch.'),
     -1: CommunityIdentity(
         'Big feelings. Different worlds. Your kind of people.'),
     28: CommunityIdentity(
@@ -50,7 +63,10 @@ class CommunityIdentity {
   };
 
   static CommunityIdentity forId(int id) =>
-      all[id] ??
+      (id <= -1000
+          ? const CommunityIdentity(
+              'Your people. Shared favourites. A place of your own.')
+          : all[id]) ??
       const CommunityIdentity(
           'Find your next film. Share what stayed with you.');
 }
@@ -64,36 +80,61 @@ class CommunityIdentityHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final identity = CommunityIdentity.forId(id);
+    final title = Semantics(
+      header: true,
+      child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 4,
+          children: [
+            Text(name,
+                style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    color: context.colors.white)),
+            ExcludeSemantics(child: CommunityIcon(id: id, size: 26)),
+          ]),
+    );
+    final description = Text(identity.blurb,
+        style: TextStyle(
+            fontSize: 16, height: 1.45, color: context.colors.medium));
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Semantics(
-            header: true,
-            child: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              runSpacing: 4,
-              children: [
-                Text(name,
-                    style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: context.colors.white)),
-                ExcludeSemantics(child: CommunityIcon(id: id, size: 26)),
-              ],
-            )),
-        const SizedBox(height: 10),
-        Text(identity.blurb,
-            style: TextStyle(
-                fontSize: 16, height: 1.45, color: context.colors.medium)),
-        const SizedBox(height: 12),
-        Text(
-            id == -1
-                ? 'Films & series · Opinions from people who joined'
-                : 'Films · Opinions from people who joined',
-            style: TextStyle(
-                fontSize: 13, height: 1.4, color: context.colors.medium)),
-      ]),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final hasPip = CommunityPip.assetFor(id) != null;
+        final compact = constraints.maxWidth < 340 ||
+            MediaQuery.textScalerOf(context).scale(16) > 20;
+        final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [title, const SizedBox(height: 10), description]);
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (!hasPip)
+            copy
+          else if (compact) ...[
+            Row(children: [
+              Expanded(child: title),
+              const SizedBox(width: 12),
+              CommunityPip(id: id, size: 64)
+            ]),
+            const SizedBox(height: 10),
+            description,
+          ] else
+            Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              Expanded(child: copy),
+              const SizedBox(width: 16),
+              CommunityPip(id: id, size: 120),
+            ]),
+          const SizedBox(height: 12),
+          Text(
+              id == -4
+                  ? 'Korean drama series · Opinions from people who joined'
+                  : id < 0
+                      ? 'Films & series · Opinions from people who joined'
+                      : 'Films · Opinions from people who joined',
+              style: TextStyle(
+                  fontSize: 13, height: 1.4, color: context.colors.medium)),
+        ]);
+      }),
     );
   }
 }
@@ -105,12 +146,15 @@ class CommunityIcon extends StatelessWidget {
   final double size;
   @override
   Widget build(BuildContext context) => ExcludeSemantics(
-        child: SvgPicture.asset(
-          'assets/icon/communities/${CommunityIdentity.all.containsKey(id) ? id : 10770}.svg',
-          width: size,
-          height: size,
-          colorFilter: ColorFilter.mode(
-              Theme.of(context).colorScheme.secondary, BlendMode.srcIn),
-        ),
+        child: id <= -1000
+            ? Icon(Icons.lock_outline,
+                size: size, color: Theme.of(context).colorScheme.secondary)
+            : SvgPicture.asset(
+                'assets/icon/communities/${CommunityIdentity.all.containsKey(id) ? id : 10770}.svg',
+                width: size,
+                height: size,
+                colorFilter: ColorFilter.mode(
+                    Theme.of(context).colorScheme.secondary, BlendMode.srcIn),
+              ),
       );
 }

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/color_utils.dart';
@@ -12,7 +13,8 @@ class ComposerRecipients extends StatefulWidget {
   State<ComposerRecipients> createState() => _ComposerRecipientsState();
 }
 
-class _ComposerRecipientsState extends State<ComposerRecipients> {
+class _ComposerRecipientsState extends State<ComposerRecipients>
+    with StarredFriendsState<ComposerRecipients> {
   final _recipientSearchController = TextEditingController();
   String _recipientSearch = '';
   @override
@@ -25,11 +27,8 @@ class _ComposerRecipientsState extends State<ComposerRecipients> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final query = _recipientSearch.toLowerCase();
-    final visibleFriends = controller.friends.where((item) {
-      final friend = item.friendUser;
-      if (friend == null) return false;
-      return query.isEmpty || friend.displayName.toLowerCase().contains(query);
-    }).toList();
+    final visibleFriends =
+        orderedFriends(controller.friends, (f) => f.friendUser, query);
     final visibleGroups = controller.groups
         .where((group) =>
             query.isEmpty ||

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flixie_app/features/watch_plans/presentation/widgets/group_plan/group_plan_card.dart';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -64,7 +65,40 @@ Future<void> open(WidgetTester tester, GroupWatchPlanFixture fixture,
   await tester.pumpAndSettle();
 }
 
+class TwoPlansFixture extends GroupWatchPlanFixture {
+  @override
+  Future<http.Response> handle(http.Request request) async {
+    if (request.url.path == '/groups/fixture-group/requests') {
+      return super.json([
+        plan,
+        {...plan, 'id': 'second-plan'}
+      ]);
+    }
+    return super.handle(request);
+  }
+}
+
 void main() {
+  testWidgets('tablet group cards use two columns and stay selectable',
+      (tester) async {
+    tester.view.physicalSize = const Size(1194, 834);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final fixture = TwoPlansFixture()..schedule();
+    await open(tester, fixture, initialId: null);
+    final cards = find.byType(GroupPlanCard);
+    expect(cards, findsNWidgets(2));
+    expect(
+        tester.getTopLeft(cards.at(0)).dy, tester.getTopLeft(cards.at(1)).dy);
+    expect(tester.getTopLeft(cards.at(1)).dx,
+        greaterThan(tester.getTopLeft(cards.at(0)).dx));
+    await tester.tap(cards.first);
+    await tester.pumpAndSettle();
+    expect(find.byType(GroupPlanCard), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'logging a watch keeps a failed save open, then refreshes and closes after retry',
       (tester) async {

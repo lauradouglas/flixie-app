@@ -99,6 +99,37 @@ class FakeAnime extends FakeGenres {
 }
 
 void main() {
+  testWidgets('light joined community uses a soft mint surface',
+      (tester) async {
+    final service = FakeGenres()..joined = true;
+    final theme = AppTheme.lightTheme;
+    await tester.pumpWidget(MaterialApp(
+        theme: theme,
+        home: Scaffold(body: GenreCommunitiesView(service: service))));
+    await tester.pumpAndSettle();
+    final button = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, '✓ Joined'));
+    expect(button.style!.foregroundColor!.resolve({}),
+        theme.colorScheme.onSecondaryContainer);
+    final surface = tester.widget<AnimatedContainer>(find
+        .ancestor(
+            of: find.text('✓ Joined'), matching: find.byType(AnimatedContainer))
+        .first);
+    expect((surface.decoration! as BoxDecoration).color,
+        theme.colorScheme.secondaryContainer);
+    expect(tester.takeException(), isNull);
+    if (const bool.fromEnvironment('COMMUNITY_CAPTURE')) {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byType(RepaintBoundary).first);
+      await tester.runAsync(() async {
+        final image = await boundary.toImage();
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        await File('/tmp/flixie-light-community-buttons.png')
+            .writeAsBytes(data!.buffer.asUint8List());
+        image.dispose();
+      });
+    }
+  });
   setUpAll(() async {
     final font = FontLoader('Manrope')
       ..addFont(rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf'));

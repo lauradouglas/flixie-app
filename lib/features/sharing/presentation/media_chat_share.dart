@@ -30,15 +30,13 @@ class MediaChatShare {
 
   Future<void> show(ChatShareMedia movie) async {
     if (context.read<AuthProvider>().dbUser == null) {
-      final box = context.findRenderObject() as RenderBox?;
-      await Share.share('${movie.title} on Flixie\n${mediaDeepLink(movie)}',
-          sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size);
+      await _external(movie);
       return;
     }
     final session = MediaShareSession(context.read<AuthProvider>());
     try {
       if (!session.isCurrent) return;
-      final toGroup = await _sheet<bool>((ctx) => ListenableBuilder(
+      final destination = await _sheet<String>((ctx) => ListenableBuilder(
           listenable: session,
           builder: (ctx, _) => !session.isCurrent
               ? const Padding(
@@ -58,18 +56,29 @@ class MediaChatShare {
                           Icon(Icons.person_rounded, color: ctx.colors.light),
                       title: const Text('Share to friend'),
                       subtitle: const Text('Send directly to one friend'),
-                      onTap: () => Navigator.pop(ctx, false)),
+                      onTap: () => Navigator.pop(ctx, 'friend')),
                   ListTile(
                       leading: const Icon(Icons.groups_2_outlined,
                           color: FlixieColors.primary),
                       title: const Text('Share to group chat'),
                       subtitle: const Text(
                           'Post in one of your groups with a message'),
-                      onTap: () => Navigator.pop(ctx, true)),
+                      onTap: () => Navigator.pop(ctx, 'group')),
+                  ListTile(
+                      leading: Icon(Icons.ios_share_rounded,
+                          color: ctx.colors.light),
+                      title: const Text('Share externally'),
+                      subtitle: const Text(
+                          'Send a link through Messages, WhatsApp or another app'),
+                      onTap: () => Navigator.pop(ctx, 'external')),
                   const SizedBox(height: 8),
                 ])));
-      if (toGroup == null || !context.mounted || !session.isCurrent) return;
-      if (toGroup) {
+      if (destination == null || !context.mounted || !session.isCurrent) return;
+      if (destination == 'external') {
+        await _external(movie);
+        return;
+      }
+      if (destination == 'group') {
         final groups = await session.loadGroups();
         if (!context.mounted || !session.isCurrent) return;
         if (groups.isEmpty) {
@@ -94,6 +103,20 @@ class MediaChatShare {
       }
     } finally {
       session.dispose();
+    }
+  }
+
+  Future<void> _external(ChatShareMedia media) async {
+    final box = context.findRenderObject() as RenderBox?;
+    try {
+      await Share.share('${media.title} on Flixie\n${mediaWebLink(media)}',
+          subject: '${media.title} on Flixie',
+          sharePositionOrigin:
+              box == null ? null : box.localToGlobal(Offset.zero) & box.size);
+    } catch (_) {
+      if (context.mounted) {
+        _notice('Could not open sharing. Please try again.', error: true);
+      }
     }
   }
 

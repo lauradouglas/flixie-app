@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/movies/presentation/widgets/review_count_label.dart';
+import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
 import '../widgets/movie_detail_loading_sections.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/media_synopsis.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
@@ -270,119 +272,153 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         ),
       );
     }
-    // Preserve the device text scale. Dense poster-led sections must reflow
-    // or scroll rather than override a user's accessibility preference.
-    return MediaQuery(
-      data: MediaQuery.of(context),
-      child: Scaffold(
-        backgroundColor: context.colors.background,
-        body: RefreshIndicator(
+    return Scaffold(
+      backgroundColor: context.colors.background,
+      body: LayoutBuilder(builder: (context, constraints) {
+        final tablet = constraints.maxWidth >= 900 &&
+            MediaQuery.textScalerOf(context).scale(1) <= 1.4;
+        final hero = MovieDetailHero(
+            key: _heroKey,
+            animateBackdropInset: true,
+            movie: movie,
+            onShowScoreInfo: () => _showFlixScoreInfo(context));
+        return RefreshIndicator(
           color: FlixieColors.primary,
           onRefresh: _refresh,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              SliverToBoxAdapter(
-                child: MovieDetailHero(
-                    animateBackdropInset: true,
-                    movie: movie,
-                    onShowScoreInfo: () => _showFlixScoreInfo(context)),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: MovieDetailHeroTokens.pageHorizontalPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(
-                          height: MovieDetailHeroTokens.heroToWatchSectionGap),
-                      _buildActionButtons(),
-                      const SizedBox(height: 18),
-                      _optionalSection(
-                          'providers',
-                          'watch providers',
-                          MovieWatchProvidersSection(
-                            key: ValueKey('providers:${movie.id}'),
-                            providers: _data.watchProviders,
-                            userProviderIds: _data.userProviderIds,
-                            userProviderMatchKeys: _data.userProviderMatchKeys,
-                            region: context
-                                    .watch<AuthProvider>()
-                                    .dbUser
-                                    ?.watchProviderRegion ??
-                                'GB',
-                            onChangeRegion: () async {
-                              await showSettingsEditDetailsSheet(context);
-                              if (mounted) await _load();
-                            },
-                          )),
-                      const SizedBox(height: 18),
-                      _buildSynopsis(context, movie),
-                      if (_data.friendsActivity.isNotEmpty ||
-                          _data.friendSummaryLoading ||
-                          _data.friendSummaryError != null) ...[
-                        const SizedBox(height: 18),
-                        _optionalSection(
-                            'friend summary',
-                            'friend summary',
-                            MovieFriendsSection(
-                              movieId: movie.id,
-                              activities: _data.friendsActivity,
-                              signedIn:
-                                  context.read<AuthProvider>().dbUser != null,
-                              loading: _data.friendSummaryLoading,
-                              summaryLoaded: _data.loadedSections
-                                  .contains('friend summary'),
-                              hasSummary:
-                                  _data.friendSummary?.friendCount != null,
-                              hasError: _data.friendSummaryError != null,
-                              onReload: () {
-                                _data.loadFriendSummary(movie.id);
-                              },
-                            )),
-                      ],
-                      if (context.read<AuthProvider>().dbUser?.id
-                          case final String viewerId) ...[
-                        const SizedBox(height: 18),
-                        MovieFollowingOpinions(
-                            key: ValueKey('following:$viewerId:${movie.id}'),
-                            movieId: movie.id,
-                            viewerId: viewerId),
-                      ],
-                      _optionalSection('activity', 'friend activity',
-                          const SizedBox.shrink()),
-                      _optionalSection('friend recommendations',
-                          'friend recommendations', const SizedBox.shrink()),
-                      _optionalSection('your providers',
-                          'your streaming services', const SizedBox.shrink()),
-                      _optionalSection(
-                          'rating', 'your rating', const SizedBox.shrink()),
-                      const SizedBox(height: 14),
-                      _buildMovieDetailTabs(),
-                      const SizedBox(height: 18),
-                      Container(
-                          key: _movieTabContentKey,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            switchInCurve: Curves.easeOut,
-                            switchOutCurve: Curves.easeIn,
-                            child: KeyedSubtree(
-                              key: ValueKey(_movieDetailTab),
-                              child: _buildSelectedMovieTab(context, movie),
-                            ),
-                          )),
-                      const SizedBox(height: 110),
-                    ],
-                  ),
-                ),
-              ),
+              SliverToBoxAdapter(child: hero),
+              if (tablet)
+                SliverToBoxAdapter(
+                    child: FlixieAdaptiveContent(
+                        child: FlixieAdaptiveColumns(
+                  primary: _buildPageSections(movie, tablet: true),
+                  secondary: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildProviders(movie),
+                              const SizedBox(height: 32),
+                              if (context.read<AuthProvider>().dbUser != null)
+                                _buildWatchHistory(),
+                            ]),
+                      )),
+                )))
+              else ...[
+                SliverToBoxAdapter(
+                    child: _buildPageSections(movie, tablet: false)),
+              ],
             ],
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
+
+  final _heroKey = GlobalKey();
+  final _providersKey = GlobalKey();
+
+  Widget _buildProviders(Movie movie) => _optionalSection(
+      'providers',
+      'watch providers',
+      MovieWatchProvidersSection(
+        key: _providersKey,
+        providers: _data.watchProviders,
+        userProviderIds: _data.userProviderIds,
+        userProviderMatchKeys: _data.userProviderMatchKeys,
+        region:
+            context.watch<AuthProvider>().dbUser?.watchProviderRegion ?? 'GB',
+        onChangeRegion: () async {
+          await showSettingsEditDetailsSheet(context);
+          if (mounted) await _load();
+        },
+      ));
+
+  Widget _buildWatchHistory() => _optionalSection(
+      'history',
+      'watch history',
+      MovieWatchHistorySection(
+        entries: _data.movieWatchHistory,
+        loading: _data.watchHistoryLoading,
+        formatDate: _formatWatchDate,
+        onAdd: () => _actionFlow.showLogWatchSheet(),
+        onEdit: (entry) => _actionFlow.showLogWatchSheet(entry: entry),
+        onDelete: _actionFlow.deleteWatchEntry,
+      ));
+
+  Widget _buildPageSections(Movie movie, {required bool tablet}) => Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: MovieDetailHeroTokens.pageHorizontalPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: MovieDetailHeroTokens.heroToWatchSectionGap),
+            _buildActionButtons(),
+            const SizedBox(height: 18),
+            if (!tablet) ...[
+              _buildProviders(movie),
+              const SizedBox(height: 18),
+            ],
+            _buildSynopsis(context, movie),
+            if (_data.friendsActivity.isNotEmpty ||
+                _data.friendSummaryLoading ||
+                _data.friendSummaryError != null) ...[
+              const SizedBox(height: 18),
+              _optionalSection(
+                  'friend summary',
+                  'friend summary',
+                  MovieFriendsSection(
+                    movieId: movie.id,
+                    activities: _data.friendsActivity,
+                    signedIn: context.read<AuthProvider>().dbUser != null,
+                    loading: _data.friendSummaryLoading,
+                    summaryLoaded:
+                        _data.loadedSections.contains('friend summary'),
+                    hasSummary: _data.friendSummary?.friendCount != null,
+                    hasError: _data.friendSummaryError != null,
+                    onReload: () {
+                      _data.loadFriendSummary(movie.id);
+                    },
+                  )),
+            ],
+            if (context.read<AuthProvider>().dbUser?.id
+                case final String viewerId) ...[
+              const SizedBox(height: 18),
+              MovieFollowingOpinions(
+                  key: ValueKey('following:$viewerId:${movie.id}'),
+                  movieId: movie.id,
+                  viewerId: viewerId),
+            ],
+            _optionalSection(
+                'activity', 'friend activity', const SizedBox.shrink()),
+            _optionalSection('friend recommendations', 'friend recommendations',
+                const SizedBox.shrink()),
+            _optionalSection('your providers', 'your streaming services',
+                const SizedBox.shrink()),
+            _optionalSection('rating', 'your rating', const SizedBox.shrink()),
+            const SizedBox(height: 14),
+            _buildMovieDetailTabs(),
+            const SizedBox(height: 18),
+            Container(
+                key: _movieTabContentKey,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: KeyedSubtree(
+                    key: ValueKey(_movieDetailTab),
+                    child: _buildSelectedMovieTab(context, movie,
+                        showHistory: !tablet),
+                  ),
+                )),
+            const SizedBox(height: 110),
+          ],
+        ),
+      );
 
   // ---- Hero top actions ----------------------------------------------------
 
@@ -982,7 +1018,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                                     : context.colors.tabBarBorder,
                                 width: selected ? 3 : 1))),
                     alignment: Alignment.center,
-                    child: Text(
+                    child: tab == MovieDetailTab.reviews
+                        ? ReviewCountLabel(
+                            count: _data.loadedSections.contains('reviews')
+                                ? _data.reviews.length : null,
+                            style: TextStyle(
+                              color: selected ? context.colors.textPrimary : context.colors.light,
+                              fontSize: 13,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                          )
+                        : Text(
                         switch (tab) {
                           MovieDetailTab.overview => 'Overview',
                           MovieDetailTab.reviews => 'Reviews',
@@ -1001,7 +1046,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     }).toList());
   }
 
-  Widget _buildSelectedMovieTab(BuildContext context, Movie movie) {
+  Widget _buildSelectedMovieTab(BuildContext context, Movie movie,
+      {bool showHistory = true}) {
     return switch (_movieDetailTab) {
       MovieDetailTab.overview => _tabContent([
           if (movie.collection != null)
@@ -1033,17 +1079,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               'reviews', 'reviews', _buildUserReviewsSection(context)),
         ]),
       MovieDetailTab.activity => _tabContent([
-          _optionalSection(
-              'history',
-              'watch history',
-              MovieWatchHistorySection(
-                entries: _data.movieWatchHistory,
-                loading: _data.watchHistoryLoading,
-                formatDate: _formatWatchDate,
-                onAdd: () => _actionFlow.showLogWatchSheet(),
-                onEdit: (entry) => _actionFlow.showLogWatchSheet(entry: entry),
-                onDelete: _actionFlow.deleteWatchEntry,
-              )),
+          if (showHistory) _buildWatchHistory(),
           _optionalSection('lists', 'lists', _buildListsSection(context)),
         ]),
       MovieDetailTab.details => _tabContent([

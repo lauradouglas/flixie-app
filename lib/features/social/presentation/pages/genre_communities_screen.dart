@@ -72,7 +72,7 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
                   '${community.joined ? 'Leave' : 'Join'} ${community.name}?'),
               content: Text(community.joined
                   ? 'Your contributions disappear from this community. Your original reviews stay intact.'
-                  : 'Your public reviews can appear here. Private reviews stay private, and joining does not follow anyone or turn on public sharing.'),
+                  : 'Your existing and future ratings count towards community scores when public sharing is on. Your public reviews can appear here. Joining does not follow anyone or turn on public sharing.'),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
@@ -114,27 +114,37 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
 
   Widget _row(GenreCommunity g) {
     final busy = _busy.contains(g.id);
+    final light = Theme.of(context).brightness == Brightness.light;
+    final joinedFill = light
+        ? Theme.of(context).colorScheme.secondaryContainer
+        : const Color(0xFF203E38);
+    final joinedInk = light
+        ? Theme.of(context).colorScheme.onSecondaryContainer
+        : const Color(0xFFA3ECDF);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
     final button = AnimatedContainer(
         duration: duration,
         decoration: BoxDecoration(
-            color: g.joined ? const Color(0xFF203E38) : Colors.transparent,
+            color: g.joined ? joinedFill : Colors.transparent,
             borderRadius: BorderRadius.circular(11)),
         child: OutlinedButton(
             onPressed: busy ? null : () => _confirm(g),
             style: OutlinedButton.styleFrom(
                 minimumSize: const Size(94, 44),
-                foregroundColor:
-                    g.joined ? const Color(0xFFA3ECDF) : context.colors.white,
+                foregroundColor: g.joined ? joinedInk : context.colors.white,
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
                 elevation: 0,
                 side: BorderSide(
                     color: g.joined
-                        ? const Color(0xFF37645A)
-                        : const Color(0xFF8266AC),
+                        ? (light
+                            ? joinedInk.withValues(alpha: 0.25)
+                            : const Color(0xFF37645A))
+                        : (light
+                            ? context.colors.primary
+                            : const Color(0xFF8266AC)),
                     width: 1),
                 textStyle:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
@@ -272,6 +282,27 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
                             selected: _joinedOnly,
                             onSelected: (_) => _filter(true))
                       ]),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () => context.push('/private-communities'),
+                          style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 12)),
+                          child: const Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              children: [
+                                Icon(Icons.lock_outline, size: 18),
+                                Text('Private communities',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600)),
+                                Icon(Icons.arrow_forward_rounded, size: 18),
+                              ]),
+                        ),
+                      ),
                       const SizedBox(height: 18),
                       Text(
                           _joinedOnly

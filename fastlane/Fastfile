@@ -119,7 +119,7 @@ platform :ios do
     upload_to_testflight(
       api_key: key, app_identifier: "com.flixie.flixieApp", ipa: ipa,
       skip_waiting_for_build_processing: options[:wait] != true, distribute_external: false,
-      changelog: "Explore Flixie without signing in, plus performance improvements."
+      changelog: options[:changelog] || "Explore Flixie without signing in, plus performance improvements."
     )
   end
   desc "Upload a production build and submit for Apple review (manual release after approval)"
@@ -136,7 +136,7 @@ platform :ios do
       submit_for_review: true, automatic_release: false,
       reject_if_possible: options[:replace_review] == true,
       skip_screenshots: true, skip_metadata: false,
-      release_notes: { "en-GB" => "Explore Flixie without signing in, plus performance improvements." },
+      release_notes: { "en-GB" => options[:notes_file] ? File.read(release_file(options[:notes_file])).strip : "Explore Flixie without signing in, plus performance improvements." },
       force: true, run_precheck_before_submit: true, precheck_include_in_app_purchases: false
     )
   end

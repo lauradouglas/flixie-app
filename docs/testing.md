@@ -1099,3 +1099,186 @@ local images control decoding dimensions and avoid CDN variability. Results are
 debug-simulator diagnostics, not physical-device frame-rate or network benchmarks.
 Do not edit production/harness sources during a capture; hashes must match.
 See `docs/performance/2026-10-09-poster-scroll/README.md` for limits and evidence.
+
+### Tablet layout review
+
+Focused tablet actions and reflow checks:
+
+```sh
+flutter test test/app/router/tablet_navigation_test.dart \
+  test/features/home/tablet_trending_gallery_test.dart \
+  test/features/watchlist/tablet_watchlist_test.dart \
+  test/features/movies/tablet_movie_detail_test.dart \
+  test/features/profile/tablet_profile_test.dart \
+  test/features/social/tablet_social_companion_test.dart
+python3 scripts/capture-tablet-layout.py --device <dedicated-ipad-id> --kind tablet
+python3 scripts/capture-tablet-layout.py --device <dedicated-phone-id> --kind phone --regressions
+```
+
+The capture runner only accepts booted simulators named `Flixie … Patrol`.
+It invokes `scripts/test-patrol.sh` and reinstalls their test app. Fictional Alex
+and Jamie fixtures supply Alien, Interstellar and The Odyssey; no live account
+or database writes occur. Captures are native Simulator PNGs under
+`output/tablet-mockups/implemented/`. The optional `--regressions` adds only the
+existing watchlist paging and large-text favourites device targets.
+
+For tablet captures, rotate the dedicated Simulator to landscape before running.
+After the five landscape captures, rotate it to portrait within the test's
+60-second wait. iPad multitasking can ignore programmatic orientation locks;
+keep the Mac unlocked to use Device Hub's rotation control. `--landscape-only`
+explicitly omits this manual rotation check and captures five pages. It does not
+verify native portrait rotation. The standalone Patrol target defaults to phone
+mode, so ordinary device-suite runs do not require manual tablet rotation.
+
+### Populated Watch Plans tablet preview
+
+Run `flutter run --no-pub -t tool/preview_watch_plans.dart -d <dedicated-simulator>`
+using Flixie Tablet Patrol. This debug-only sandbox uses fictional accounts and
+in-memory plan responses; it never sends plan mutations to the backend. Friends
+contains scheduled nights, an invitation and a plan still being arranged; Groups
+contains two scheduled nights and one film-selection plan. Relaunch to reset.
+The normal app still uses the normal account/API. Local database equivalents are
+provided by the backend's guarded `seed-dev-group-watch-plans.ts` and
+`seed-dev-watch-plan-dates.ts` scripts.
+
+
+## Feed conversation indicators and friend search — 12 October 2026
+
+Focused coverage includes `test/features/social/friend_selection_test.dart`,
+`test/features/guest/guest_community_feed_test.dart`,
+`test/features/sharing/widget_test.dart`,
+`test/features/social/discussion/controller_test.dart`, `test/community_space_test.dart`,
+`test/social_activity_view_test.dart`, `test/compact_activity_post_test.dart`,
+`test/activity_tile_test.dart` and guest-router/movie-friends regressions.
+Checks cover public rating-only browsing and paging without account requests,
+comment counts, avatar badges, default Around Flixie scope, stable starred order,
+name/username filters and retained recipients, spoiler-gated read markers,
+account changes, retry, narrow/landscape/tablet layouts and doubled text.
+
+Backend checks: `src/services/guestCommunityFeed.test.ts`,
+`src/services/activityStateService.test.ts`, `src/routes/community.test.ts`,
+`src/routes/communitySpaces.test.ts` and `src/routes/guest.test.ts`.
+Run with `npm test -- <paths>` from FlixieBE; TypeScript checking also passed.
+The development-only `20261012120000_conversation_visibility` migration is
+applied locally. Rerunnable fixtures and a real local HTTP/database check:
+
+```sh
+NODE_ENV=development node --env-file=.env.local -r ts-node/register scripts/seed-dev-feed-discovery.ts
+```
+
+The script guards local PostgreSQL and only changes fictional
+`dev-movie-opinions:` accounts with `@example.invalid` email addresses. It leaves
+Alien rated 9 with one community comment and an Anime thread with three visible
+replies, one new for Ellis (own replies excluded), and starred Robin for Ellis.
+It verifies opening marks loaded replies read, then restores the unread fixture.
+
+Four native journeys passed on dedicated Flixie Polls Patrol:
+
+```sh
+scripts/test-patrol.sh -d 6155C494-EA8D-44D2-965D-ECEF4FDA1A91 -t patrol_test/activity_navigation_test.dart -t patrol_test/media_sharing_test.dart
+```
+
+The ordinary iPhone development app was hot restarted for routing/default state,
+then reloaded. Native Around Flixie shows rating-only Alien and Jujutsu Kaisen
+posts and the correct one/zero comment labels. No runtime errors reported.
+Guest paging and unread transitions are verified in widget/API/database tests;
+no native guest sign-out or physical Android execution was performed. No full
+regression suite or production deployment was run.
+
+
+Threaded-reply fixture follow-up: `communityReplies.routes.ts` now accepts
+bounded opaque parent IDs, matching existing comment reads and stored IDs,
+while keeping UUID validation for new replies and all target/access/deletion
+checks. `src/routes/community.test.ts` covers successful opaque-parent posting,
+missing-parent rejection and empty-parent validation. The public-replies case in
+`test/community_expansion_test.dart` verifies retained drafts, successful retry,
+spoiler protection and removal of the misleading disabled-replies explanation.
+Both focused tests and widget analysis pass; the running app was hot reloaded.
+
+## Pip on native Home Screen widgets — 12 October 2026
+
+Both native Search and Watchlist layouts include decorative static popcorn Pip
+using 160px bundled artwork. iOS extension build and artwork-bundle verification
+passed with `xcodebuild -project ios/Runner.xcodeproj -target FlixieSearchWidget
+-configuration Debug -sdk iphonesimulator ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+CODE_SIGNING_ALLOWED=NO CONFIGURATION_BUILD_DIR=/private/tmp/flixie-pip-widget-build build`.
+
+Android debug app and instrumentation builds passed. All ten tests in
+`com.flixie.app.FlixieWidgetsTest` passed on dedicated Flixie Screenshots
+emulator-5554, including the added Pip visibility/wordmark/accessibility check,
+compact/wide layouts, enlarged text, account isolation, real poster replacement
+and actual widget taps launching the correct Search/Watchlist link. Run from
+`android/` with `ANDROID_SERIAL=emulator-5554 ./gradlew
+:app:connectedDebugAndroidTest
+-Pandroid.testInstrumentationRunnerArguments.class=com.flixie.app.FlixieWidgetsTest`.
+An initial adb property timeout during emulator startup resolved; no test was
+skipped or weakened. Native widgets require an app build/install, so Flutter
+hot reload does not apply. No database fixtures, full Flutter regression suite,
+production migration or deployment was needed.
+
+Native Android capture also passed via the existing isolated
+`captureNativeWidgetPreviewWhenRequested` case with `captureWidgets=true`.
+The real RemoteViews preview was pulled to `/private/tmp/flixie-widgets-pip.png`
+and inspected: Pip is visible in all three presented sizes, branding/actions
+remain legible, and the wide Watchlist retains four posters. Gradle removes its
+test runner after connected tests, so the runner was reinstalled solely on the
+dedicated emulator before this capture. iOS Home Screen gallery/physical-device
+visual verification remains outstanding; the extension compiles and contains its
+Pip resource. No ordinary development iPhone install or account state was changed.
+
+## Recent Profile Stats trophy shields — 12 October 2026
+
+`flutter test test/features/profile/recent_milestones_test.dart
+test/features/profile/recent_milestones_controller_test.dart
+test/features/profile/profile_controller_test.dart
+test/features/profile/tablet_profile_test.dart` — 21 checks pass. Covers newest
+three earned milestones, actual localized dates, locked/older exclusion, narrow
+phone/tablet/landscape widths, doubled text, empty versus failure, actionable retry,
+retained content, disposal and account changes. Focused analysis is clean.
+Phone/tablet captures in `output/profile-milestones/` inspected with app fonts.
+Interactive fictional previews: `tool/preview_recent_milestones.dart`. Existing
+guarded movie-opinion seed provides fictional reviews/watches for milestone API
+calculation; no database/schema changes needed. No goldens regenerated.
+Dart MCP connection timed out; CLI attach to the previously advertised iPhone VM
+service did not connect, so running-app refresh/native presentation are unverified.
+
+## Home Screen Pip simulator refresh — 12 October 2026
+
+At the user’s request, rebuilt and installed the ordinary development app on the
+iPhone 17 Pro simulator. Runtime inspection identified a named-image lookup failure
+for the standalone widget PNG. Changed the shared artwork view to decode that
+bundled file through UIImage; the corrected full app/extension build passes.
+Visually verified Pip beside the wordmark in the existing Home Screen Search
+widget. Physical-device rendering remains unverified. No production deployment.
+
+Simulator refresh follow-up: user requested reload; stopped the stuck development
+runner/debugger and successfully rebuilt/launched `lib/main.dart` on the existing
+iPhone 17 Pro simulator. The app is running with the latest source.
+
+Milestones-page trophy follow-up: 11 focused checks pass across
+`test/profile_milestones_test.dart`,
+`test/features/profile/milestones_trophy_test.dart` and recent-milestone tests.
+Earned versus unearned artwork, Next up/Earned actions, progress, privacy and
+responsive cases pass. Owner/friend page captures inspected; focused analysis
+clean. Synced and hot reloaded on the running iPhone 17 Pro simulator.
+
+## External media sharing and automatic store fallback — 12 October 2026
+
+29 focused Flutter checks pass across external sharing, sharing widgets/session and
+internal chat payloads. Final HTTPS payload recheck passes for member/guest movie/show
+sharing. Native share method is intercepted; these checks do not send real messages
+or prove the OS share sheet/browser association. Focused static analysis is clean.
+Website build, TypeScript, SEO and HTTP route/association checks pass; device-store
+selection checks include iPhone/iPad, iPad desktop mode, Android and desktop.
+Movie/show landing pages inspected at desktop and phone width in the local browser.
+The development iPhone simulator hot reload succeeded. No website publication or
+app release. See `docs/sharing/external-media-links.md` for rollout and device checks.
+
+Dedicated native follow-up: `scripts/test-patrol.sh -d
+6155C494-EA8D-44D2-965D-ECEF4FDA1A91 -t patrol_test/media_sharing_test.dart`
+with `demo_firebase_plist` passed all four journeys (external movie/show guest/member
+payloads, existing friend/group send retry, dismiss during pending creation).
+Native share method intercepted; no real messages sent. First attempt rejected a
+slash in a test description and ran zero tests; corrected rerun passes.
+Temporary native Firebase config restored. Result:
+`build/ios_results_1791832493459.xcresult`. No production/browser store launch claim.

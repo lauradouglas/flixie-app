@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -30,7 +31,8 @@ class InviteMembersSheet extends StatefulWidget {
   State<InviteMembersSheet> createState() => InviteMembersSheetState();
 }
 
-class InviteMembersSheetState extends State<InviteMembersSheet> {
+class InviteMembersSheetState extends State<InviteMembersSheet>
+    with StarredFriendsState<InviteMembersSheet> {
   List<FriendshipUser> _friends = [];
   final List<String> _selected = [];
   final TextEditingController _search = TextEditingController();
@@ -127,9 +129,7 @@ class InviteMembersSheetState extends State<InviteMembersSheet> {
           child: Text('Account changed. Close this sheet to continue.'));
     }
     final query = _search.text.toLowerCase();
-    final filtered = _friends.where((f) {
-      return f.username.toLowerCase().contains(query);
-    }).toList();
+    final filtered = orderedFriends(_friends, (f) => f, query);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,

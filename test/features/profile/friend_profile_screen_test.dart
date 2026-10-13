@@ -303,6 +303,8 @@ void main() {
   for (final size in [
     const Size(320, 800),
     const Size(390, 850),
+    const Size(700, 1000),
+    const Size(834, 1194),
     const Size(1024, 800),
     const Size(844, 390)
   ]) {
@@ -323,6 +325,12 @@ void main() {
                 .widget<ProfileAvatarView>(find.byType(ProfileAvatarView).first)
                 .profileBadges,
             isNotEmpty);
+        if (size.width >= 700 && scale == 1) {
+          final header = tester.getRect(find.byType(FriendProfileHeader));
+          final totals = tester.getRect(find.byType(FriendProfileTotals));
+          expect(totals.left, greaterThan(header.right));
+          expect(totals.top, lessThan(header.bottom));
+        }
         expect(find.text('Message'), findsOneWidget);
         expect(find.text('Plan a watch'), findsOneWidget);
         for (final tab in ['Activity', 'Reviews', 'Overview']) {

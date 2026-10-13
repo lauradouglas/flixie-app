@@ -36,6 +36,12 @@ void main() {
                       CommunityIcon(id: id),
                       const SizedBox(height: 8),
                       Text(const {
+                        -2: 'Superheroes',
+                        -3: 'True Crime',
+                        -4: 'K-Drama',
+                        -5: 'Star Wars',
+                        -6: 'Studio Ghibli',
+                        -7: 'Cult Classics',
                         -1: 'Anime',
                         28: 'Action',
                         12: 'Adventure',

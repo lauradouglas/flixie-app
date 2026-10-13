@@ -9,7 +9,9 @@ String? setupDestination(String value) {
     return null;
   }
   final path = uri.path;
-  if (RegExp(r'^/(movies|shows|people)/[0-9]+$').hasMatch(path)) return uri.toString();
+  if (RegExp(r'^/(movies|shows|people)/[0-9]+$').hasMatch(path)) {
+    return uri.toString();
+  }
   if (path == '/watchlist') return '/watchlist';
   if (path == '/social') return '/social';
   if (path == '/search' && uri.queryParameters['focus'] == '1') {
@@ -19,6 +21,8 @@ String? setupDestination(String value) {
           .hasMatch(path) ||
       RegExp(r'^/genre-communities/-?[0-9]+(?:/discussions/[^/]+)?$')
           .hasMatch(path) ||
+      RegExp(r'^/community-invites/[A-Za-z0-9_-]{43}$').hasMatch(path) ||
+      path == '/private-communities' ||
       path == '/notifications') {
     return uri.toString();
   }

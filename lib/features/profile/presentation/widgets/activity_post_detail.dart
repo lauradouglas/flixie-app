@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -272,23 +273,18 @@ class _ActivityPostDetailState extends State<ActivityPostDetail> {
                 children: [
               if (widget.onReact != null)
                 Builder(
-                    builder: (anchor) => TextButton.icon(
+                    builder: (anchor) => IconButton(
+                        tooltip: 'Add reaction',
                         onPressed:
                             widget.busy ? null : () => widget.onReact!(anchor),
                         icon: const Icon(Icons.add_reaction_outlined),
-                        style: TextButton.styleFrom(
-                            foregroundColor: secondary,
-                            textStyle: Theme.of(context)
-                                .textTheme
-                                .labelLarge
-                                ?.copyWith(
-                                    fontSize: 14, fontWeight: FontWeight.w600)),
-                        label: const Text('React'))),
+                        style:
+                            IconButton.styleFrom(foregroundColor: secondary))),
               for (final reaction in ActivityReaction.values)
                 if ((widget.reactions.counts[reaction.emoji] ?? 0) > 0)
                   FlixiePill.action(
-                      label: Text(
-                          '${reaction.emoji} ${widget.reactions.counts[reaction.emoji]}'),
+                      label: PipReactionCount(reaction.emoji,
+                          widget.reactions.counts[reaction.emoji]!),
                       tooltip: reaction.label,
                       onPressed:
                           widget.busy || widget.onReactionSelected == null

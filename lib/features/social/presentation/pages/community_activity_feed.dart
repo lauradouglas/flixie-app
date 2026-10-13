@@ -362,7 +362,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                                     icon: const Icon(Icons.close))
                               ]),
                               const Text(
-                                  'Share your existing and future film and show reviews, including ratings, and public personal lists with everyone on Flixie. Watch history, watchlists and watch plans stay out of Around Flixie. Turning this off stops sharing reviews and lists through Around Flixie and community review feeds; Friends is unchanged. Discussions and public replies you publish are separate and remain until you delete them.'),
+                                  'Share your existing and future film and show ratings and reviews, and public personal lists with everyone on Flixie. Watch history, watchlists and watch plans stay out of Around Flixie. Turning this off stops sharing reviews and lists through Around Flixie and community review feeds; Friends is unchanged. Discussions and public replies you publish are separate and remain until you delete them.'),
                               if (_settingsError != null)
                                 TextButton(
                                     onPressed: () async {
@@ -453,7 +453,15 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                                           : item.type ==
                                                   ActivityListType.showReview
                                               ? 'SHOW_REVIEW'
-                                              : 'MOVIE_LIST',
+                                              : item.type ==
+                                                      ActivityListType
+                                                          .movieRating
+                                                  ? 'MOVIE_RATING'
+                                                  : item.type ==
+                                                          ActivityListType
+                                                              .showRating
+                                                      ? 'SHOW_RATING'
+                                                      : 'MOVIE_LIST',
                                       targetId: item.id,
                                       reportedUserId: item.userId,
                                       username: item.username,

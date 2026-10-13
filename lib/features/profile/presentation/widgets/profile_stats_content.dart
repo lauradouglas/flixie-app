@@ -95,7 +95,7 @@ class ProfileStatsContent extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: context.colors.white)),
         );
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final watching = <Widget>[
       if (failed)
         TextButton.icon(
             onPressed: onRetry,
@@ -118,42 +118,53 @@ class ProfileStatsContent extends StatelessWidget {
               onPressed: onWrapped,
               child: Text('View ${data.year} Wrapped ›'))),
       heading('Monthly watches'),
-      SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            for (var i = 0; i < counts.length; i++)
-              Semantics(
-                  label: '${months[i]} ${data.year}: ${counts[i]} watches',
-                  child: ExcludeSemantics(
-                      child: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Column(children: [
-                      Text('${counts[i]}',
-                          style: TextStyle(
-                              color: context.colors.light, fontSize: 12)),
-                      const SizedBox(height: 4),
-                      SizedBox(
-                          height: 70,
-                          width: 28,
-                          child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: Container(
-                                height: counts[i] == 0
-                                    ? 2
-                                    : counts[i] / maxMonth * 70,
-                                decoration: BoxDecoration(
-                                    color: counts[i] == 0
-                                        ? context.colors.surfaceElevated
-                                        : context.colors.primaryText,
-                                    borderRadius: BorderRadius.circular(4)),
-                              ))),
-                      const SizedBox(height: 6),
-                      Text(months[i],
-                          style: TextStyle(
-                              color: context.colors.light, fontSize: 12)),
-                    ]),
-                  ))),
-          ])),
+      LayoutBuilder(builder: (context, constraints) {
+        final wide = MediaQuery.sizeOf(context).width >= 700 &&
+            MediaQuery.textScalerOf(context).scale(1) <= 1.4;
+        final bars = <Widget>[
+          for (var i = 0; i < counts.length; i++)
+            Semantics(
+                label: '${months[i]} ${data.year}: ${counts[i]} watches',
+                child: ExcludeSemantics(
+                    child: Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Column(children: [
+                    Text('${counts[i]}',
+                        style: TextStyle(
+                            color: context.colors.light, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                        height: 70,
+                        width: 28,
+                        child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Container(
+                              height: counts[i] == 0
+                                  ? 2
+                                  : counts[i] / maxMonth * 70,
+                              decoration: BoxDecoration(
+                                  color: counts[i] == 0
+                                      ? context.colors.surfaceElevated
+                                      : context.colors.primaryText,
+                                  borderRadius: BorderRadius.circular(4)),
+                            ))),
+                    const SizedBox(height: 6),
+                    Text(months[i],
+                        style: TextStyle(
+                            color: context.colors.light, fontSize: 12)),
+                  ]),
+                ))),
+        ];
+        if (wide && constraints.maxWidth >= counts.length * 36) {
+          return Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [for (final bar in bars) Expanded(child: bar)]);
+        }
+        return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end, children: bars));
+      }),
       if (data.year == now.year)
         Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -164,6 +175,8 @@ class ProfileStatsContent extends StatelessWidget {
             insights: data.insights!,
             year: data.year,
             movies: data.totalMoviesWatched),
+    ];
+    final taste = <Widget>[
       heading('Your ratings · All time'),
       Material(
           color: context.colors.surface,
@@ -266,7 +279,33 @@ class ProfileStatsContent extends StatelessWidget {
                     child: _RecentRatingTile(rating: rating)),
             ])),
       ],
-    ]);
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final wide = constraints.maxWidth >= 700 &&
+          MediaQuery.textScalerOf(context).scale(1) <= 1.4;
+      if (!wide) {
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [...watching, ...taste]);
+      }
+      return Row(
+        key: const ValueKey('tablet-stats-columns'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+              flex: 3,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: watching)),
+          const SizedBox(width: 40),
+          Expanded(
+              flex: 2,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: taste)),
+        ],
+      );
+    });
   }
 }
 

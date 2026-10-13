@@ -1,3 +1,4 @@
+import '../widgets/watchlist_tablet_gallery.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -274,6 +275,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
   @override
   Widget build(BuildContext context) {
     return FlixiePageScaffold(
+      adaptiveContent: true,
       appBar: AppBar(
         leading: const WatchlistNavigationButton(),
         backgroundColor: Colors.transparent,
@@ -316,10 +318,12 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         TextButton(
             onPressed: _watchlist.retryExperience,
             child: Text('${_watchlist.experienceError} Retry')),
-      _buildStatsRow(),
-      _buildSearchBar(),
-      _buildMediaFilter(),
-      if (hasItems) _buildReleaseFilters(),
+      _buildHeaderPair(_buildStatsRow(), _buildSearchBar(), firstWidth: 320),
+      if (hasItems)
+        _buildHeaderPair(_buildMediaFilter(), _buildReleaseFilters(),
+            firstWidth: 280)
+      else
+        _buildMediaFilter(),
       if (hasItems)
         TonightFiltersPanel(
           key: _tonightPanelKey,
@@ -511,43 +515,64 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       );
     }
 
-    return ListView.separated(
-      key: const ValueKey('watchlist-cards'),
-      padding: const EdgeInsets.only(bottom: 20),
-      itemCount: header.length + items.length,
-      separatorBuilder: (context, index) => index < header.length
-          ? const SizedBox.shrink()
-          : const SizedBox(height: 4),
-      itemBuilder: (context, index) {
-        if (index < header.length) return header[index];
+    Widget buildItem(BuildContext context, int itemIndex, bool gallery) {
+      final pageStart = (itemIndex ~/ 20) * 20;
+      _watchlist.scheduleEnrichment(
+          items.skip(pageStart).take(itemIndex % 20 >= 15 ? 40 : 20));
+      final item = items[itemIndex];
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_watchlist.usesExperience &&
+            _watchlist.experienceFits[_watchlist.experienceKey(item)] != null)
+          Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(_watchlist
+                  .experienceFits[_watchlist.experienceKey(item)]!.reasons
+                  .join(' · '))),
+        item is WatchlistMovie
+            ? _buildWatchlistRow(item, user, gallery: gallery)
+            : _buildShowWatchlistRow(item as WatchlistShowEntry,
+                gallery: gallery),
+      ]);
+    }
 
-        final itemIndex = index - header.length;
-        final pageStart = (itemIndex ~/ 20) * 20;
-        _watchlist.scheduleEnrichment(
-            items.skip(pageStart).take(itemIndex % 20 >= 15 ? 40 : 20));
-        final item = items[itemIndex];
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            if (_watchlist.usesExperience &&
-                _watchlist.experienceFits[_watchlist.experienceKey(item)] !=
-                    null)
-              Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text([
-                    ..._watchlist
-                        .experienceFits[_watchlist.experienceKey(item)]!
-                        .reasons,
-                  ].join(' · '))),
-            item is WatchlistMovie
-                ? _buildWatchlistRow(item, user)
-                : _buildShowWatchlistRow(item as WatchlistShowEntry),
-          ]),
-        );
-      },
-    );
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth >= 700 &&
+          MediaQuery.textScalerOf(context).scale(1) <= 1.4) {
+        return WatchlistTabletGallery(
+            header: header,
+            itemCount: items.length,
+            itemBuilder: (context, index) => buildItem(context, index, true));
+      }
+      return ListView.separated(
+        key: const ValueKey('watchlist-cards'),
+        padding: const EdgeInsets.only(bottom: 20),
+        itemCount: header.length + items.length,
+        separatorBuilder: (context, index) => index < header.length
+            ? const SizedBox.shrink()
+            : const SizedBox(height: 4),
+        itemBuilder: (context, index) => index < header.length
+            ? header[index]
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: buildItem(context, index - header.length, false)),
+      );
+    });
   }
+
+  Widget _buildHeaderPair(Widget first, Widget second,
+          {required double firstWidth}) =>
+      LayoutBuilder(builder: (context, constraints) {
+        if (constraints.maxWidth >= 900 &&
+            MediaQuery.textScalerOf(context).scale(1) <= 1.4) {
+          return Row(children: [
+            SizedBox(width: firstWidth, child: first),
+            Expanded(child: second),
+          ]);
+        }
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [first, second]);
+      });
 
   Future<void> _pickFromTonight(List<Object> items) async {
     if (items.isEmpty) return;
@@ -702,7 +727,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         ),
       );
 
-  Widget _buildWatchlistRow(WatchlistMovie item, dynamic user) {
+  Widget _buildWatchlistRow(WatchlistMovie item, dynamic user,
+      {bool gallery = false}) {
     final isWatched = user?.isMovieWatched(item.movieId) ?? false;
     final pending =
         !_watchlist.completedEnrichment.contains('movie:${item.movieId}');
@@ -712,6 +738,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         _watchlist.movieWatchProviders[item.movieId] ?? const <WatchProvider>[];
     final canWatchNow = _watchlist.isAvailableOnUserProviders(item.movieId);
     return WatchlistMovieRow(
+      posterGallery: gallery,
       watchlistItem: item,
       isWatched: isWatched,
       availableProviders: providers,
@@ -757,11 +784,13 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     );
   }
 
-  Widget _buildShowWatchlistRow(WatchlistShowEntry item) {
+  Widget _buildShowWatchlistRow(WatchlistShowEntry item,
+      {bool gallery = false}) {
     void details() => context.push(
         showDetailPath(item.showId, source: DetailSource.watchlist),
         extra: {'title': item.title, 'poster': item.posterPath});
     return WatchlistMovieRow(
+      posterGallery: gallery,
       isShow: true,
       watchlistItem: WatchlistMovie(
           id: 'show-${item.showId}',

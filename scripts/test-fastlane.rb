@@ -182,6 +182,18 @@ class FastlaneTest < Minitest::Test
     assert_equal true, upload[:skip_waiting_for_build_processing]
     assert_equal 'com.flixie.flixieApp', upload[:app_identifier]
   end
+  def test_apple_submit_uses_requested_release_notes
+    ENV['APP_STORE_CONNECT_KEY_ID'] = 'fake'
+    ENV['APP_STORE_CONNECT_ISSUER_ID'] = 'fake'
+    ENV['APP_STORE_CONNECT_KEY_FILE'] = '/tmp/fake.p8'
+    ENV['RELEASE_VERSION'] = '2.0.2'
+    @runner.run(:ios, :submit, build_number: 107, uploaded: true,
+      notes_file: 'fastlane/release-metadata/ios/2.0.2/en-GB/release_notes.txt')
+    notes = @runner.calls.last.last[:release_notes]['en-GB']
+    assert_includes notes, 'Pip reactions'
+    assert_includes notes, 'review counts'
+  end
+
   def test_ios_build_validates_signed_ipa_before_returning
     original_glob = Dir.method(:[])
     Dir.define_singleton_method(:[]) { |*_args| ['/tmp/fake.ipa'] }

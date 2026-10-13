@@ -2,6 +2,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/core/auth/notification_deep_link.dart';
 
 void main() {
+  test('private invite notification opens a safe invitation preview', () {
+    expect(
+        notificationDeepLinkPath(
+            {'type': 'COMMUNITY_INVITE', 'invitationId': 'invite-123'}),
+        '/private-communities?invitation=invite-123');
+    expect(
+        notificationDeepLinkPath({
+          'type': 'COMMUNITY_INVITE',
+          'invitationId': '../escape',
+          'route': '/movies/129'
+        }),
+        '/private-communities');
+  });
   test(
       'community mentions open a precise comment with a compatible legacy route',
       () {

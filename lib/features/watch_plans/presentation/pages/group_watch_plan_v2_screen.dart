@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -204,7 +205,7 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
   Widget _screenBody(GroupWatchRequest? request) => FlixieRefresh(
         color: FlixieColors.primary,
         onRefresh: _controller.load,
-        child: ListView(
+        child: _adaptiveBody(ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
           children: [
@@ -236,6 +237,9 @@ class _GroupWatchPlanV2ScreenState extends State<GroupWatchPlanV2Screen> {
                 onBack: () => _controller.select(null),
               ),
           ],
-        ),
+        )),
       );
+
+  Widget _adaptiveBody(Widget child) =>
+      widget.embedded ? child : FlixieAdaptiveContent(child: child);
 }

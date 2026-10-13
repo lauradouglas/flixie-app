@@ -33,7 +33,7 @@ class DiscussionReplyComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
       decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: Theme.of(context).scaffoldBackgroundColor,
           border: Border(
               top: BorderSide(
                   color: context.colors.light.withValues(alpha: .2)))),

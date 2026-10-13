@@ -50,68 +50,138 @@ List<Map<String, dynamic>> _entries(
 
 /// The whole column is a shortcut, including its movie/show breakdown.
 class ProfileLibraryTotals extends StatelessWidget {
-  const ProfileLibraryTotals({super.key, required this.user});
+  const ProfileLibraryTotals(
+      {super.key, required this.user, this.tablet = false});
   final User user;
+  final bool tablet;
 
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) {
+    if (tablet) {
+      return Material(
         type: MaterialType.transparency,
-        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          for (final library in ProfileLibrary.values) ...[
-            if (library != ProfileLibrary.watched)
-              Container(
-                  width: 1, height: 48, color: context.colors.tabBarBorder),
-            Expanded(child: Builder(builder: (context) {
-              final movies = _entries(user, library, false).length;
-              final shows = _entries(user, library, true).length;
-              return Semantics(
-                button: true,
-                label:
-                    '${library.title}, ${movies + shows} titles. Open ${library.title.toLowerCase()}',
-                child: InkWell(
-                  key: ValueKey('profile-total-${library.name}'),
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () {
-                    switch (library) {
-                      case ProfileLibrary.watched:
-                        context.push('/watch-history');
-                      case ProfileLibrary.watchlist:
-                        context.go('/watchlist');
-                      case ProfileLibrary.favourites:
-                        showFavouriteMoviesSheet(
-                            context, user.favoriteMovies ?? []);
-                    }
-                  },
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Text('${movies + shows}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: library.color(context),
-                              fontWeight: FontWeight.w900,
-                              fontSize: 24)),
-                      Text(library.title,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: context.colors.medium,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 5),
-                      Text(
-                          '$movies ${movies == 1 ? 'movie' : 'movies'} · $shows ${shows == 1 ? 'show' : 'shows'}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 11,
-                              height: 1.4,
-                              color: context.colors.light)),
-                    ]),
-                  ),
-                ),
-              );
-            })),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final library in ProfileLibrary.values)
+              _tabletRow(context, library),
           ],
-        ]),
+        ),
       );
+    }
+    return Material(
+      type: MaterialType.transparency,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        for (final library in ProfileLibrary.values) ...[
+          if (library != ProfileLibrary.watched)
+            Container(width: 1, height: 48, color: context.colors.tabBarBorder),
+          Expanded(child: Builder(builder: (context) {
+            final movies = _entries(user, library, false).length;
+            final shows = _entries(user, library, true).length;
+            return Semantics(
+              button: true,
+              label:
+                  '${library.title}, ${movies + shows} titles. Open ${library.title.toLowerCase()}',
+              child: InkWell(
+                key: ValueKey('profile-total-${library.name}'),
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  switch (library) {
+                    case ProfileLibrary.watched:
+                      context.push('/watch-history');
+                    case ProfileLibrary.watchlist:
+                      context.go('/watchlist');
+                    case ProfileLibrary.favourites:
+                      showFavouriteMoviesSheet(
+                          context, user.favoriteMovies ?? []);
+                  }
+                },
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('${movies + shows}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: library.color(context),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 24)),
+                    Text(library.title,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: context.colors.medium,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 5),
+                    Text(
+                        '$movies ${movies == 1 ? 'movie' : 'movies'} · $shows ${shows == 1 ? 'show' : 'shows'}',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 11,
+                            height: 1.4,
+                            color: context.colors.light)),
+                  ]),
+                ),
+              ),
+            );
+          })),
+        ],
+      ]),
+    );
+  }
+
+  void _open(BuildContext context, ProfileLibrary library) {
+    switch (library) {
+      case ProfileLibrary.watched:
+        context.push('/watch-history');
+      case ProfileLibrary.watchlist:
+        context.go('/watchlist');
+      case ProfileLibrary.favourites:
+        showFavouriteMoviesSheet(context, user.favoriteMovies ?? []);
+    }
+  }
+
+  Widget _tabletRow(BuildContext context, ProfileLibrary library) {
+    final movies = _entries(user, library, false).length;
+    final shows = _entries(user, library, true).length;
+    return Semantics(
+      button: true,
+      label:
+          '${library.title}, ${movies + shows} titles. Open ${library.title.toLowerCase()}',
+      child: InkWell(
+        key: ValueKey('profile-total-${library.name}'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _open(context, library),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(
+                    child: Text(library.title,
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: context.colors.medium))),
+                Text('${movies + shows}',
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: library.color(context))),
+                const SizedBox(width: 12),
+                Icon(Icons.chevron_right,
+                    size: 20, color: context.colors.medium),
+              ]),
+              const SizedBox(height: 4),
+              Text(
+                  '$movies ${movies == 1 ? 'movie' : 'movies'} · $shows ${shows == 1 ? 'show' : 'shows'}',
+                  style: TextStyle(
+                      fontSize: 13, height: 1.4, color: context.colors.medium)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

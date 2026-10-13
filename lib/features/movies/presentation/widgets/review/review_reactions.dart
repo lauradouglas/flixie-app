@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -5,6 +6,7 @@ import 'package:flixie_app/models/activity_reaction.dart';
 
 // Ordered list of supported reactions: (emoji, reactionType key)
 final _kReactions = reviewActivityReactions.entries
+    .where((entry) => ActivityReaction.selectable.contains(entry.value))
     .map((entry) => (entry.value.emoji, entry.key))
     .toList();
 
@@ -127,9 +129,11 @@ class _ReactionChipState extends State<_ReactionChip>
   @override
   Widget build(BuildContext context) {
     return Semantics(
-        label: '${widget.emoji}, ${widget.count} reactions',
+        label:
+            '${ActivityReaction.fromEmoji(widget.emoji)?.label ?? 'Reaction'}, ${widget.count} reactions',
         child: FlixiePill.action(
             selected: widget.isActive,
+            tooltip: ActivityReaction.fromEmoji(widget.emoji)?.label,
             onPressed: widget.onTap,
             label: Row(mainAxisSize: MainAxisSize.min, children: [
               if (widget.isLoading)
@@ -139,9 +143,7 @@ class _ReactionChipState extends State<_ReactionChip>
                     child: CircularProgressIndicator(strokeWidth: 2))
               else
                 ScaleTransition(
-                    scale: _scale,
-                    child: Text(widget.emoji,
-                        style: const TextStyle(fontSize: 20))),
+                    scale: _scale, child: PipReaction(widget.emoji, size: 40)),
               if (widget.count > 0) ...[
                 const SizedBox(width: 6),
                 Text('${widget.count}')
@@ -173,15 +175,14 @@ class ReviewReactionPreview extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      child: Wrap(
         children: [
           ...top.map((e) {
-            final emoji = reviewReactionEmoji(e.key);
             final isMe = myReaction == e.key;
             return Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: FlixiePill.label(
-                    selected: isMe, label: Text('$emoji ${e.value}')));
+                    selected: isMe, label: PipReactionCount(e.key, e.value)));
           }),
         ],
       ),

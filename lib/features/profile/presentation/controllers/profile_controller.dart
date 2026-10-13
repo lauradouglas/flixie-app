@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/profile_milestone.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -43,6 +44,8 @@ class ProfileController extends ChangeNotifier {
   List<Review> reviews = [];
   int reviewCount = 0;
   MovieWrapped? wrapped;
+  ProfileMilestones? milestones;
+  bool milestonesLoading = false, milestonesFailed = false;
   Map<int, Person> directorPeople = {};
   bool activityLoading = true,
       ratingsLoading = true,
@@ -90,6 +93,8 @@ class ProfileController extends ChangeNotifier {
         reviews = [];
         reviewCount = 0;
         wrapped = null;
+        milestones = null;
+        milestonesLoading = milestonesFailed = false;
         directorPeople = {};
         activityCursor = null;
         activityFilter = ProfileActivityFilter.all;
@@ -123,7 +128,7 @@ class ProfileController extends ChangeNotifier {
   }
 
   void _invalidateOptional() {
-    for (final section in ['activity', 'ratings', 'stats']) {
+    for (final section in ['activity', 'ratings', 'stats', 'milestones']) {
       _versions[section] = (_versions[section] ?? 0) + 1;
     }
     _activityLoaded = _ratingsLoaded = false;
@@ -338,6 +343,7 @@ class ProfileController extends ChangeNotifier {
 
   Future<void> _loadStats({required bool forceRefresh}) async {
     final viewer = auth.dbUser!.id, current = _request('stats');
+    unawaited(loadMilestones(forceRefresh: forceRefresh));
     change(() {
       statsLoading = true;
       statsFailed = false;
@@ -382,6 +388,24 @@ class ProfileController extends ChangeNotifier {
       if (current()) change(() => statsFailed = true);
     } finally {
       if (current()) change(() => statsLoading = false);
+    }
+  }
+
+  Future<void> loadMilestones({bool forceRefresh = false}) async {
+    final viewer = auth.dbUser?.id;
+    if (_disposed || viewer == null) return;
+    final current = _request('milestones');
+    change(() {
+      milestonesLoading = true;
+      milestonesFailed = false;
+    });
+    try {
+      final value = await service.milestones(viewer, refresh: forceRefresh);
+      if (current()) change(() => milestones = value);
+    } catch (_) {
+      if (current()) change(() => milestonesFailed = true);
+    } finally {
+      if (current()) change(() => milestonesLoading = false);
     }
   }
 

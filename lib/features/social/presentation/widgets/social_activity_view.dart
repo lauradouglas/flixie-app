@@ -13,8 +13,8 @@ class SocialActivityView extends StatefulWidget {
 }
 
 class _SocialActivityViewState extends State<SocialActivityView> {
-  int _selected = 0;
-  final _visited = <int>{0};
+  int _selected = 2;
+  final _visited = <int>{2};
   @override
   Widget build(BuildContext context) {
     final feeds = widget.feeds ??

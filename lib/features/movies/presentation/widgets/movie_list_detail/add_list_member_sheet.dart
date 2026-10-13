@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/models/friendship.dart';
@@ -13,7 +14,8 @@ class AddListMemberSheet extends StatefulWidget {
   State<AddListMemberSheet> createState() => AddListMemberSheetState();
 }
 
-class AddListMemberSheetState extends State<AddListMemberSheet> {
+class AddListMemberSheetState extends State<AddListMemberSheet>
+    with StarredFriendsState<AddListMemberSheet> {
   final _searchController = TextEditingController();
   String _query = '';
 
@@ -26,15 +28,7 @@ class AddListMemberSheetState extends State<AddListMemberSheet> {
   @override
   Widget build(BuildContext context) {
     final query = _query.trim().toLowerCase();
-    final visible = query.isEmpty
-        ? widget.friends
-        : widget.friends
-            .where((friend) => [
-                  friend.username,
-                  friend.firstName ?? '',
-                  friend.lastName ?? '',
-                ].join(' ').toLowerCase().contains(query))
-            .toList(growable: false);
+    final visible = orderedFriends(widget.friends, (f) => f, query);
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(

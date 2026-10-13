@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/data/starred_people.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,6 +18,32 @@ void main() {
     await (FontLoader('MaterialIcons')
           ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
         .load();
+  });
+  testWidgets('starred recipient is first and filtering preserves selection',
+      (tester) async {
+    final auth = ShareAuth();
+    addTearDown(auth.dispose);
+    StarredPeople.instance.selectAccount('fixture-viewer');
+    StarredPeople.instance.ids = {'friend-1'};
+    addTearDown(() => StarredPeople.instance.selectAccount(null));
+    useApiFixture(MockClient(
+        (r) async => http.Response(jsonEncode(friendsPayload(3)), 200)));
+    await tester.pumpWidget(shareHost(auth));
+    await tester.pumpAndSettle();
+    await openPicker(tester, false);
+    expect(tester.getTopLeft(find.text('OdysseyFan1')).dy,
+        lessThan(tester.getTopLeft(find.text('AlienFan')).dy));
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    final search = find.byType(TextField).first;
+    await tester.enterText(search, 'Alien');
+    await tester.pumpAndSettle();
+    expect(find.text('OdysseyFan1'), findsNothing);
+    expect(find.text('AlienFan'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
+    await tester.enterText(search, '');
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
   testWidgets('friend selection, send failure and retry',
       (tester) => sendJourney(tester, group: false));
@@ -60,7 +87,7 @@ void main() {
         await tester.pumpWidget(shareHost(auth, scale: 2));
         await tester.pumpAndSettle();
         await openPicker(tester, group);
-        await tester.ensureVisible(find.byType(TextField));
+        await tester.ensureVisible(find.byType(TextField).last);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());

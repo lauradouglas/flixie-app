@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
@@ -24,7 +25,7 @@ class FriendsRow extends StatefulWidget {
   State<FriendsRow> createState() => _FriendsRowState();
 }
 
-class _FriendsRowState extends State<FriendsRow> {
+class _FriendsRowState extends State<FriendsRow> with StarredFriendsState<FriendsRow> {
   // Tracks users for whom a request was sent this session,
   // so they appear immediately in the Sent tab.
   final List<FriendshipUser> _extraSentUsers = [];
@@ -66,7 +67,7 @@ class _FriendsRowState extends State<FriendsRow> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final friends = widget.data.friendships;
+    final friends = orderedFriends(widget.data.friendships, (f) => f.friendUser);
     final total = friends.length;
 
     return Column(

@@ -3,6 +3,12 @@ import 'package:flixie_app/core/analytics/detail_source.dart';
 String notificationDeepLinkPath(Map<String, dynamic> data) {
   final route = data['route']?.toString();
   final type = (data['type']?.toString() ?? '').toUpperCase();
+  if (type == 'COMMUNITY_INVITE') {
+    final invitation = data['invitationId']?.toString() ?? '';
+    return RegExp(r'^[A-Za-z0-9_-]{1,100}$').hasMatch(invitation)
+        ? '/private-communities?invitation=$invitation'
+        : '/private-communities';
+  }
   final category = (data['category']?.toString() ?? '').toUpperCase();
   final groupId = data['groupId']?.toString();
   final friendId = data['friendId']?.toString();
@@ -21,7 +27,7 @@ String notificationDeepLinkPath(Map<String, dynamic> data) {
       (communityRoute == '/community/people' ||
           RegExp(r'^/genre-communities/-?[0-9]+/discussions/[^/?#]+(?:\?reply=[^&#]+)?$')
               .hasMatch(communityRoute) ||
-          RegExp(r'^/community/posts/[^/?#]+/(movie-review|show-review|movie-list-added)/[^/?#]+$')
+          RegExp(r'^/community/posts/[^/?#]+/(movie-review|show-review|movie-list-added|movie-rating|show-rating)/[^/?#]+$')
               .hasMatch(communityRoute))) {
     return communityRoute;
   }

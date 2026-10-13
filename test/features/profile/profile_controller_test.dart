@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/profile_milestone.dart';
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
@@ -41,6 +42,10 @@ ContinueWatchingShow continuing(int id) =>
     ContinueWatchingShow.fromJson({'showId': id, 'name': 'Alien: Earth $id'});
 
 class ProfileData extends ProfileDataService {
+  @override
+  Future<ProfileMilestones> milestones(String userId,
+          {bool refresh = false}) async =>
+      const ProfileMilestones(items: [], owner: true);
   final calls = <String>[];
   final activityGates = <String, Completer<ActivityPage>>{};
   final extraGates = <String, Completer<List<ContinueWatchingShow>>>{};

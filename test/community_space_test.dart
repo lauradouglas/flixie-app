@@ -22,7 +22,7 @@ import 'package:flixie_app/features/social/presentation/widgets/community_identi
 
 class SpaceFixture extends CommunitySpaceService {
   bool fail = false, joined = true, spoiler = true;
-  int posts = 0;
+  int posts = 0, unread = 0;
   Map<String, dynamic>? payload;
   Completer<Map<String, dynamic>>? pending;
   final calls = <String>[];
@@ -43,6 +43,7 @@ class SpaceFixture extends CommunitySpaceService {
         'season': 1,
         'episode': 25,
         'replyCount': 2,
+        'unreadReplyCount': unread,
         'createdAt':
             DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
         'show': {'id': 1429, 'title': 'Attack on Titan'}
@@ -138,6 +139,28 @@ class SpaceMembership extends GenreCommunityService {
   }
 }
 
+class ResumedRatingFixture extends SpaceFixture {
+  bool rated = false;
+  @override
+  Future<Map<String, dynamic>> get(int id, String path,
+      [Map<String, String> query = const {}]) async {
+    if (path != '/discover') return super.get(id, path, query);
+    return {
+      'items': [
+        {
+          'id': 1429,
+          'title': 'Attack on Titan',
+          'kind': 'show',
+          'posterPath': null,
+          'average': rated ? 10.0 : null,
+          'count': rated ? 1 : 0
+        }
+      ],
+      'nextOffset': null
+    };
+  }
+}
+
 Future<void> showSpace(WidgetTester tester, Widget child) async {
   final auth = TestAuth();
   addTearDown(auth.dispose);
@@ -148,6 +171,13 @@ Future<void> showSpace(WidgetTester tester, Widget child) async {
           ..syncUser('viewer'))
   ], child: MaterialApp(theme: AppTheme.darkTheme, home: child)));
   await tester.pumpAndSettle();
+}
+
+class EmptyTopicSpaceFixture extends CommunitySpaceService {
+  @override
+  Future<Map<String, dynamic>> get(int id, String path,
+          [Map<String, String> query = const {}]) async =>
+      {'items': []};
 }
 
 Future<void> tapSpace(WidgetTester t, String text) async {
@@ -216,6 +246,27 @@ void main() {
         .load();
   });
   setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  testWidgets(
+      'K-Drama discovery is series-only and empty catalogue needs no reviews',
+      (t) async {
+    await showSpace(
+        t,
+        Scaffold(
+            body: SpaceCollection(
+                communityId: -4,
+                service: EmptyTopicSpaceFixture(),
+                section: 'discover',
+                joined: true)));
+    expect(find.textContaining('Popular Korean drama series'), findsOneWidget);
+    expect(find.text('Movies'), findsNothing);
+    expect(find.text('All'), findsNothing);
+    expect(
+        find.text(
+            'No matching titles yet. Pull to refresh as the catalogue grows.'),
+        findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
   testWidgets(
       'community introduction scrolls away to leave room for discussions',
       (t) async {
@@ -237,10 +288,12 @@ void main() {
       (t) async {
     await t.binding.setSurfaceSize(const Size(430, 932));
     addTearDown(() => t.binding.setSurfaceSize(null));
-    final fixture = SpaceFixture()..spoiler = false;
+    final fixture = SpaceFixture()
+      ..spoiler = false
+      ..unread = 1;
     await showSpace(t, CommunitySpaceScreen(communityId: -1, service: fixture));
     expect(find.text('Ellis · 2h ago'), findsOneWidget);
-    await t.ensureVisible(find.text('2 replies'));
+    await t.ensureVisible(find.text('2 replies · 1 new'));
     if (const bool.fromEnvironment('COMMUNITY_CAPTURE')) {
       final boundary = t.renderObject<RenderRepaintBoundary>(
           find.byType(RepaintBoundary).first);
@@ -252,7 +305,7 @@ void main() {
         img.dispose();
       });
     }
-    await t.tap(find.text('2 replies'));
+    await t.tap(find.text('2 replies · 1 new'));
     await t.pumpAndSettle();
     expect(find.byType(CommunityDiscussionScreen), findsOneWidget);
     expect(t.takeException(), isNull);
@@ -532,6 +585,20 @@ void main() {
     expect(find.text('Attack on Titan'), findsNothing);
     await tapSpace(t, 'All');
     expect(fixture.calls.last, contains('filter: all'));
+  });
+  testWidgets('Discover reloads saved community ratings when the app resumes',
+      (t) async {
+    final fixture = ResumedRatingFixture();
+    await showSpace(t, CommunitySpaceScreen(communityId: -1, service: fixture));
+    await tapSpace(t, 'Discover');
+    expect(find.text('No community ratings yet'), findsOneWidget);
+    fixture.rated = true;
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await t.pumpAndSettle();
+    expect(find.text('10.0/10'), findsOneWidget);
+    expect(find.text('1 Anime members'), findsOneWidget);
+    expect(find.text('No community ratings yet'), findsNothing);
   });
   testWidgets(
       'failed refresh of a complete feed retries and keeps loaded posts',

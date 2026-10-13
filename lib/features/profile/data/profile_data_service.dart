@@ -1,3 +1,5 @@
+import 'milestone_cache.dart';
+import 'package:flixie_app/models/profile_milestone.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
 import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/movie_list.dart';
@@ -28,6 +30,8 @@ class ProfileDataService {
       UserService.getUserReviews(userId);
   Future<MovieWrapped> wrapped(String userId, int year) =>
       UserService.getMovieWrapped(userId, year);
+  Future<ProfileMilestones> milestones(String userId, {bool refresh = false}) =>
+      MilestoneCache.instance.load(userId, refresh: refresh);
   Future<Person> person(int id) => PersonService.getPersonById(id);
   Future<List<MovieList>> movieLists(String userId) =>
       UserService.getMovieLists(userId);

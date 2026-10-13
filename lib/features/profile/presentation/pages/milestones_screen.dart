@@ -1,3 +1,4 @@
+import '../widgets/milestone_shield.dart';
 import 'package:flixie_app/features/profile/data/milestone_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -186,14 +187,7 @@ class _MilestonesContentState extends State<MilestonesContent> {
                   child: ListTile(
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    leading: Icon(
-                        switch (group) {
-                          'Watching' => Icons.movie_outlined,
-                          'Exploring' => Icons.explore_outlined,
-                          'Together' => Icons.people_outline,
-                          _ => Icons.chat_bubble_outline,
-                        },
-                        color: context.colors.primaryText),
+                    leading: MilestoneShield(group: group),
                     title: Text(group,
                         style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: Text(switch (group) {
@@ -249,8 +243,10 @@ class _MilestonesContentState extends State<MilestonesContent> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: ExpansionTile(
                           tilePadding: EdgeInsets.zero,
-                          leading: Icon(_icon(next.family),
-                              color: context.colors.warning),
+                          leading: MilestoneShield(
+                              group: next.group,
+                              family: next.family,
+                              earned: next.earned),
                           title: Text(next.title),
                           subtitle: Text(
                               '${items.where((item) => item.earned).length} of ${items.length} milestones earned'),
@@ -286,19 +282,6 @@ class _MilestonesContentState extends State<MilestonesContent> {
   }
 }
 
-IconData _icon(String family) => switch (family) {
-      'films' => Icons.movie_outlined,
-      'series' => Icons.tv_rounded,
-      'together' || 'movie_mates' || 'group_nights' => Icons.people_outline,
-      'countries' => Icons.public,
-      'decades' => Icons.history,
-      'collections' => Icons.collections_bookmark_outlined,
-      'comfort' => Icons.favorite_outline,
-      'reviews' => Icons.chat_bubble_outline,
-      'recommendations' => Icons.thumb_up_outlined,
-      _ => Icons.explore_outlined,
-    };
-
 class _MilestoneRow extends StatelessWidget {
   const _MilestoneRow({required this.item, required this.showProgress});
   final ProfileMilestone item;
@@ -311,7 +294,8 @@ class _MilestoneRow extends StatelessWidget {
             color: context.colors.surfaceElevated,
             borderRadius: BorderRadius.circular(14)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(_icon(item.family), color: context.colors.warning, size: 28),
+          MilestoneShield(
+              group: item.group, family: item.family, earned: item.earned),
           const SizedBox(width: 14),
           Expanded(
               child: Column(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
 import '../widgets/watch_requests/watch_requests_list.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -129,22 +130,54 @@ class _WatchRequestsPageState extends State<_WatchRequestsPage>
         isFocused: isFocused,
         searchController: _searchController,
         buildCard: _buildRequestCard);
+    final tablet = MediaQuery.sizeOf(context).width >= 700 &&
+        MediaQuery.textScalerOf(context).scale(1) <= 1.4;
     final body = isFocused
         ? directBody
         : Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                child: WatchRequestAudienceSwitcher(
-                  selected: _audience,
-                  friendActiveCount: _controller.count(WatchPlanFilter.active),
-                  groupActiveCount: _controller.groupActiveCount,
-                  onChanged: (value) => setState(() => _audience = value),
+              if (tablet)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  child: Wrap(
+                    spacing: 20,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                          width: 340,
+                          child: WatchRequestAudienceSwitcher(
+                              selected: _audience,
+                              friendActiveCount:
+                                  _controller.count(WatchPlanFilter.active),
+                              groupActiveCount: _controller.groupActiveCount,
+                              onChanged: (value) =>
+                                  setState(() => _audience = value))),
+                      if (_audience == WatchRequestAudience.friends)
+                        _buildFriendFilters(),
+                      FilledButton.icon(
+                          onPressed: _actions.startNewWatchPlan,
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Make a Watch Plan')),
+                    ],
+                  ),
                 ),
-              ),
-              if (_audience == WatchRequestAudience.friends)
+              if (!tablet)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                  child: WatchRequestAudienceSwitcher(
+                    selected: _audience,
+                    friendActiveCount:
+                        _controller.count(WatchPlanFilter.active),
+                    groupActiveCount: _controller.groupActiveCount,
+                    onChanged: (value) => setState(() => _audience = value),
+                  ),
+                ),
+              if (!tablet && _audience == WatchRequestAudience.friends)
                 _buildFriendFilters(),
-              if (_audience == WatchRequestAudience.friends && !isFocused)
+              if (!tablet &&
+                  _audience == WatchRequestAudience.friends &&
+                  !isFocused)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                   child: SizedBox(
@@ -290,7 +323,7 @@ class _WatchRequestsPageState extends State<_WatchRequestsPage>
             ),
           ),
         ),
-        child: body,
+        child: isFocused ? body : FlixieAdaptiveContent(child: body),
       ),
     );
     // Preserve the device text scale; this surface uses flexible and

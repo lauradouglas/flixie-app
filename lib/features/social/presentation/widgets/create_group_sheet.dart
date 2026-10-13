@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -22,7 +23,8 @@ class CreateGroupSheet extends StatefulWidget {
   State<CreateGroupSheet> createState() => _CreateGroupSheetState();
 }
 
-class _CreateGroupSheetState extends State<CreateGroupSheet> {
+class _CreateGroupSheetState extends State<CreateGroupSheet>
+    with StarredFriendsState<CreateGroupSheet> {
   final FriendActionsController _friendActions =
       FriendActionsController.instance;
   final _formKey = GlobalKey<FormState>();
@@ -252,9 +254,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet> {
 
   Widget _buildInviteStep(ScrollController scrollController) {
     final query = _searchController.text.toLowerCase();
-    final filtered = _friends.where((f) {
-      return f.username.toLowerCase().contains(query);
-    }).toList();
+    final filtered = orderedFriends(_friends, (f) => f, query);
 
     return Column(
       children: [

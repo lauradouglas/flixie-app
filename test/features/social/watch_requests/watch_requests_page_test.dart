@@ -46,6 +46,29 @@ Future<void> tapButton(WidgetTester tester, String text) async {
 }
 
 void main() {
+  testWidgets('tablet separates upcoming plans from invitations',
+      (tester) async {
+    tester.view.physicalSize = const Size(1194, 834);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final upcoming = WatchPlanFixture(status: 'ACCEPTED', scheduled: true);
+    final invite = WatchPlanFixture();
+    invite.plan['id'] = 'invite';
+    useApiFixture(MockClient((request) async {
+      if (request.url.path == '/requests/store-viewer/all') {
+        return upcoming.json([upcoming.plan, invite.plan]);
+      }
+      return upcoming.handle(request);
+    }));
+    await mount(tester, PlansAuth());
+    expect(find.byKey(const ValueKey('tablet-watch-plan-columns')),
+        findsOneWidget);
+    expect(find.text('Upcoming'), findsOneWidget);
+    expect(find.text('Needs your response'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets(
       'paired refresh listeners coalesce; Past and Active filtering add no reads',

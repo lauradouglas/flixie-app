@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/models/movie_list.dart';
@@ -126,7 +127,8 @@ class _FriendsPicker extends StatefulWidget {
   State<_FriendsPicker> createState() => _FriendsPickerState();
 }
 
-class _FriendsPickerState extends State<_FriendsPicker> {
+class _FriendsPickerState extends State<_FriendsPicker>
+    with StarredFriendsState<_FriendsPicker> {
   String query = '';
   final search = TextEditingController();
 
@@ -139,10 +141,7 @@ class _FriendsPickerState extends State<_FriendsPicker> {
   @override
   Widget build(BuildContext context) {
     final q = query.trim().toLowerCase();
-    final friends = widget.relationships.friends.where((f) =>
-        '${f.username} ${f.firstName ?? ''} ${f.lastName ?? ''}'
-            .toLowerCase()
-            .contains(q));
+    final friends = orderedFriends(widget.relationships.friends, (f) => f, q);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       TextField(
           controller: search,

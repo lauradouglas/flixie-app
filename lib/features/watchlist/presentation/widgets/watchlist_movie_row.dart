@@ -14,6 +14,7 @@ import 'watchlist_poster_placeholder.dart';
 import 'watchlist_providers_inline.dart';
 
 class WatchlistMovieRow extends StatelessWidget {
+  final bool posterGallery;
   final bool isShow, isLoadingFriends, friendsFailed, providersFailed;
   final String region;
   final String? metadataOverride;
@@ -36,6 +37,7 @@ class WatchlistMovieRow extends StatelessWidget {
   const WatchlistMovieRow({
     super.key,
     this.isShow = false,
+    this.posterGallery = false,
     this.isLoadingFriends = false,
     this.friendsFailed = false,
     this.providersFailed = false,
@@ -103,136 +105,146 @@ class WatchlistMovieRow extends StatelessWidget {
           ...movie.genres.take(2),
           if (isWatched) 'Watched',
         ].join(' · ');
+    final poster = Semantics(
+      label: '${movie.title} poster',
+      image: true,
+      button: true,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: posterGallery ? double.infinity : 68,
+              height: posterGallery ? null : 102,
+              child: movie.posterPath == null
+                  ? const WatchlistPosterPlaceholder()
+                  : CachedNetworkImage(
+                      memCacheWidth: posterGallery
+                          ? null
+                          : watchlistPosterDecodeWidth(
+                              MediaQuery.devicePixelRatioOf(context)),
+                      imageUrl:
+                          'https://image.tmdb.org/t/p/w342${movie.posterPath}',
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) =>
+                          const WatchlistPosterPlaceholder(),
+                      errorWidget: (_, __, ___) =>
+                          const WatchlistPosterPlaceholder(),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final details = InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(movie.title,
+                style: TextStyle(
+                    color: context.colors.textPrimary,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(metadata,
+                style: TextStyle(color: context.colors.light, fontSize: 13)),
+            const SizedBox(height: 7),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              FlixiePill.label(label: Text(isShow ? 'Show' : 'Movie')),
+              if (releaseStatus(movie.releaseDate) == ReleaseStatus.comingSoon)
+                const FlixiePill.label(
+                  avatar: Icon(Icons.event_outlined),
+                  label: Text('Coming soon'),
+                ),
+            ]),
+            if (releaseStatus(movie.releaseDate) ==
+                ReleaseStatus.comingSoon) ...[
+              const SizedBox(height: 4),
+              Text('Releases ${_formatDate(movie.releaseDate)}',
+                  style: TextStyle(color: context.colors.light, fontSize: 13)),
+            ],
+          ]),
+        ));
+    final menu = PopupMenuButton<String>(
+      tooltip: 'More actions',
+      color: context.colors.surfaceElevated,
+      onSelected: (value) {
+        switch (value) {
+          case 'details':
+            onTap();
+          case 'watched':
+            onMarkAsWatched();
+          case 'favourite':
+            onAddToFavourites?.call();
+          case 'list':
+            onAddToList?.call();
+          case 'request_watch':
+            onRequestToWatch?.call();
+          case 'remove':
+            onRemove();
+        }
+      },
+      itemBuilder: (_) => [
+        if (_formatDate(watchlistItem.createdAt).isNotEmpty)
+          PopupMenuItem<String>(
+              enabled: false,
+              child: Text('Added ${_formatDate(watchlistItem.createdAt)}')),
+        const PopupMenuItem(value: 'details', child: Text('Title details')),
+        PopupMenuItem(
+            value: 'watched',
+            child: Text(isShow
+                ? 'Manage episodes & watched status'
+                : 'Mark as Watched')),
+        if (!isShow || onAddToFavourites != null)
+          const PopupMenuItem(
+              value: 'favourite', child: Text('Add to favourites')),
+        if (!isShow || onAddToList != null)
+          const PopupMenuItem(value: 'list', child: Text('Add to list')),
+        if (!isShow || onRequestToWatch != null)
+          const PopupMenuItem(
+              value: 'request_watch', child: Text('Invite friends')),
+        const PopupMenuItem(value: 'remove', child: Text('Remove')),
+      ],
+      child: Semantics(
+          label: 'Actions for ${movie.title}',
+          button: true,
+          child: SizedBox(
+              width: 44,
+              height: 44,
+              child:
+                  Icon(Icons.more_horiz_rounded, color: context.colors.light))),
+    );
     return Material(
       color: Colors.transparent,
       child: Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Semantics(
-              label: '${movie.title} poster',
-              image: true,
-              button: true,
-              onTap: onTap,
-              child: ExcludeSemantics(
-                child: InkWell(
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 68,
-                      height: 102,
-                      child: movie.posterPath == null
-                          ? const WatchlistPosterPlaceholder()
-                          : CachedNetworkImage(
-                              memCacheWidth: watchlistPosterDecodeWidth(
-                                  MediaQuery.devicePixelRatioOf(context)),
-                              imageUrl:
-                                  'https://image.tmdb.org/t/p/w342${movie.posterPath}',
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) =>
-                                  const WatchlistPosterPlaceholder(),
-                              errorWidget: (_, __, ___) =>
-                                  const WatchlistPosterPlaceholder(),
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-                child: InkWell(
-                    onTap: onTap,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 44),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(movie.title,
-                                style: TextStyle(
-                                    color: context.colors.textPrimary,
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
-                            Text(metadata,
-                                style: TextStyle(
-                                    color: context.colors.light, fontSize: 13)),
-                            const SizedBox(height: 7),
-                            Wrap(spacing: 6, runSpacing: 6, children: [
-                              FlixiePill.label(
-                                  label: Text(isShow ? 'Show' : 'Movie')),
-                              if (releaseStatus(movie.releaseDate) ==
-                                  ReleaseStatus.comingSoon)
-                                const FlixiePill.label(
-                                  avatar: Icon(Icons.event_outlined),
-                                  label: Text('Coming soon'),
-                                ),
-                            ]),
-                            if (releaseStatus(movie.releaseDate) ==
-                                ReleaseStatus.comingSoon) ...[
-                              const SizedBox(height: 4),
-                              Text('Releases ${_formatDate(movie.releaseDate)}',
-                                  style: TextStyle(
-                                      color: context.colors.light,
-                                      fontSize: 13)),
-                            ],
-                          ]),
-                    ))),
-            PopupMenuButton<String>(
-              tooltip: 'More actions',
-              color: context.colors.surfaceElevated,
-              onSelected: (value) {
-                switch (value) {
-                  case 'details':
-                    onTap();
-                  case 'watched':
-                    onMarkAsWatched();
-                  case 'favourite':
-                    onAddToFavourites?.call();
-                  case 'list':
-                    onAddToList?.call();
-                  case 'request_watch':
-                    onRequestToWatch?.call();
-                  case 'remove':
-                    onRemove();
-                }
-              },
-              itemBuilder: (_) => [
-                if (_formatDate(watchlistItem.createdAt).isNotEmpty)
-                  PopupMenuItem<String>(
-                      enabled: false,
-                      child: Text(
-                          'Added ${_formatDate(watchlistItem.createdAt)}')),
-                const PopupMenuItem(
-                    value: 'details', child: Text('Title details')),
-                PopupMenuItem(
-                    value: 'watched',
-                    child: Text(isShow
-                        ? 'Manage episodes & watched status'
-                        : 'Mark as Watched')),
-                if (!isShow || onAddToFavourites != null)
-                  const PopupMenuItem(
-                      value: 'favourite', child: Text('Add to favourites')),
-                if (!isShow || onAddToList != null)
-                  const PopupMenuItem(
-                      value: 'list', child: Text('Add to list')),
-                if (!isShow || onRequestToWatch != null)
-                  const PopupMenuItem(
-                      value: 'request_watch', child: Text('Invite friends')),
-                const PopupMenuItem(value: 'remove', child: Text('Remove')),
-              ],
-              child: Semantics(
-                  label: 'Actions for ${movie.title}',
-                  button: true,
-                  child: SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Icon(Icons.more_horiz_rounded,
-                          color: context.colors.light))),
-            ),
-          ]),
+          if (posterGallery) ...[
+            Stack(children: [
+              AspectRatio(aspectRatio: 2 / 3, child: poster),
+              Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Material(
+                    color: context.colors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    child: menu,
+                  )),
+            ]),
+            const SizedBox(height: 12),
+            details,
+          ] else
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              poster,
+              const SizedBox(width: 12),
+              Expanded(child: details),
+              menu,
+            ]),
           const SizedBox(height: 8),
           WatchlistFriendsViewing(
               movieId: movie.id,

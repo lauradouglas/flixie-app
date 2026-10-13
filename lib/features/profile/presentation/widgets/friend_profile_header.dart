@@ -271,8 +271,10 @@ class FriendProfileActions extends StatelessWidget {
 }
 
 class FriendProfileTotals extends StatelessWidget {
-  const FriendProfileTotals({super.key, required this.user});
+  const FriendProfileTotals(
+      {super.key, required this.user, this.tablet = false});
   final User user;
+  final bool tablet;
   @override
   Widget build(BuildContext context) => _modernStats(
       context,
@@ -292,6 +294,34 @@ class FriendProfileTotals extends StatelessWidget {
       (watchlist, 'Watchlist', Icons.bookmark_border_rounded),
       (favourites, 'Favourites', Icons.favorite_border_rounded),
     ];
+    if (tablet) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (var i = 0; i < values.length; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                    child: Text(values[i].$2,
+                        style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600))),
+                Text('${values[i].$1}',
+                    style: TextStyle(
+                        color: context.colors.primaryText,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700)),
+              ]),
+              const SizedBox(height: 4),
+              Text(breakdowns[i],
+                  style: TextStyle(
+                      color: context.colors.medium, fontSize: 13, height: 1.4)),
+            ]),
+          ),
+      ]);
+    }
     return Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(children: [

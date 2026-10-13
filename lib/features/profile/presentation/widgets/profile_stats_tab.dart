@@ -1,3 +1,5 @@
+import 'recent_milestones.dart';
+import 'package:flixie_app/models/profile_milestone.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/monthly_watch_summary.dart';
 import 'package:flixie_app/features/profile/presentation/pages/milestones_screen.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +9,6 @@ import 'package:flixie_app/models/movie_rating.dart';
 import 'package:flixie_app/models/movie_wrapped.dart';
 import 'package:flixie_app/models/person.dart';
 import 'package:flixie_app/models/user.dart' as models;
-import 'package:flixie_app/app/theme/app_theme.dart';
 
 import 'profile_stats_content.dart';
 
@@ -15,6 +16,10 @@ class ProfileStatsTab extends StatelessWidget {
   const ProfileStatsTab(
       {super.key,
       required this.wrapped,
+      this.milestones,
+      this.milestonesLoading = false,
+      this.milestonesFailed = false,
+      this.onRetryMilestones,
       required this.failed,
       required this.onRetry,
       required this.ratings,
@@ -22,6 +27,9 @@ class ProfileStatsTab extends StatelessWidget {
       required this.directorPeople,
       required this.user});
   final MovieWrapped? wrapped;
+  final ProfileMilestones? milestones;
+  final bool milestonesLoading, milestonesFailed;
+  final VoidCallback? onRetryMilestones;
   final bool failed;
   final VoidCallback onRetry;
   final List<MovieRating> ratings;
@@ -57,31 +65,15 @@ class ProfileStatsTab extends StatelessWidget {
                         onDiscover: () => context.push('/search'),
                         onLog: () => context.push('/search'),
                       ),
-                      if (wrapped!.insights!['milestone'] != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 14),
-                          child: Row(children: [
-                            Icon(Icons.star_outline_rounded,
-                                color: context.colors.warning),
-                            const SizedBox(width: 10),
-                            Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text('Latest milestone',
-                                      style: TextStyle(
-                                          color: context.colors.medium,
-                                          fontSize: 12)),
-                                  Text(
-                                      '${wrapped!.insights!['milestone']['count']} unique films watched',
-                                      style: TextStyle(
-                                          color: context.colors.white,
-                                          fontWeight: FontWeight.w600)),
-                                ])),
-                          ]),
-                        ),
                     ]),
+              )),
+            if (user?.id != null)
+              SliverToBoxAdapter(
+                  child: RecentMilestones(
+                data: milestones,
+                loading: milestonesLoading,
+                failed: milestonesFailed,
+                onRetry: onRetryMilestones,
               )),
             if (user?.id != null)
               SliverToBoxAdapter(

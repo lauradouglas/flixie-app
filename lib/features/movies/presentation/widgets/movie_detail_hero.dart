@@ -238,6 +238,7 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 500;
+        final tablet = constraints.maxWidth >= 560;
         final safeTop = MediaQuery.paddingOf(context).top;
         final hasBackdrop = movie.backdropPath?.trim().isNotEmpty == true;
         final heroScrimHeight =
@@ -247,141 +248,149 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
                     ? MovieDetailHeroTokens.posterCompactWidthFactor
                     : MovieDetailHeroTokens.posterRegularWidthFactor))
             .clamp(MovieDetailHeroTokens.posterMinWidth,
-                MovieDetailHeroTokens.posterMaxWidth);
+                tablet ? 220.0 : MovieDetailHeroTokens.posterMaxWidth);
 
         final stacked = constraints.maxWidth < 330 ||
-            MediaQuery.textScalerOf(context).scale(1) > 1.3;
+            (MediaQuery.textScalerOf(context).scale(1) > 1.3 &&
+                constraints.maxWidth < 700);
         return Stack(
           children: [
             if (hasBackdrop)
               Positioned.fill(
                   child: MovieHeaderBackdrop(path: movie.backdropPath!.trim())),
-            MediaBackdropInset(
-              animate: widget.animateBackdropInset,
-              hasBackdrop: hasBackdrop,
-              width: constraints.maxWidth,
-              top: safeTop + MovieDetailHeroTokens.heroSurfaceTopPadding,
-              bottom: MovieDetailHeroTokens.heroSurfaceBottomPadding,
-              child: Flex(
-                direction: stacked ? Axis.vertical : Axis.horizontal,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: posterWidth.toDouble(),
-                    child: AspectRatio(
-                      aspectRatio: MovieDetailHeroTokens.posterAspectRatio,
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(
-                              MovieDetailHeroTokens.posterCornerRadius),
-                          topRight: Radius.circular(
-                              MovieDetailHeroTokens.posterRightRadius),
-                          bottomLeft: Radius.circular(
-                              MovieDetailHeroTokens.posterCornerRadius),
-                          bottomRight: Radius.circular(
-                              MovieDetailHeroTokens.posterRightRadius),
-                        ),
-                        child: Hero(
-                          tag: 'movie-poster-${movie.id}',
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: movie.posterPath == null
-                                  ? null
-                                  : () => _showPosterViewer(movie),
-                              child: movie.posterPath == null
-                                  ? Container(
-                                      color: context
-                                          .colors.tabBarBackgroundFocused,
-                                      child: Icon(Icons.movie_outlined,
-                                          color: context.colors.medium,
-                                          size: 42),
-                                    )
-                                  : CachedNetworkImage(
-                                      imageUrl:
-                                          'https://image.tmdb.org/t/p/w780${movie.posterPath}',
-                                      fit: BoxFit.cover,
-                                      alignment: Alignment.center,
-                                      errorWidget: (_, __, ___) => Center(
+            Padding(
+              padding: EdgeInsets.symmetric(
+                  horizontal: constraints.maxWidth >= 700 ? 24 : 0),
+              child: MediaBackdropInset(
+                animate: widget.animateBackdropInset,
+                hasBackdrop: hasBackdrop,
+                width: constraints.maxWidth,
+                top: safeTop + MovieDetailHeroTokens.heroSurfaceTopPadding,
+                bottom: MovieDetailHeroTokens.heroSurfaceBottomPadding,
+                child: Flex(
+                  direction: stacked ? Axis.vertical : Axis.horizontal,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: posterWidth.toDouble(),
+                      child: AspectRatio(
+                        aspectRatio: MovieDetailHeroTokens.posterAspectRatio,
+                        child: ClipRRect(
+                          borderRadius: tablet
+                              ? BorderRadius.circular(12)
+                              : const BorderRadius.only(
+                                  topLeft: Radius.circular(
+                                      MovieDetailHeroTokens.posterCornerRadius),
+                                  topRight: Radius.circular(
+                                      MovieDetailHeroTokens.posterRightRadius),
+                                  bottomLeft: Radius.circular(
+                                      MovieDetailHeroTokens.posterCornerRadius),
+                                  bottomRight: Radius.circular(
+                                      MovieDetailHeroTokens.posterRightRadius),
+                                ),
+                          child: Hero(
+                            tag: 'movie-poster-${movie.id}',
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: movie.posterPath == null
+                                    ? null
+                                    : () => _showPosterViewer(movie),
+                                child: movie.posterPath == null
+                                    ? Container(
+                                        color: context
+                                            .colors.tabBarBackgroundFocused,
                                         child: Icon(Icons.movie_outlined,
                                             color: context.colors.medium,
                                             size: 42),
+                                      )
+                                    : CachedNetworkImage(
+                                        imageUrl:
+                                            'https://image.tmdb.org/t/p/w780${movie.posterPath}',
+                                        fit: BoxFit.cover,
+                                        alignment: Alignment.center,
+                                        errorWidget: (_, __, ___) => Center(
+                                          child: Icon(Icons.movie_outlined,
+                                              color: context.colors.medium,
+                                              size: 42),
+                                        ),
                                       ),
-                                    ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: MovieDetailHeroTokens.heroColumnGap),
-                  Expanded(
-                    flex: stacked ? 0 : 1,
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                        right: MovieDetailHeroTokens.heroContentRightInset,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(
-                              top: compact ? 4 : 6,
+                    const SizedBox(width: MovieDetailHeroTokens.heroColumnGap),
+                    Expanded(
+                      flex: stacked ? 0 : 1,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: MovieDetailHeroTokens.heroContentRightInset,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(
+                                top: compact ? 4 : 6,
+                              ),
+                              child: _buildTitleBlock(context, movie,
+                                  compact: compact),
                             ),
-                            child: _buildTitleBlock(context, movie,
-                                compact: compact),
-                          ),
-                          SizedBox(
-                            height: compact
-                                ? MovieDetailHeroTokens.textBlockGapCompact
-                                : MovieDetailHeroTokens.textBlockGapRegular,
-                          ),
-                          _buildHeroFlixScoreBadge(context, movie),
-                          SizedBox(
-                            height: compact
-                                ? MovieDetailHeroTokens.textBlockGapCompact
-                                : MovieDetailHeroTokens.textBlockGapRegular,
-                          ),
-                          _buildHeroMetadataRow(movie, compact: compact),
-                          if ((movie.tagline ?? '').isNotEmpty) ...[
                             SizedBox(
                               height: compact
                                   ? MovieDetailHeroTokens.textBlockGapCompact
                                   : MovieDetailHeroTokens.textBlockGapRegular,
                             ),
-                            Text(
-                              movie.tagline!,
-                              style: TextStyle(
-                                color: context.colors.light,
-                                fontSize: compact
-                                    ? MovieDetailHeroTokens.taglineCompact
-                                    : MovieDetailHeroTokens.taglineRegular,
-                                fontWeight: FontWeight.w700,
-                                height: MovieDetailHeroTokens.taglineLineHeight,
-                              ),
+                            _buildHeroFlixScoreBadge(context, movie),
+                            SizedBox(
+                              height: compact
+                                  ? MovieDetailHeroTokens.textBlockGapCompact
+                                  : MovieDetailHeroTokens.textBlockGapRegular,
                             ),
+                            _buildHeroMetadataRow(movie, compact: compact),
+                            if ((movie.tagline ?? '').isNotEmpty) ...[
+                              SizedBox(
+                                height: compact
+                                    ? MovieDetailHeroTokens.textBlockGapCompact
+                                    : MovieDetailHeroTokens.textBlockGapRegular,
+                              ),
+                              Text(
+                                movie.tagline!,
+                                style: TextStyle(
+                                  color: context.colors.light,
+                                  fontSize: compact
+                                      ? MovieDetailHeroTokens.taglineCompact
+                                      : MovieDetailHeroTokens.taglineRegular,
+                                  fontWeight: FontWeight.w700,
+                                  height:
+                                      MovieDetailHeroTokens.taglineLineHeight,
+                                ),
+                              ),
+                            ],
+                            SizedBox(
+                              height: compact
+                                  ? MovieDetailHeroTokens.genreTopGapCompact
+                                  : MovieDetailHeroTokens.genreTopGapRegular,
+                            ),
+                            _buildGenrePills(
+                              movie,
+                              compact: compact,
+                              maxItems: compact ? 2 : 3,
+                            ),
+                            SizedBox(
+                              height: compact
+                                  ? MovieDetailHeroTokens.textBlockGapCompact
+                                  : MovieDetailHeroTokens.textBlockGapRegular,
+                            ),
+                            _buildHeroLinks(movie, compact: true),
                           ],
-                          SizedBox(
-                            height: compact
-                                ? MovieDetailHeroTokens.genreTopGapCompact
-                                : MovieDetailHeroTokens.genreTopGapRegular,
-                          ),
-                          _buildGenrePills(
-                            movie,
-                            compact: compact,
-                            maxItems: compact ? 2 : 3,
-                          ),
-                          SizedBox(
-                            height: compact
-                                ? MovieDetailHeroTokens.textBlockGapCompact
-                                : MovieDetailHeroTokens.textBlockGapRegular,
-                          ),
-                          _buildHeroLinks(movie, compact: true),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             Positioned(

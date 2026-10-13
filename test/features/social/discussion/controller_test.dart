@@ -33,6 +33,25 @@ class ReadFixture extends CommunitySpaceService {
   }
 }
 
+class ReadMarkerFixture extends ReadFixture {
+  final markers = <Map<String, dynamic>>[];
+  @override
+  Future<Map<String, dynamic>> get(int id, String path,
+      [Map<String, String> query = const {}]) async {
+    final data = await super.get(id, path, query);
+    return path.endsWith('/replies')
+        ? {...data, 'readThrough': '2026-10-12T10:00:00Z'}
+        : data;
+  }
+
+  @override
+  Future<Map<String, dynamic>> post(
+      int id, String path, Map<String, dynamic> body) async {
+    markers.add({'path': path, ...body});
+    return {'read': true};
+  }
+}
+
 CommunityDiscussionController owner(ReadFixture fixture,
         {bool? joined = true}) =>
     CommunityDiscussionController(
@@ -47,6 +66,22 @@ Map<String, dynamic> page(String id, {String? next}) => {
       'nextCursor': next
     };
 void main() {
+  test(
+      'opening replies marks only the server-provided boundary; hidden spoilers do not mark read',
+      () async {
+    final fixture = ReadMarkerFixture()..spoiler = true;
+    final c = owner(fixture);
+    addTearDown(c.dispose);
+    await c.load();
+    expect(fixture.markers, isEmpty);
+    c.reveal = true;
+    await c.loadReplies();
+    expect(fixture.markers.single, {
+      'path': '/discussions/thread/read',
+      'readThrough': '2026-10-12T10:00:00Z',
+      'reveal': true
+    });
+  });
   test('spoiler boundary prevents replies until explicitly revealed', () async {
     final f = ReadFixture()..spoiler = true;
     final c = owner(f);

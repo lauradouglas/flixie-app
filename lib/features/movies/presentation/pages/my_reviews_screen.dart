@@ -1,9 +1,9 @@
+import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_card.dart'
     as shared;
 import 'package:flixie_app/features/profile/presentation/controllers/review_reactions_controller.dart';
-import 'package:flixie_app/models/activity_reaction.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -416,8 +416,7 @@ class _ReviewCardState extends State<ReviewCard> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(reviewReactionEmoji(e.key),
-                                  style: const TextStyle(fontSize: 13)),
+                              PipReaction(e.key, size: 24),
                               const SizedBox(width: 2),
                               Text(
                                 '${e.value}',

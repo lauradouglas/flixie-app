@@ -4,6 +4,23 @@ Implemented locally on 28 September 2026 following approval of the Anime mockup.
 iOS and Android phones are the primary target. Existing Social → Communities
 routes now open the same four-tab experience for Anime and film-genre communities.
 
+## Private communities — local surface, 11 October 2026
+
+Social → Communities → Private communities opens an invitation-only hub.
+Creation, invitation preview and administration reuse `showFlixiePromptSheet`
+and the existing bounded, scrollable, safe-area sheet treatment. Owner/admin
+roles, discussions, polls and member reviews reuse the established community
+controls rather than introducing a separate visual system.
+
+The surface retains Flixie's wordmark, Manrope typography, active light/dark
+palette and each user's own avatar badge border. It extends the identity recorded
+in `docs/brand-system.md`; invitation privacy is a feature access rule, not a
+new global design direction.
+
+The native light-mode invitation preview was inspected clean. All 42 focused
+Flutter tests and both light/dark iOS Patrol invitation journeys passed. This
+records local implementation and scoped verification; no production release.
+
 ## User experience
 
 - Discuss: latest member discussions, general questions or a catalogue-linked title,

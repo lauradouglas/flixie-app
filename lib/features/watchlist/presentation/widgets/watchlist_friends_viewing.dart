@@ -1,3 +1,5 @@
+import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -117,75 +119,98 @@ class WatchlistFriendsViewing extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 20),
                         child: Text('No friends watched yet',
                             style: TextStyle(color: context.colors.light))),
-                  for (final friend in friends) ...[
-                    Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: LayoutBuilder(builder: (context, constraints) {
-                          final scope = friend.ratingScope.isEmpty
-                              ? (isShow ? 'show' : 'movie')
-                              : friend.ratingScope;
-                          final scopeLabel =
-                              '${scope[0].toUpperCase()}${scope.substring(1)} rating';
-                          final state =
-                              friend.watched ? 'Watched' : 'Not marked watched';
-                          final details = Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                    friend.displayName?.trim().isNotEmpty ==
-                                            true
-                                        ? friend.displayName!
-                                        : friend.username,
-                                    style: TextStyle(
-                                        color: context.colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 3),
-                                Text(
-                                    '$state · ${friend.rating == null ? 'Not rated yet' : scopeLabel}',
-                                    style: TextStyle(
-                                        color: context.colors.light,
-                                        fontSize: 13)),
-                              ]);
-                          final rating = Text(
-                              hideMovieRatings(context, movieId,
-                                      isShow: isShow, ownerId: friend.userId)
-                                  ? 'Hidden'
-                                  : friend.rating == null
-                                      ? '—'
-                                      : '${friend.rating! == friend.rating!.roundToDouble() ? friend.rating!.toInt() : friend.rating}/10',
-                              style: TextStyle(
-                                  color: friend.rating == null
-                                      ? context.colors.light
-                                      : context.colors.warning,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800));
-                          final stacked = constraints.maxWidth < 360 &&
-                              MediaQuery.textScalerOf(context).scale(16) > 24;
-                          return Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                _avatar(friend),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                    child: stacked
-                                        ? Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                                details,
-                                                const SizedBox(height: 6),
-                                                rating
-                                              ])
-                                        : details),
-                                if (!stacked) ...[
-                                  const SizedBox(width: 12),
-                                  rating
-                                ],
-                              ]);
-                        })),
-                    Divider(height: 1, color: context.colors.tabBarBorder),
-                  ],
+                  FriendSearchScope<FriendRecommendationItem>(
+                      items: friends,
+                      userOf: (f) => FriendshipUser(
+                          id: f.userId,
+                          username: f.username,
+                          firstName: f.displayName),
+                      builder: (context, visible) => Column(children: [
+                            for (final friend in visible) ...[
+                              Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                  child: LayoutBuilder(
+                                      builder: (context, constraints) {
+                                    final scope = friend.ratingScope.isEmpty
+                                        ? (isShow ? 'show' : 'movie')
+                                        : friend.ratingScope;
+                                    final scopeLabel =
+                                        '${scope[0].toUpperCase()}${scope.substring(1)} rating';
+                                    final state = friend.watched
+                                        ? 'Watched'
+                                        : 'Not marked watched';
+                                    final details = Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                              friend.displayName
+                                                          ?.trim()
+                                                          .isNotEmpty ==
+                                                      true
+                                                  ? friend.displayName!
+                                                  : friend.username,
+                                              style: TextStyle(
+                                                  color: context.colors.white,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600)),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                              '$state · ${friend.rating == null ? 'Not rated yet' : scopeLabel}',
+                                              style: TextStyle(
+                                                  color: context.colors.light,
+                                                  fontSize: 13)),
+                                        ]);
+                                    final rating = Text(
+                                        hideMovieRatings(context, movieId,
+                                                isShow: isShow,
+                                                ownerId: friend.userId)
+                                            ? 'Hidden'
+                                            : friend.rating == null
+                                                ? '—'
+                                                : '${friend.rating! == friend.rating!.roundToDouble() ? friend.rating!.toInt() : friend.rating}/10',
+                                        style: TextStyle(
+                                            color: friend.rating == null
+                                                ? context.colors.light
+                                                : context.colors.warning,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w800));
+                                    final stacked =
+                                        constraints.maxWidth < 360 &&
+                                            MediaQuery.textScalerOf(context)
+                                                    .scale(16) >
+                                                24;
+                                    return Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          _avatar(friend),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                              child: stacked
+                                                  ? Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                          details,
+                                                          const SizedBox(
+                                                              height: 6),
+                                                          rating
+                                                        ])
+                                                  : details),
+                                          if (!stacked) ...[
+                                            const SizedBox(width: 12),
+                                            rating
+                                          ],
+                                        ]);
+                                  })),
+                              Divider(
+                                  height: 1,
+                                  color: context.colors.tabBarBorder),
+                            ],
+                          ])),
                   const SizedBox(height: 16),
                   Text(
                       average == null

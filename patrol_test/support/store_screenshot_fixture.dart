@@ -1,3 +1,5 @@
+import 'package:flixie_app/app/router/flixie_tablet_navigation.dart';
+import 'package:flixie_app/features/social/presentation/pages/social_screen.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -671,7 +673,8 @@ class StoreScreenshotFixture {
   }
 }
 
-GoRouter storeScreenshotRouter() => GoRouter(routes: [
+GoRouter storeScreenshotRouter({bool tabletReview = false}) =>
+    GoRouter(routes: [
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => MainNavigationShell(navigationShell: shell),
         branches: [
@@ -679,14 +682,22 @@ GoRouter storeScreenshotRouter() => GoRouter(routes: [
             ('/', const HomeScreen()),
             ('/search', const SizedBox.shrink()),
             ('/plans', const WatchRequestsScreen()),
-            ('/social', const SizedBox.shrink()),
+            (
+              '/social',
+              tabletReview ? const SocialScreen() : const SizedBox.shrink()
+            ),
             ('/profile', const ProfileScreen()),
           ])
             StatefulShellBranch(
                 routes: [GoRoute(path: path, builder: (_, __) => screen)]),
         ],
       ),
-      GoRoute(path: '/watchlist', builder: (_, __) => const WatchlistScreen()),
+      GoRoute(
+          path: '/watchlist',
+          builder: (_, __) => tabletReview
+              ? const FlixieTabletRouteFrame(
+                  watchlist: true, child: WatchlistScreen())
+              : const WatchlistScreen()),
       GoRoute(
           path: '/watch-requests/store-movie-night',
           builder: (_, __) =>
@@ -696,7 +707,10 @@ GoRouter storeScreenshotRouter() => GoRouter(routes: [
           builder: (_, __) => const CommunitySpaceScreen(communityId: 18)),
       GoRoute(
           path: '/movies/157336',
-          builder: (_, __) => const MovieDetailScreen(movieId: '157336')),
+          builder: (_, __) => tabletReview
+              ? const FlixieTabletRouteFrame(
+                  child: MovieDetailScreen(movieId: '157336'))
+              : const MovieDetailScreen(movieId: '157336')),
       GoRoute(
           path: '/shows/15621',
           builder: (_, __) => const ShowDetailScreen(showId: '15621')),

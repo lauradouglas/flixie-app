@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -19,10 +20,13 @@ class FriendShareComposer extends StatefulWidget {
   State<FriendShareComposer> createState() => _FriendShareComposerState();
 }
 
-class _FriendShareComposerState extends State<FriendShareComposer> {
-  late String selectedFriendId = widget.friends.first.friendUser!.id;
+class _FriendShareComposerState extends State<FriendShareComposer>
+    with StarredFriendsState<FriendShareComposer> {
+  late String selectedFriendId =
+      orderedFriends(widget.friends, (f) => f.friendUser).first.friendUser!.id;
   final messageController =
       TextEditingController(text: 'You should watch this.');
+  String _query = '';
   bool sending = false;
   ChatShareMedia get movie => widget.movie;
   List<Friendship> get friends => widget.friends;
@@ -46,6 +50,7 @@ class _FriendShareComposerState extends State<FriendShareComposer> {
           orElse: () => friends.first,
         );
         final friendUser = selectedFriend.friendUser;
+        final visible = orderedFriends(friends, (f) => f.friendUser, _query);
 
         return Padding(
           padding: EdgeInsets.only(
@@ -97,14 +102,21 @@ class _FriendShareComposerState extends State<FriendShareComposer> {
                 ),
               ),
               const SizedBox(height: 10),
+              TextField(
+                  onChanged: (value) => setState(() => _query = value),
+                  decoration: const InputDecoration(
+                      hintText: 'Search friends',
+                      prefixIcon: Icon(Icons.search_rounded))),
+              const SizedBox(height: 10),
+              if (visible.isEmpty) const Text('No friends match your search.'),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 228),
                 child: ListView.separated(
                   shrinkWrap: true,
-                  itemCount: friends.length,
+                  itemCount: visible.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, index) {
-                    final friendship = friends[index];
+                    final friendship = visible[index];
                     final friend = friendship.friendUser;
                     if (friend == null) return const SizedBox.shrink();
                     final isSelected = friend.id == selectedFriendId;

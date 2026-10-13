@@ -91,7 +91,7 @@ class _SharingState extends State<AroundFlixieSharingSetting> {
           const Text('Watch history, watchlists and watch plans stay out.'),
           const SizedBox(height: 12),
           const Text(
-              'Turn this off to stop sharing your reviews and lists through Around Flixie and community review feeds. Friends sharing stays the same.'),
+              'Turn this off to stop sharing your ratings, reviews and lists through Around Flixie and community review feeds. Friends sharing stays the same.'),
           const SizedBox(height: 12),
           const Text(
               'Discussions and public replies you publish are separate. Turning this off does not delete them; use Delete on each discussion or reply.'),

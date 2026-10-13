@@ -1,6 +1,7 @@
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flixie_app/core/widgets/pip_startup_brand.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 
@@ -183,62 +184,7 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (_, __) {
-                final turn = _controller.value * 6.283;
-                final pulse = 1 + .05 * (1 - (2 * _controller.value - 1).abs());
-                return SizedBox(
-                  width: 190,
-                  height: 190,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Transform.scale(
-                        scale: pulse,
-                        child: Container(
-                          width: 126,
-                          height: 126,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                FlixieColors.primary.withValues(alpha: .28),
-                                FlixieColors.primary.withValues(alpha: .04),
-                              ],
-                            ),
-                            border: Border.all(
-                              color:
-                                  FlixieColors.primary.withValues(alpha: .32),
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.local_movies_rounded,
-                            color: FlixieColors.primary,
-                            size: 58,
-                          ),
-                        ),
-                      ),
-                      _orbitingSpark(
-                        turn,
-                        Icons.auto_awesome_rounded,
-                        context.colors.tertiary,
-                      ),
-                      _orbitingSpark(
-                        turn + 2.1,
-                        Icons.favorite_rounded,
-                        Colors.pinkAccent,
-                      ),
-                      _orbitingSpark(
-                        turn + 4.2,
-                        Icons.people_alt_rounded,
-                        context.colors.success,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+            const PipStartupBrand(),
             const SizedBox(height: 8),
             Text(
               'Getting the good stuff',
@@ -271,28 +217,6 @@ class _HomeBootLoadingScreenState extends State<HomeBootLoadingScreen>
               },
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _orbitingSpark(double angle, IconData icon, Color color) {
-    return Transform.rotate(
-      angle: angle,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Transform.rotate(
-          angle: -angle,
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: context.colors.surfaceElevated,
-              shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: .45)),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
         ),
       ),
     );
