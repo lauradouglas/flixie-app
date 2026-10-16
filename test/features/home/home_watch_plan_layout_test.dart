@@ -41,5 +41,10 @@ void main() {
     expect(phone.cardsPerPage, 1);
     expect(phone.stacked, isFalse);
     expect(phone.cardWidth, 351);
+    expect(phone.padding, 6, reason: 'align with the phone trending card edge');
+    final singlePhone =
+        HomeWatchPlanLayout(screen: const Size(390, 844), width: 390, count: 1);
+    expect(singlePhone.padding, 6);
+    expect(singlePhone.cardWidth + singlePhone.padding * 2, 390);
   });
 }

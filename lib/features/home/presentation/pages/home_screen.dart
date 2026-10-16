@@ -1,3 +1,4 @@
+import '../widgets/cinema_list.dart';
 import 'package:flixie_app/features/movies/presentation/trailers/trailer_player_sheet.dart';
 import '../widgets/recommendations_loading_card.dart';
 import '../widgets/pip_loading_strip.dart';
@@ -687,6 +688,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: InCinemasSection(
                   key: _cinemasKey,
                   region: region,
+                  mediaBuilder: (movies) => CinemaList(
+                        movies: movies,
+                        savedIds: _watchlistMovieIds,
+                        pendingIds: _watchlistUpdatesInFlight,
+                        onDetails: (movie) => context
+                            .push(movieDetailPath(movie.id), extra: {
+                          'title': movie.name,
+                          'poster': movie.poster
+                        }),
+                        onSave: (movie) => _toggleHeroWatchlist(context, movie),
+                        onTrailer: (movie) => _openHeroTrailer(context, movie),
+                      ),
                   savedIds: _watchlistMovieIds,
                   pendingIds: _watchlistUpdatesInFlight,
                   onDetails: (movie) => context.push(movieDetailPath(movie.id),
