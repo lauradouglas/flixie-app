@@ -712,6 +712,7 @@ class ShowDetailActionFlow {
       backgroundColor: Colors.transparent,
       builder: (_) => WriteReviewSheet(
         showId: show.id,
+        mediaTitle: show.name,
         userId: user.id,
         initialRating: _data.userRating?.toDouble(),
         onSubmitted: (review) {

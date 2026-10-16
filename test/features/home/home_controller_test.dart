@@ -93,6 +93,19 @@ class Data extends HomeDataService {
   }
 
   @override
+  Future<List<FriendMediaInteraction>> showFriends(String id, int showId) {
+    calls.add('show-friends:$id:$showId');
+    return Future.value(const [
+      FriendMediaInteraction(
+          userId: 'fictional',
+          username: 'Robin',
+          onWatchlist: true,
+          favourited: true,
+          profileBadges: ['fixture-border'])
+    ]);
+  }
+
+  @override
   Future<List<FriendMediaInteraction>> friends(String id, int movieId) {
     calls.add('friends:$id:$movieId');
     return friendRequest?.call(id, movieId) ?? Future.value([]);
@@ -186,6 +199,26 @@ void main() {
     await flush();
     expect(home.watchlist.value.data.ids, isEmpty);
     expect(data.calls, isNot(contains('watchlist:second')));
+  });
+
+  test('mixed trending separates movie/show membership and friend results',
+      () async {
+    auth.user = viewer('first').copyWith(showWatchlist: [
+      {'showId': 348, 'removed': false}
+    ]);
+    data.trendingRequest = (_) async =>
+        [alien, const MovieShort(id: 13, name: 'A show', mediaType: 'SHOW')];
+    await home.load();
+    await flush();
+    expect(home.watchlist.value.data.ids, contains(-348));
+    await home.showHeroPage(0);
+    expect(data.calls.where((call) => call.startsWith('friends:')).toList(),
+        ['friends:first:13']);
+    expect(data.calls, contains('show-friends:first:13'));
+    expect(home.friendActivity(-13).value.data.single.profileBadges,
+        ['fixture-border']);
+    expect(home.friendActivity(13).value.data, isEmpty);
+    expect(home.friendActivityLoaded(-13), isTrue);
   });
 
   test('explicit friend activity requests fetch ahead and reuse empty results',

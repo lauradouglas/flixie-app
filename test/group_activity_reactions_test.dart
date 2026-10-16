@@ -61,7 +61,7 @@ void main() {
     expect(original.counts['❤️'], 2);
   });
   testWidgets(
-      'ten Pip reactions save, change and remove through the activity API',
+      'twelve Pip reactions save, change and remove through the activity API',
       (tester) async {
     final auth = _Auth();
     addTearDown(auth.dispose);
@@ -87,7 +87,7 @@ void main() {
       expect(find.byType(PipReactionCount), findsOneWidget);
       for (final emoji in [
         ...ActivityReaction.selectable.map((reaction) => reaction.emoji),
-        '💯'
+        ActivityReaction.selectable.last.emoji
       ]) {
         final react = find.byTooltip('Add reaction');
         await tester.ensureVisible(react);
@@ -126,8 +126,9 @@ void main() {
               (widget) => widget is PipReaction && widget.value == '❤️'),
           findsOneWidget);
       expect(find.text('2'), findsOneWidget);
-      await tester.tap(find.byWidgetPredicate(
-          (widget) => widget is PipReaction && widget.value == '❤️'));
+      await tester.tap(find.byTooltip('Add reaction'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(ActivityReaction.values.first.label).last);
       await tester.pumpAndSettle();
       expect(find.byType(PipReactionCount), findsOneWidget);
       expect(find.byTooltip('Add reaction'), findsOneWidget);
@@ -191,7 +192,7 @@ void main() {
       expect(find.byType(PipReactionCount), findsOneWidget);
       for (final emoji in [
         ...ActivityReaction.selectable.map((reaction) => reaction.emoji),
-        '💯'
+        ActivityReaction.selectable.last.emoji
       ]) {
         final react = find.byTooltip('Add reaction');
         await tester.ensureVisible(react);
@@ -230,8 +231,9 @@ void main() {
               (widget) => widget is PipReaction && widget.value == '❤️'),
           findsOneWidget);
       expect(find.text('2'), findsOneWidget);
-      await tester.tap(find.byWidgetPredicate(
-          (widget) => widget is PipReaction && widget.value == '❤️'));
+      await tester.tap(find.byTooltip('Add reaction'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip(ActivityReaction.values.first.label).last);
       await tester.pumpAndSettle();
       expect(find.byType(PipReactionCount), findsOneWidget);
       expect(find.byTooltip('Add reaction'), findsOneWidget);

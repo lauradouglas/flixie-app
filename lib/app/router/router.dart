@@ -1,4 +1,11 @@
+import 'package:flixie_app/features/movies/presentation/pages/watch_invite_saved_screen.dart';
+import 'package:flixie_app/core/auth/pending_watch_invite_store.dart';
+import 'package:flixie_app/features/movies/presentation/pages/external_watch_invite_screen.dart';
+import 'package:flixie_app/features/space_premiere/presentation/pages/space_premiere_screen.dart';
+import 'package:flixie_app/features/pip_games/presentation/pages/pip_games_screen.dart';
+import 'package:flixie_app/features/pip_pairs/presentation/pages/pip_pairs_screen.dart';
 import 'route_error_screen.dart';
+import 'package:flixie_app/features/popcorn_catch/presentation/pages/popcorn_catch_screen.dart';
 import 'package:flixie_app/features/guest/presentation/guest_community_feed.dart';
 import 'package:flixie_app/features/social/presentation/pages/private_communities_screen.dart';
 import 'flixie_tablet_navigation.dart';
@@ -209,9 +216,35 @@ GoRouter buildRouter(
       if (signedOut) {
         initialEntryResolved = true;
         GuestAccess.clear();
+        await PendingWatchInviteStore.clear();
         pendingSetupDestination = null;
         initialGuestPath = null;
         return '/';
+      }
+      final externalToken = state.uri.path == '/invite'
+          ? state.uri.queryParameters['watch']
+          : state.uri.path.startsWith('/watch-invites/')
+              ? state.uri.path.split('/').last
+              : null;
+      if (PendingWatchInviteStore.valid(externalToken)) {
+        await PendingWatchInviteStore.save(externalToken!);
+        pendingSetupDestination = '/watch-invites/$externalToken';
+        if (state.uri.path == '/invite') return pendingSetupDestination;
+      }
+      if (status != AuthStatus.unknown &&
+          (state.uri.path == '/splash' ||
+              state.uri.path == '/' ||
+              (status == AuthStatus.authenticated &&
+                  !authProvider.needsSocialProfile &&
+                  state.uri.path.startsWith('/auth')))) {
+        final pendingInvite = await PendingWatchInviteStore.read();
+        if (pendingInvite != null) return '/watch-invites/$pendingInvite';
+        if (status == AuthStatus.authenticated &&
+            !authProvider.needsSocialProfile) {
+          final pendingLog =
+              await PendingWatchInviteStore.readLog(authProvider.dbUser?.id);
+          if (pendingLog != null) return '/watch-requests/$pendingLog?log=true';
+        }
       }
       final hasCompletedSetup = authProvider.dbUser?.completedSetup ?? false;
       // Native universal links may retain their HTTPS origin in state.uri.
@@ -305,7 +338,11 @@ GoRouter buildRouter(
           initialGuestPath = null;
           return target;
         }
-        if (GuestAccess.isPublicPath(state.uri.path)) return null;
+        if (GuestAccess.isPublicPath(state.uri.path) &&
+            !(state.uri.path == '/play/popcorn-catch' &&
+                state.uri.queryParameters.containsKey('challenge'))) {
+          return null;
+        }
         GuestAccess.destination = state.uri.toString();
         GuestAccess.action = null;
         GuestAccess.awaitingAccount = true;
@@ -319,7 +356,9 @@ GoRouter buildRouter(
               : '/terms-required';
         }
         if (state.matchedLocation == '/terms-required') {
-          return hasCompletedSetup
+          return (hasCompletedSetup ||
+                  pendingSetupDestination?.startsWith('/watch-invites/') ==
+                      true)
               ? (pendingSetupDestination ?? '/')
               : Uri(
                       path: '/onboarding',
@@ -331,8 +370,17 @@ GoRouter buildRouter(
         // Referral codes apply only to new account creation. Never carry one
         // into an existing authenticated account or a later sign-up.
         unawaited(referralStore.clear().catchError((_) {}));
-        // New users must complete onboarding before entering the app shell.
+        // Invited members can log this one viewing before optional setup.
+        // This does not mark onboarding complete or unlock other app routes.
         if (!hasCompletedSetup) {
+          final pendingLog =
+              await PendingWatchInviteStore.readLog(authProvider.dbUser?.id);
+          final invitePath = RegExp(r'^/watch-invites/[A-Za-z0-9_-]{43}$')
+              .hasMatch(state.uri.path);
+          final logPath = pendingLog != null &&
+              (state.uri.path == '/watch-requests/$pendingLog' ||
+                  state.uri.path == '/watch-entry-saved/$pendingLog');
+          if (invitePath || logPath) return null;
           if (isOnboarding) return null;
           return Uri(
                   path: '/onboarding',
@@ -488,6 +536,32 @@ GoRouter buildRouter(
           state,
           PickForUsScreen(userId: context.read<AuthProvider>().dbUser!.id),
         ),
+      ),
+      GoRoute(
+        path: '/play',
+        pageBuilder: (context, state) => _pushPage(
+            state,
+            PipGamesScreen(
+                guest: context.watch<AuthProvider>().dbUser == null)),
+      ),
+      GoRoute(
+        path: '/play/space-premiere',
+        pageBuilder: (context, state) =>
+            _pushPage(state, const SpacePremiereScreen()),
+      ),
+      GoRoute(
+        path: '/play/pip-pairs',
+        pageBuilder: (context, state) =>
+            _pushPage(state, const PipPairsScreen()),
+      ),
+      GoRoute(
+        path: '/play/popcorn-catch',
+        pageBuilder: (context, state) => _pushPage(
+            state,
+            PopcornCatchScreen(
+                userId: context.watch<AuthProvider>().dbUser?.id,
+                challengeId: state.uri.queryParameters['challenge'],
+                autoStartChallenge: state.extra == true)),
       ),
       GoRoute(
         path: '/group-watch-plans-v2',
@@ -784,6 +858,7 @@ GoRouter buildRouter(
           state,
           WatchRequestDetailScreen(
             requestId: state.pathParameters['requestId'] ?? '',
+            logOnOpen: state.uri.queryParameters['log'] == 'true',
           ),
         ),
       ),
@@ -830,6 +905,19 @@ GoRouter buildRouter(
                     setupDestination(state.uri.queryParameters['next'] ?? ''))),
       ),
 
+      GoRoute(
+          path: '/watch-entry-saved/:requestId',
+          builder: (context, state) {
+            final details = state.extra is Map ? state.extra as Map : const {};
+            return WatchInviteSavedScreen(
+                requestId: state.pathParameters['requestId']!,
+                movieTitle: details['movieTitle'] as String?,
+                rating: details['rating'] as int?);
+          }),
+      GoRoute(
+          path: '/watch-invites/:token',
+          builder: (context, state) =>
+              ExternalWatchInviteScreen(token: state.pathParameters['token']!)),
       GoRoute(
         path: '/invite',
         redirect: (_, state) {

@@ -1,0 +1,6 @@
+Pip arcade now has quiet background music and sound effects in Pip Pairs, Popcorn Catch and Space Premiere.
+
+Card flips and matches, popcorn catches and streaks, laser zaps, shield hits and wave celebrations.
+Use the speaker button for separately saved music and effects controls and music volume.
+Audio pauses when leaving/backgrounding games; opening settings pauses action games.
+Pip character voice sounds are not included.

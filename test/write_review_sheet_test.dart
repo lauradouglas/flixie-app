@@ -1,3 +1,4 @@
+import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
@@ -11,17 +12,18 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
         home: Scaffold(
             body: WriteReviewSheet(
                 movieId: 1, userId: 'user-1', onSubmitted: (_) {}))));
     expect(find.text('5 / 10'), findsNothing);
     expect(
-        tester
-            .widgetList<FlixiePill>(find.byType(FlixiePill))
-            .where((p) => p.selected),
+        tester.widgetList<FlixiePill>(find.byType(FlixiePill)).where((p) =>
+            p.selected && int.tryParse((p.label as Text).data ?? '') != null),
         isEmpty);
     expect(tester.widget<ElevatedButton>(find.byType(ElevatedButton)).onPressed,
         isNull);
+    await tester.ensureVisible(find.text('8'));
     await tester.tap(find.text('8'));
     await tester.pump();
     expect(find.text('8 / 10'), findsOneWidget);
@@ -36,6 +38,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.darkTheme,
         home: Scaffold(
           body: WriteReviewSheet(
             movieId: 1,
@@ -49,14 +52,23 @@ void main() {
     );
 
     expect(find.text('9 / 10'), findsOneWidget);
+    await tester.ensureVisible(find.text('Change rating'));
+    await tester.tap(find.text('Change rating'));
+    await tester.pumpAndSettle();
     final selectedRatings = tester
         .widgetList<FlixiePill>(find.byType(FlixiePill))
-        .where((chip) => chip.selected)
+        .where((chip) =>
+            chip.selected &&
+            int.tryParse((chip.label as Text).data ?? '') != null)
         .toList();
     expect(selectedRatings, hasLength(1));
     expect((selectedRatings.single.label as Text).data, '9');
-    expect(tester.widgetList<Switch>(find.byType(Switch)).first.value, isFalse);
-    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+    expect(
+        tester
+            .widget<FlixiePill>(find.widgetWithText(FlixiePill, 'Recommend'))
+            .selected,
+        isFalse);
+    expect(find.byIcon(Icons.star_rounded), findsNWidgets(10));
   });
 
   testWidgets('supports the same review flow for a TV show', (tester) async {
@@ -65,6 +77,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        theme: AppTheme.darkTheme,
         home: Scaffold(
           body: WriteReviewSheet(
             showId: 42,
@@ -77,12 +90,12 @@ void main() {
       ),
     );
 
-    expect(find.text('Write a Review'), findsOneWidget);
+    expect(find.text('Dear TV diary…'), findsOneWidget);
     expect(find.text('8 / 10'), findsOneWidget);
-    expect(find.text('I recommend this show'), findsOneWidget);
-    expect(find.text('Share your thoughts about the show...'), findsOneWidget);
+    expect(find.text('Recommend'), findsOneWidget);
+    expect(find.text('What made this one memorable?'), findsOneWidget);
     expect(find.text('Contains spoilers'), findsOneWidget);
-    expect(find.text('Submit Review'), findsOneWidget);
+    expect(find.text('Post review'), findsOneWidget);
   });
 
   for (final size in [const Size(320, 568), const Size(800, 1000)]) {
@@ -90,33 +103,36 @@ void main() {
       await tester.binding.setSurfaceSize(size);
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.darkTheme,
           home: Scaffold(
               body: MediaQuery(
-        data: MediaQueryData(
-            size: size, textScaler: const TextScaler.linear(1.4)),
-        child: WriteReviewSheet(
-            movieId: 1,
-            userId: 'user',
-            watchEntryId: 'recent',
-            onSubmitted: (_) {},
-            watchEntries: const [
-              MovieWatchEntry(
-                  id: 'recent',
-                  userId: 'user',
-                  movieId: 1,
-                  removed: false,
-                  watchedAt: '2026-09-23'),
-              MovieWatchEntry(
-                  id: 'older',
-                  userId: 'user',
-                  movieId: 1,
-                  removed: false,
-                  watchedAt: '2026-08-01'),
-            ]),
-      ))));
+            data: MediaQueryData(
+                size: size, textScaler: const TextScaler.linear(1.4)),
+            child: WriteReviewSheet(
+                movieId: 1,
+                userId: 'user',
+                watchEntryId: 'recent',
+                onSubmitted: (_) {},
+                watchEntries: const [
+                  MovieWatchEntry(
+                      id: 'recent',
+                      userId: 'user',
+                      movieId: 1,
+                      removed: false,
+                      watchedAt: '2026-09-23'),
+                  MovieWatchEntry(
+                      id: 'older',
+                      userId: 'user',
+                      movieId: 1,
+                      removed: false,
+                      watchedAt: '2026-08-01'),
+                ]),
+          ))));
       final field = find.byType(DropdownButtonFormField<String>);
       expect(tester.state<FormFieldState<String>>(field).value, 'recent');
-      // The preselected watch date is visible before opening or changing it.
+      await tester.ensureVisible(field);
+      await tester.pumpAndSettle();
+      // The selected watch date remains readable in its compact linkage control.
       final selectedDate = find.text('Watch 2 · Wed, Sep 23').hitTestable();
       expect(selectedDate, findsOneWidget);
       final fieldBounds = tester.getRect(field);

@@ -32,23 +32,6 @@ class HomeNotificationAction extends StatelessWidget {
   }
 }
 
-class HomeUnreadUpdates extends StatelessWidget {
-  const HomeUnreadUpdates({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final count = context
-        .select<AuthProvider, int>((auth) => auth.unreadNotificationCount);
-    if (count == 0) return const SizedBox.shrink();
-    return ListTile(
-      leading: const Icon(Icons.mark_chat_unread_outlined),
-      title: const Text('Catch up on your Flixie'),
-      subtitle: Text('$count unread updates'),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => context.push('/notifications'),
-    );
-  }
-}
-
 class HomeRefreshStatus extends StatelessWidget {
   const HomeRefreshStatus(
       {super.key, required this.secondaryError, required this.onRetry});

@@ -1,0 +1,193 @@
+{
+  "origin": "Original procedural synthesis; original music compositions. No sampled voices or third-party audio.",
+  "approved": "User authorised background music and game effects on 15 October 2026. Pip voice reactions excluded.",
+  "generator": "design/pip-audio/generate_preview.py",
+  "files": [
+    {
+      "file": "arcade-select.wav",
+      "seconds": 0.28,
+      "peak": 0.298,
+      "group": "Pip & arcade",
+      "label": "Arcade selection",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "arcade-pause.wav",
+      "seconds": 0.34,
+      "peak": 0.299,
+      "group": "Pip & arcade",
+      "label": "Pause / open menu",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "pairs-flip.wav",
+      "seconds": 0.2,
+      "peak": 0.215,
+      "group": "Pip Pairs",
+      "label": "Card flip",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "pairs-match.wav",
+      "seconds": 0.56,
+      "peak": 0.311,
+      "group": "Pip Pairs",
+      "label": "Pair matched",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "pairs-mismatch.wav",
+      "seconds": 0.38,
+      "peak": 0.3,
+      "group": "Pip Pairs",
+      "label": "Try another pair",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "pairs-complete.wav",
+      "seconds": 0.91,
+      "peak": 0.311,
+      "group": "Pip Pairs",
+      "label": "Board complete",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "popcorn-catch.wav",
+      "seconds": 0.21,
+      "peak": 0.259,
+      "group": "Popcorn Catch",
+      "label": "Catch a treat",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "popcorn-gold.wav",
+      "seconds": 0.51,
+      "peak": 0.311,
+      "group": "Popcorn Catch",
+      "label": "Golden popcorn",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "popcorn-burnt.wav",
+      "seconds": 0.42,
+      "peak": 0.268,
+      "group": "Popcorn Catch",
+      "label": "Burnt popcorn / lose a heart",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "popcorn-streak.wav",
+      "seconds": 0.57,
+      "peak": 0.3,
+      "group": "Popcorn Catch",
+      "label": "Catch streak",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "popcorn-round.wav",
+      "seconds": 0.71,
+      "peak": 0.268,
+      "group": "Popcorn Catch",
+      "label": "Round complete",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "space-laser.wav",
+      "seconds": 0.21,
+      "peak": 0.159,
+      "group": "Space Premiere",
+      "label": "Pip laser",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "space-enemy.wav",
+      "seconds": 0.23,
+      "peak": 0.247,
+      "group": "Space Premiere",
+      "label": "Invader pop",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "space-shield.wav",
+      "seconds": 0.3,
+      "peak": 0.249,
+      "group": "Space Premiere",
+      "label": "Shield hit",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "space-heart.wav",
+      "seconds": 0.59,
+      "peak": 0.268,
+      "group": "Space Premiere",
+      "label": "Lose a heart",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "space-wave.wav",
+      "seconds": 0.83,
+      "peak": 0.3,
+      "group": "Space Premiere",
+      "label": "Wave cleared",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "space-over.wav",
+      "seconds": 0.91,
+      "peak": 0.3,
+      "group": "Space Premiere",
+      "label": "Game over",
+      "status": "Awaiting user approval",
+      "type": "effect"
+    },
+    {
+      "file": "pairs-music.wav",
+      "seconds": 20.0,
+      "peak": 0.402,
+      "group": "Music",
+      "label": "Pip Pairs \u2014 Little Matches",
+      "type": "music",
+      "bpm": 96,
+      "loop": true,
+      "status": "Awaiting user approval"
+    },
+    {
+      "file": "popcorn-music.wav",
+      "seconds": 16.55,
+      "peak": 0.4,
+      "group": "Music",
+      "label": "Popcorn Catch \u2014 Cinema Bounce",
+      "type": "music",
+      "bpm": 116,
+      "loop": true,
+      "status": "Awaiting user approval"
+    },
+    {
+      "file": "space-music.wav",
+      "seconds": 15.48,
+      "peak": 0.403,
+      "group": "Music",
+      "label": "Space Premiere \u2014 Star Patrol",
+      "type": "music",
+      "bpm": 124,
+      "loop": true,
+      "status": "Awaiting user approval"
+    }
+  ]
+}

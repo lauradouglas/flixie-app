@@ -27,8 +27,10 @@ class HomeHeroCard extends StatelessWidget {
       required this.onWatchlist,
       required this.onTrailer,
       required this.onFriendsRetry,
-      this.showFriendActivity = true});
+      this.showFriendActivity = true,
+      this.contentSized = false});
   final bool showFriendActivity;
+  final bool contentSized;
   final MovieShort movie;
   final double posterHeight;
   final bool inWatchlist,
@@ -42,7 +44,7 @@ class HomeHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final posterUrl = homeHeroImageUrl(movie.poster);
     final ratingsHidden = context.select<MovieRatingPrivacy?, bool>(
-        (privacy) => privacy?.hides(movie.id) ?? false);
+        (privacy) => privacy?.hides(movie.id, isShow: movie.isShow) ?? false);
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -54,6 +56,7 @@ class HomeHeroCard extends StatelessWidget {
       child: InkWell(
         onTap: onOpen,
         child: Column(
+          mainAxisSize: contentSized ? MainAxisSize.min : MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
@@ -86,7 +89,7 @@ class HomeHeroCard extends StatelessWidget {
                               aspectRatio: 2 / 3,
                               child: CachedNetworkImage(
                                 imageUrl: posterUrl,
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
                                 alignment: Alignment.center,
                                 errorWidget: (_, __, ___) =>
                                     _heroFallback(context),
@@ -101,12 +104,28 @@ class HomeHeroCard extends StatelessWidget {
                 ],
               ),
             ),
-            Expanded(
+            Flexible(
+              fit: contentSized ? FlexFit.loose : FlexFit.tight,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 child: Column(
+                  mainAxisSize:
+                      contentSized ? MainAxisSize.min : MainAxisSize.max,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: context.colors.primary.withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(6)),
+                      child: Text(movie.isShow ? 'TV show' : 'Movie',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: context.colors.primaryText)),
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -158,7 +177,7 @@ class HomeHeroCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Text(
                         movie.overview!,
-                        maxLines: 3,
+                        maxLines: 4,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: context.colors.light,
@@ -167,7 +186,10 @@ class HomeHeroCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    const Spacer(),
+                    if (contentSized)
+                      const SizedBox(height: 8)
+                    else
+                      const Spacer(),
                     Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       runSpacing: 6,
@@ -249,7 +271,7 @@ class HomeHeroCard extends StatelessWidget {
                       ],
                     ),
                     if (showFriendActivity) ...[
-                      const SizedBox(height: 7),
+                      const SizedBox(height: 4),
                       HomeFriendActivityFooter(
                           interactions: interactions,
                           loading: friendActivityLoading,

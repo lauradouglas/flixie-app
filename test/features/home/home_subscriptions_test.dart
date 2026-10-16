@@ -19,6 +19,50 @@ import '../../home_startup_recovery_test.dart' show Session;
 import '../../auth_recovery_test.dart' show profile;
 
 void main() {
+  testWidgets('unread notifications use the bell without a Home catch-up banner',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    HomeScreen.clearSessionSnapshotForTesting();
+    final session = Session();
+    final auth = AuthProvider(session, MovieService(),
+        prefetchAfterAuth: false,
+        profileLoader: (id) async => profile(id),
+        termsStatusLoader: () async => true);
+    final cache = WatchRequestCache();
+    final client = MockClient((request) async => http.Response(
+        jsonEncode(request.url.path == '/groups/home/watch-plans'
+            ? {'groups': []}
+            : request.url.path == '/community/activity'
+                ? {'items': [], 'nextCursor': null}
+                : []),
+        200));
+    ApiClient.useClientForTesting(client);
+    addTearDown(() {
+      ApiClient.useClientForTesting(null);
+      client.close();
+    });
+    session.events.add(session.identity);
+    await tester.pump();
+    await tester.pumpWidget(MultiProvider(providers: [
+      ChangeNotifierProvider<AuthProvider>.value(value: auth),
+      ChangeNotifierProvider<WatchRequestCache>.value(value: cache),
+    ], child: const MaterialApp(home: HomeScreen())));
+    await tester.pump();
+    auth.setUnreadNotificationCount(3);
+    await tester.pump();
+    expect(find.text('Catch up on your Flixie'), findsNothing);
+    expect(find.text('3 unread updates'), findsNothing);
+    expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
+    final badge = tester.widget<Badge>(find.byType(Badge).first);
+    expect(badge.isLabelVisible, isTrue);
+    expect((badge.label! as Text).data, '3');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    auth.dispose();
+    cache.dispose();
+    await session.events.close();
+  });
+
   testWidgets(
       'signed-in trending survives profile and recommendation updates without friend calls',
       (tester) async {
@@ -79,7 +123,11 @@ void main() {
 
     auth.setUnreadNotificationCount(3);
     await tester.pump();
-    expect(find.text('3 unread updates'), findsOneWidget);
+    expect(find.text('Catch up on your Flixie'), findsNothing);
+    expect(find.text('3 unread updates'), findsNothing);
+    final notificationBadge = tester.widget<Badge>(find.byType(Badge).first);
+    expect(notificationBadge.isLabelVisible, isTrue);
+    expect((notificationBadge.label! as Text).data, '3');
     auth.updateDbUser(profile(session.identity.uid)
         .copyWith(firstName: 'Taylor', profileBadges: ['EARLY_ADOPTER']));
     await tester.pump();

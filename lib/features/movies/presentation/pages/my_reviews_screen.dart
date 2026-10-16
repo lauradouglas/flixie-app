@@ -416,7 +416,7 @@ class _ReviewCardState extends State<ReviewCard> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              PipReaction(e.key, size: 24),
+                              PipReaction(e.key, size: 24, previewable: true, count: e.value),
                               const SizedBox(width: 2),
                               Text(
                                 '${e.value}',

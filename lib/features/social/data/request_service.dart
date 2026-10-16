@@ -134,17 +134,22 @@ class RequestService {
     String? reviewText,
     String? watchedAt,
     bool? recommended,
+    String? watchComment,
+    bool publishReview = false,
+    bool containsSpoilers = false,
   }) async {
     await ApiClient.post(
       '/watch-requests/$watchRequestId/watch-confirmations',
       body: {
         'userId': userId,
         'watched': watched,
-        if (watched && rating != null) 'rating': rating,
-        if (watched && reviewText != null && reviewText.trim().isNotEmpty)
-          'reviewText': reviewText.trim(),
-        if (watched && watchedAt != null) 'watchedAt': watchedAt,
-        if (watched && recommended != null) 'recommended': recommended,
+        if (watched) 'rating': rating,
+        if (watched && reviewText != null) 'reviewText': reviewText.trim(),
+        if (watched) 'watchedAt': watchedAt,
+        'publishReview': publishReview,
+        if (watched && publishReview) 'watchComment': watchComment,
+        'containsSpoilers': containsSpoilers,
+        if (watched) 'recommended': recommended,
       },
     );
     final state = await getWatchRequestState(

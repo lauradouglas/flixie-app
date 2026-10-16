@@ -1,0 +1,5 @@
+Guest play and shared-watch navigation fixes
+- Close Popcorn Catch after signup and return to Home.
+- Leave a saved shared-watch recap without looping back.
+- Reopen saved viewings as recaps instead of reopening the watch editor.
+- Keep each person’s watch and rating independent.

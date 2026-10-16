@@ -267,6 +267,12 @@ class HomeController {
                 .where((item) => item.removed != true)
                 .map((item) => item.movieId)
                 .toSet();
+            ids.addAll((user.showWatchlist ?? const [])
+                .whereType<Map>()
+                .where((entry) => entry['removed'] != true)
+                .map((entry) => int.tryParse('${entry['showId']}'))
+                .whereType<int>()
+                .map((id) => -id));
             // A response must not undo an optimistic edit still in flight.
             for (final id in current.pending) {
               current.ids.contains(id) ? ids.add(id) : ids.remove(id);
@@ -300,36 +306,37 @@ class HomeController {
 
   Future<void> retryFriendActivity(MovieShort movie) async {
     if (_disposed || _userId == null) return;
-    _loadedFriendIds.remove(movie.id);
+    _loadedFriendIds.remove(movie.homeKey);
     await _loadFriend(movie, _userId!, _generation);
   }
 
   Future<void> _loadFriend(MovieShort movie, String id, int generation) {
-    if (!_current(generation, id) || _loadedFriendIds.contains(movie.id)) {
+    if (!_current(generation, id) || _loadedFriendIds.contains(movie.homeKey)) {
       return Future.value();
     }
-    final pending = _friendLoads[movie.id];
+    final pending = _friendLoads[movie.homeKey];
     if (pending != null) return pending;
     final request = _fetchFriend(movie, id, generation);
-    _friendLoads[movie.id] = request;
+    _friendLoads[movie.homeKey] = request;
     return request.whenComplete(() {
-      if (identical(_friendLoads[movie.id], request)) {
-        _friendLoads.remove(movie.id);
+      if (identical(_friendLoads[movie.homeKey], request)) {
+        _friendLoads.remove(movie.homeKey);
       }
     });
   }
 
   Future<void> _fetchFriend(MovieShort movie, String id, int generation) async {
-    final state = friendActivity(movie.id);
+    final state = friendActivity(movie.homeKey);
     state.update(loading: true, clearError: true);
     for (var attempt = 0; attempt < 2; attempt++) {
       if (!_current(generation, id)) return;
       try {
-        final items = await _service
-            .friends(id, movie.id)
+        final items = await (movie.isShow
+                ? _service.showFriends(id, movie.id)
+                : _service.friends(id, movie.id))
             .timeout(const Duration(seconds: 15));
         if (!_current(generation, id)) return;
-        _loadedFriendIds.add(movie.id);
+        _loadedFriendIds.add(movie.homeKey);
         state.update(
             data: List.unmodifiable(items), loading: false, clearError: true);
         return;

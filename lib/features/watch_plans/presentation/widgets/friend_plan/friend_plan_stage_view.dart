@@ -115,9 +115,14 @@ class FriendPlanStageView extends StatelessWidget {
       const SizedBox(height: 20),
       if (proposal == null) ...[
         Text(
-            'Movie confirmed. Choose a date that works for you both. A time is optional.',
+            r.lightweight
+                ? 'Your plan is saved. Add a date when you know, or log your watch afterwards.'
+                : 'Movie confirmed. Choose a date that works for you both. A time is optional.',
             style: friendPlanBody.copyWith(color: context.colors.light)),
-        _button('Suggest a date', Icons.calendar_month, onSuggestSchedule),
+        _button(r.lightweight ? 'Add a date' : 'Suggest a date',
+            Icons.calendar_month, onSuggestSchedule),
+        if (r.lightweight)
+          _button('We watched it', Icons.check_rounded, onConfirmWatched),
         _button('Change movie', Icons.movie_outlined, onChangeMovie,
             primary: false),
       ] else ...[
@@ -202,7 +207,8 @@ class FriendPlanStageView extends StatelessWidget {
             style: friendPlanBody.copyWith(color: context.colors.light)),
         if (!r.watchConfirmations.any((c) => c.userId == myUserId)) ...[
           _button('Log your watch', Icons.check, onConfirmWatched),
-          _button('I didn’t make it', Icons.event_busy, onNotThisTime,
+          _button(r.lightweight ? 'I wasn’t there' : 'I didn’t make it',
+              Icons.event_busy, onNotThisTime,
               primary: false),
         ],
         const SizedBox(height: 20),

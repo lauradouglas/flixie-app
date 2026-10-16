@@ -17,6 +17,7 @@ class FriendPlanRecap extends StatelessWidget {
       required this.myUserId,
       required this.onConfirmWatched,
       required this.onNewPlan,
+      this.onNotThisTime,
       this.myAvatar,
       this.myProfileBadges = const [],
       this.busy = false});
@@ -27,6 +28,7 @@ class FriendPlanRecap extends StatelessWidget {
   final List<String> myProfileBadges;
   final bool busy;
   final VoidCallback onConfirmWatched, onNewPlan;
+  final VoidCallback? onNotThisTime;
   WatchRequest get r => request;
   WatchRequestUser? get other => r.otherUser(myUserId);
   String get friend => other?.username ?? 'your friend';
@@ -38,6 +40,10 @@ class FriendPlanRecap extends StatelessWidget {
     final ratings = hidden
         ? <int>[]
         : watched.map((c) => c.rating).whereType<int>().toList();
+    final allResponded = r.viewingPersonIds.every(r.hasCurrentUserConfirmed);
+    final missed = r.watchConfirmations.where((c) => !c.watched).length;
+    final allViewersRated =
+        allResponded && watched.isNotEmpty && ratings.length == watched.length;
     final mine = watched.where((c) => c.userId == myUserId).firstOrNull;
     final recommendations = watched.where((c) => c.recommended == true).length;
     Widget metric(IconData icon, Color color, String value, String detail) =>
@@ -67,7 +73,7 @@ class FriendPlanRecap extends StatelessWidget {
           Icon(Icons.bar_chart_rounded, color: context.colors.primaryText),
           const SizedBox(width: 12),
           Expanded(
-              child: Text('Your recap',
+              child: Text(r.isSharedViewing ? 'Shared viewing' : 'Your recap',
                   style: friendPlanTitle.copyWith(
                       color: context.colors.textPrimary)))
         ]),
@@ -77,7 +83,13 @@ class FriendPlanRecap extends StatelessWidget {
               Icons.people_outline,
               context.colors.primaryText,
               '${watched.length} watched',
-              watched.length == 2 ? 'You and $friend' : 'Of 2 people');
+              r.isSharedViewing
+                  ? (allResponded && missed > 0
+                      ? '$missed ${missed == 1 ? 'wasn’t' : 'weren’t'} there'
+                      : 'Of ${r.viewingPersonIds.length} people')
+                  : watched.length == 2
+                      ? 'You and $friend'
+                      : 'Of 2 people');
           final score = metric(
               Icons.star_rounded,
               context.colors.warning,
@@ -89,10 +101,22 @@ class FriendPlanRecap extends StatelessWidget {
               hidden
                   ? 'Rate to see scores'
                   : ratings.isEmpty
-                      ? 'No one has rated yet'
-                      : ratings.length == 1
-                          ? 'Only 1 of 2 rated'
-                          : 'Both rated');
+                      ? (r.isSharedViewing && allResponded
+                          ? 'No ratings for this viewing'
+                          : 'No one has rated yet')
+                      : r.isSharedViewing && allViewersRated
+                          ? (missed > 0
+                              ? 'Everyone who watched has rated'
+                              : 'Everyone has rated')
+                          : r.isSharedViewing && allResponded
+                              ? '${ratings.length} of ${watched.length} viewers rated'
+                              : ratings.length == 1
+                                  ? (r.isSharedViewing
+                                      ? '1 of ${r.viewingPersonIds.length} rated'
+                                      : 'Only 1 of 2 rated')
+                                  : (r.isSharedViewing
+                                      ? '${ratings.length} of ${r.viewingPersonIds.length} rated'
+                                      : 'Both rated'));
           if (constraints.maxWidth < 300 ||
               MediaQuery.textScalerOf(context).scale(1) > 1.3) {
             return Column(
@@ -108,38 +132,54 @@ class FriendPlanRecap extends StatelessWidget {
             Expanded(child: score)
           ]);
         }),
+        if (r.isSharedViewing && allResponded)
+          Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text('Everyone has responded',
+                  style:
+                      friendPlanBody.copyWith(color: context.colors.success))),
         if (recommendations > 0)
           Padding(
               padding: const EdgeInsets.only(top: 16),
               child: Text(
-                  recommendations == 2
-                      ? 'Both recommend it'
-                      : '1 recommends it',
+                  '$recommendations ${recommendations == 1 ? 'recommends' : 'recommend'} it',
                   style:
                       friendPlanBody.copyWith(color: context.colors.success))),
       ])),
-      for (final isMine in [true, false]) ...[
+      if (r.isSharedViewing &&
+          !r.isTerminal &&
+          !r.watchConfirmations.any((c) => c.userId == myUserId)) ...[
+        _button('Log your watch', Icons.check, onConfirmWatched),
+        if (onNotThisTime != null)
+          _button('I wasn’t there', Icons.event_busy, onNotThisTime,
+              primary: false),
+      ],
+      for (final person in r.isSharedViewing
+          ? r.viewingPeople
+          : <WatchRequestUser?>[null, other]) ...[
         const SizedBox(height: 8),
         WatchPlanSurface(
             padding: const EdgeInsets.all(12),
-            child: _recapPerson(context, isMine)),
+            child: _recapPerson(context,
+                r.isSharedViewing ? person?.id == myUserId : person == null,
+                person: person)),
       ],
       if (mine != null) ...[
         const SizedBox(height: 24),
         WatchPlanSurface(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Your review',
+          Text('Your watch comment',
               style:
                   friendPlanTitle.copyWith(color: context.colors.textPrimary)),
           const SizedBox(height: 8),
           Text(
-              mine.reviewText?.trim().isNotEmpty == true
-                  ? mine.reviewText!
+              mine.watchComment?.trim().isNotEmpty == true
+                  ? mine.watchComment!
                   : 'Share your thoughts on $title.',
               style: friendPlanBody.copyWith(color: context.colors.light)),
           _button(
-              mine.reviewText?.trim().isNotEmpty == true
+              mine.watchComment?.trim().isNotEmpty == true
                   ? 'Edit your thoughts'
                   : 'Add your thoughts',
               Icons.edit_outlined,
@@ -149,13 +189,15 @@ class FriendPlanRecap extends StatelessWidget {
       ],
       const SizedBox(height: 12),
       _button('Plan another movie', Icons.add, onNewPlan),
-      _message(context),
+      if (!r.isSharedViewing) _message(context),
     ]);
   }
 
-  Widget _recapPerson(BuildContext context, bool mine) {
+  Widget _recapPerson(BuildContext context, bool mine,
+      {WatchRequestUser? person}) {
+    final subject = person ?? other;
     final entry = r.watchConfirmations
-        .where((c) => c.userId == (mine ? myUserId : other?.id))
+        .where((c) => c.userId == (mine ? myUserId : subject?.id))
         .firstOrNull;
     final hidden = hideMovieRatings(context, r.movieId,
         isShow: r.showId != null, ownerId: entry?.userId);
@@ -183,12 +225,20 @@ class FriendPlanRecap extends StatelessWidget {
                           color: context.colors.textPrimary)),
                 ]);
       return Row(children: [
-        _avatar(mine, 44),
+        ProfileAvatarView(
+            avatar: mine ? myAvatar ?? person?.avatar : subject?.avatar,
+            profileBadges: mine
+                ? (person?.profileBadges ?? myProfileBadges)
+                : subject?.profileBadges ?? const [],
+            fallbackText:
+                mine ? 'Y' : (subject?.displayName ?? '?').characters.first,
+            fallbackColor: FlixieColors.primary,
+            size: 44),
         const SizedBox(width: 12),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(mine ? 'You' : friend,
+          Text(mine ? 'You' : subject?.displayName ?? friend,
               style: friendPlanTitle.copyWith(
                   color: context.colors.textPrimary, fontSize: 16)),
           const SizedBox(height: 4),
@@ -197,13 +247,13 @@ class FriendPlanRecap extends StatelessWidget {
                   ? 'To respond'
                   : entry.watched
                       ? 'Watched'
-                      : 'Didn’t make it',
+                      : (r.isSharedViewing ? 'Wasn’t there' : 'Didn’t make it'),
               style: friendPlanBody.copyWith(color: context.colors.light)),
           if (compact) rating,
           if (!mine &&
               entry?.watched == true &&
-              entry?.reviewText?.isNotEmpty == true)
-            Text(entry!.reviewText!,
+              entry?.watchComment?.isNotEmpty == true)
+            Text(entry!.watchComment!,
                 style: friendPlanBody.copyWith(color: context.colors.light)),
         ])),
         if (!compact)
@@ -218,16 +268,6 @@ class FriendPlanRecap extends StatelessWidget {
       ]);
     });
   }
-
-  Widget _avatar(bool mine, double size) => ProfileAvatarView(
-        avatar: mine ? myAvatar : other?.avatar,
-        profileBadges:
-            mine ? myProfileBadges : other?.profileBadges ?? const [],
-        fallbackText:
-            mine ? 'Y' : (friend.isEmpty ? '?' : friend[0].toUpperCase()),
-        fallbackColor: FlixieColors.primary,
-        size: size,
-      );
 
   Widget _message(BuildContext context) => _button(
       'Message $friend',

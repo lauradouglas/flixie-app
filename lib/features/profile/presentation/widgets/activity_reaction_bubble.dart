@@ -13,7 +13,11 @@ Future<Object?> showActivityReactionBubble(
     isScrollControlled: true,
     showDragHandle: true,
     constraints: BoxConstraints(
-        maxWidth: 640, maxHeight: MediaQuery.sizeOf(context).height * .7),
+        minWidth: MediaQuery.sizeOf(context).shortestSide >= 600
+            ? MediaQuery.sizeOf(context).width
+            : 0,
+        maxWidth: MediaQuery.sizeOf(context).width,
+        maxHeight: MediaQuery.sizeOf(context).height * .7),
     builder: (sheet) => SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -21,7 +25,12 @@ Future<Object?> showActivityReactionBubble(
           Text('React with Pip', style: Theme.of(sheet).textTheme.titleLarge),
           const SizedBox(height: 16),
           LayoutBuilder(builder: (context, constraints) {
-            final columns = constraints.maxWidth < 380 ? 3 : 5;
+            final largeText = MediaQuery.textScalerOf(context).scale(16) > 20;
+            final columns = largeText || constraints.maxWidth < 330
+                ? 2
+                : constraints.maxWidth < 500
+                    ? 3
+                    : 4;
             final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
             return Wrap(spacing: 8, runSpacing: 8, children: [
               for (final reaction in ActivityReaction.selectable)

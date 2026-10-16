@@ -136,6 +136,60 @@ class FlixieWidgetsTest {
         } finally { bitmap.recycle() }
     }
 
+    @Test fun oversizedDownloadedAndCachedPostersAreSampledBeforeDisplay() {
+        FlixieWidgetStore.sync(context, payload(count = 1))
+        val snapshot = FlixieWidgetStore.read(context)
+        val item = snapshot.getJSONArray("items").getJSONObject(0)
+        val original = Bitmap.createBitmap(740, 1110, Bitmap.Config.ARGB_8888)
+        original.eraseColor(android.graphics.Color.MAGENTA)
+        try {
+            val bytes = java.io.ByteArrayOutputStream().apply {
+                assertTrue(original.compress(Bitmap.CompressFormat.JPEG, 85, this))
+            }.toByteArray()
+            val downloaded = FlixieWidgetStore.decodePosterBytes(bytes)
+            assertNotNull(downloaded)
+            try {
+                assertEquals(185, downloaded!!.width)
+                assertEquals(278, downloaded.height)
+                assertTrue(downloaded.allocationByteCount < original.allocationByteCount / 10)
+            } finally { downloaded?.recycle() }
+            // Simulate a file cached by an older build, without a network request.
+            assertTrue(FlixieWidgetStore.publishPoster(context, snapshot.getString("revision"), item.getString("file"), original))
+            val cached = FlixieWidgetStore.poster(context, item)
+            assertNotNull(cached)
+            try {
+                assertEquals(185, cached!!.width)
+                assertEquals(278, cached.height)
+                instrumentation.runOnMainSync {
+                    val view = FlixieWatchlistWidget().views(context, options(300)).apply(context, FrameLayout(context))
+                    assertEquals(View.VISIBLE, view.findViewById<ImageView>(R.id.widget_poster_0).visibility)
+                    assertEquals(View.GONE, view.findViewById<TextView>(R.id.widget_title_0).visibility)
+                }
+            } finally { cached?.recycle() }
+        } finally { original.recycle() }
+    }
+
+    @Test fun thumbnailDecodePreservesSmallImagesAndRejectsInvalidOrExcessiveImages() {
+        for ((width, height) in listOf(185 to 278, 40 to 60, 1100 to 1100)) {
+            val original = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            try {
+                val bytes = java.io.ByteArrayOutputStream().apply {
+                    assertTrue(original.compress(Bitmap.CompressFormat.PNG, 100, this))
+                }.toByteArray()
+                val decoded = FlixieWidgetStore.decodePosterBytes(bytes)
+                try {
+                    if (width == 1100) assertNull(decoded)
+                    else {
+                        assertNotNull(decoded)
+                        assertEquals(width, decoded!!.width)
+                        assertEquals(height, decoded.height)
+                    }
+                } finally { decoded?.recycle() }
+            } finally { original.recycle() }
+        }
+        assertNull(FlixieWidgetStore.decodePosterBytes(byteArrayOf(1, 2, 3)))
+    }
+
     @Test fun captureNativeWidgetPreviewWhenRequested() {
         if (InstrumentationRegistry.getArguments().getString("captureWidgets") != "true") return
         val posters = listOf("/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg", "/vfrQk5IPloGg1v9Rzbh2Eg3VGyM.jpg",

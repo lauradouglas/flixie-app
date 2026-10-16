@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
+import 'package:flixie_app/core/auth/pending_watch_invite_store.dart';
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
@@ -27,20 +29,25 @@ import '../widgets/watch_requests/watch_request_controls.dart';
 export 'watch_request_detail_screen.dart' show WatchRequestDetailScreen;
 
 class WatchRequestsScreen extends StatelessWidget {
-  const WatchRequestsScreen({super.key, this.initialRequestId});
+  const WatchRequestsScreen(
+      {super.key, this.initialRequestId, this.logOnOpen = false});
   final String? initialRequestId;
+  final bool logOnOpen;
   @override
   Widget build(BuildContext context) {
     final viewer =
         context.select<AuthProvider, String?>((auth) => auth.dbUser?.id);
     return _WatchRequestsPage(
         key: ValueKey((viewer, initialRequestId)),
-        initialRequestId: initialRequestId);
+        initialRequestId: initialRequestId,
+        logOnOpen: logOnOpen);
   }
 }
 
 class _WatchRequestsPage extends StatefulWidget {
-  const _WatchRequestsPage({super.key, this.initialRequestId});
+  final bool logOnOpen;
+  const _WatchRequestsPage(
+      {super.key, this.initialRequestId, required this.logOnOpen});
   final String? initialRequestId;
   @override
   State<_WatchRequestsPage> createState() => _WatchRequestsPageState();
@@ -48,6 +55,25 @@ class _WatchRequestsPage extends StatefulWidget {
 
 class _WatchRequestsPageState extends State<_WatchRequestsPage>
     with WidgetsBindingObserver {
+  Future<void> _leaveFocusedViewing() async {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    final auth = context.read<AuthProvider>();
+    final owner = auth.dbUser?.id;
+    final pending = await PendingWatchInviteStore.readLog(owner);
+    if (!mounted || auth.dbUser?.id != owner) return;
+    if (pending == widget.initialRequestId) {
+      await PendingWatchInviteStore.clear();
+      if (!mounted || auth.dbUser?.id != owner) return;
+      GuestAccess.clear();
+      context.go(auth.dbUser?.completedSetup == true ? '/' : '/onboarding');
+      return;
+    }
+    context.go('/');
+  }
+
   final _searchController = TextEditingController();
   late final WatchRequestsController _controller;
   var _audience = WatchRequestAudience.friends;
@@ -80,7 +106,26 @@ class _WatchRequestsPageState extends State<_WatchRequestsPage>
     _controller.start();
   }
 
+  bool _openedLog = false;
   void _changed() {
+    if (mounted && widget.logOnOpen && !_openedLog && !_controller.loading) {
+      final plan = _controller.requests
+          .where((p) => p.id == widget.initialRequestId)
+          .firstOrNull;
+      if (plan != null &&
+          !plan.isCancelled &&
+          !plan.isDeclined &&
+          !plan.isExpired) {
+        _openedLog = true;
+        final alreadyLogged = plan.watchConfirmations.any(
+            (entry) => entry.userId == _controller.viewer && entry.watched);
+        if (!alreadyLogged) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _controller.owns) _completion.confirmWatched(plan);
+          });
+        }
+      }
+    }
     if (mounted) setState(() {});
   }
 
@@ -219,8 +264,13 @@ class _WatchRequestsPageState extends State<_WatchRequestsPage>
     final screen = FlixiePageScaffold(
       extendBodyBehindAppBar: backdropBehindHeader,
       appBar: FlixieTitleAppBar(
-        leading: isFocused ? const FlixieBackButton() : null,
-        backgroundColor: backdropBehindHeader
+        leading: isFocused
+            ? IconButton(
+                tooltip: flixieBackLabel(context),
+                icon: Icon(flixieBackIcon(context)),
+                onPressed: _leaveFocusedViewing)
+            : null,
+        backgroundColor: backdropBehindHeader && !filtered.first.isSharedViewing
             ? Colors.transparent
             : context.colors.background,
         title: Column(
@@ -232,7 +282,10 @@ class _WatchRequestsPageState extends State<_WatchRequestsPage>
                     fontSize: isFocused ? 20 : 22,
                     fontWeight: FontWeight.bold)),
             if (isFocused && focusedCompanion != null)
-              Text('With $focusedCompanion',
+              Text(
+                  filtered.first.isSharedViewing
+                      ? 'Shared viewing · ${filtered.first.viewingPersonIds.length} people'
+                      : 'With $focusedCompanion',
                   style: TextStyle(color: context.colors.medium, fontSize: 12))
             else if (!_controller.loading && _controller.error == null)
               Text(

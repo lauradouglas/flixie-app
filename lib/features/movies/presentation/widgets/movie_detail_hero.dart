@@ -1,14 +1,13 @@
+import 'package:flixie_app/features/movies/presentation/trailers/trailer_player_sheet.dart';
 import 'media_backdrop_inset.dart';
 import 'movie_header_backdrop.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:palette_generator/palette_generator.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_back_button.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flixie_app/models/movie.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'full_screen_movie_poster.dart';
@@ -547,7 +546,7 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
       label: 'Watch trailer',
       iconColor: context.colors.danger,
       compact: compact,
-      onTap: () => _openTrailer(trailer.youtubeUrl),
+      onTap: () => _openTrailer(trailer.key),
     );
   }
 
@@ -601,19 +600,9 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
     );
   }
 
-  Future<void> _openTrailer(String trailerUrl) async {
-    final uri = Uri.tryParse(trailerUrl);
-    if (uri == null ||
-        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-              type: FlixieToastType.error,
-              content: const Text('Could not open this trailer')),
-        );
-      }
-    }
-  }
+  Future<void> _openTrailer(String trailerUrl) =>
+      showTrailerPlayerSheet(context,
+          source: trailerUrl, title: '${widget.movie.title} trailer');
 
   // ---- Genre pills ---------------------------------------------------------
 

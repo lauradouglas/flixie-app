@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/pip_games/presentation/pages/pip_games_screen.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,7 +39,7 @@ void main() {
                   ]
                 }
               : [
-                  {'id': 348, 'title': 'Alien'}
+                  {'id': 348, 'title': 'Alien', 'mediaType': 'MOVIE'}
                 ]),
           200);
     }));
@@ -59,7 +60,21 @@ void main() {
           Provider<MovieService>.value(value: movies),
         ],
         child: MaterialApp.router(
-            routerConfig: router, theme: AppTheme.darkTheme)));
+            routerConfig: router, theme: AppTheme.darkTheme, builder: (context,child) => MediaQuery(data: MediaQuery.of(context).copyWith(disableAnimations:true),child:child!))));
+    await $(find.byTooltip('Play with Pip')).tap();
+    expect(find.byType(PipGamesScreen), findsOneWidget);
+    for (final path in [
+      '/play/pip-pairs',
+      '/play/space-premiere',
+      '/play/popcorn-catch'
+    ]) {
+      router.go(path);
+      await $.pumpAndSettle();
+      expect(router.routeInformationProvider.value.uri.path, path);
+      expect(find.text('Create account'), findsNothing);
+    }
+    router.go('/');
+    await $.pumpAndSettle();
     await $('Alien').tap();
     movies.core[348]!.complete(const Movie(
         id: 348,

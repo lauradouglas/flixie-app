@@ -12,7 +12,7 @@ import 'trending_service.dart';
 class HomeDataService {
   const HomeDataService();
   Future<List<MovieShort>> trending({bool refresh = false}) =>
-      TrendingService.getTrendingMovies(refresh: refresh);
+      TrendingService.getTrendingMedia(refresh: refresh);
   Future<List<MovieShort>> recommendations(String userId,
           {bool refresh = false}) =>
       RecommendationService.getUserRecommendations(userId, refresh: refresh);
@@ -22,4 +22,6 @@ class HomeDataService {
       ShowService.getContinueWatching(userId);
   Future<List<FriendMediaInteraction>> friends(String userId, int movieId) =>
       FriendService.getFriendsMovieInteractions(userId, movieId);
+  Future<List<FriendMediaInteraction>> showFriends(String userId, int showId) =>
+      FriendService.getFriendsShowInteractions(userId, showId);
 }

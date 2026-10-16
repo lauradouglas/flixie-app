@@ -167,7 +167,10 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Start with the people, place or date',
+                            !controller.isGroupMode &&
+                                    controller.movieChoices.length == 1
+                                ? 'Going with someone? Save your plan here.'
+                                : 'A film together, whenever it happens',
                             style: TextStyle(
                               color: context.colors.medium,
                               fontSize: 13,
@@ -216,7 +219,7 @@ class _MovieWatchRequestSheetState extends State<MovieWatchRequestSheet> {
                       ? 'DATE'
                       : 'DATE & TIME',
                   value: controller.selectedDate == null
-                      ? 'Choose when to watch'
+                      ? 'Date to decide'
                       : controller.scheduleMode == ScheduleMode.dateOnly
                           ? MaterialLocalizations.of(context)
                               .formatFullDate(controller.selectedDate!)

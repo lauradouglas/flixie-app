@@ -1,716 +1,647 @@
-import 'package:flixie_app/core/utils/skeleton.dart';
-import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
 import 'package:flutter/material.dart';
-
-import 'package:flixie_app/core/api/api_client.dart';
-import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/api/api_client.dart';
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
+import 'package:flixie_app/features/movies/models/watch_log_details.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
+import 'package:flixie_app/core/utils/color_utils.dart';
+import 'package:flixie_app/models/friendship.dart';
+import 'package:flixie_app/models/movie_watch_entry.dart';
+import 'watch_companion_picker.dart';
+
+Future<T?> showMovieWatchLogSheet<T>(
+        {required BuildContext context, required WidgetBuilder builder}) =>
+    showModalBottomSheet<T>(
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).shortestSide >= 600
+                ? (MediaQuery.sizeOf(context).width >
+                        MediaQuery.sizeOf(context).height
+                    ? 820
+                    : 560)
+                : MediaQuery.sizeOf(context).width),
+        builder: builder);
 
 class RewatchLogSheet extends StatefulWidget {
-  const RewatchLogSheet({
-    super.key,
-    this.initial,
-    required this.onSubmit,
-    this.showReviewOption = false,
-    this.onReviewSelected,
-    this.isRewatch = false,
-    this.previousWatch,
-    this.watchPlans,
-    this.onPlanSelected,
-    this.isPlanReview = false,
-  });
-
+  const RewatchLogSheet(
+      {super.key,
+      this.initial,
+      required this.onSubmit,
+      this.showReviewOption = false,
+      this.onReviewSelected,
+      this.isRewatch = false,
+      this.previousWatch,
+      this.watchPlans,
+      this.onPlanSelected,
+      this.isPlanReview = false,
+      this.movieTitle,
+      this.movieYear,
+      this.loadFriends,
+      this.onDetailsChanged,
+      this.companion,
+      this.companions = const [],
+      this.initialWatchedAt,
+      this.initialDateUnknown = false});
+  final MovieWatchEntry? initial, previousWatch;
+  final Future<void> Function(
+      {required String? watchedAt,
+      required double? rating,
+      required bool? recommended,
+      required String? notes}) onSubmit;
+  final bool showReviewOption, isRewatch, isPlanReview, initialDateUnknown;
+  final ValueChanged<bool>? onReviewSelected;
   final Future<List<MovieWatchPlanChoice>>? watchPlans;
   final ValueChanged<MovieWatchPlanChoice?>? onPlanSelected;
-  final bool isPlanReview;
-  final MovieWatchEntry? initial;
-  final Future<void> Function({
-    required String? watchedAt,
-    required double? rating,
-    required bool? recommended,
-    required String? notes,
-  }) onSubmit;
-  final bool showReviewOption;
-  final ValueChanged<bool>? onReviewSelected;
-  final bool isRewatch;
-  final MovieWatchEntry? previousWatch;
-
+  final String? movieTitle, movieYear, initialWatchedAt;
+  final FriendshipUser? companion;
+  final List<FriendshipUser> companions;
+  final Future<List<Friendship>> Function()? loadFriends;
+  final ValueChanged<WatchLogDetails>? onDetailsChanged;
   @override
   State<RewatchLogSheet> createState() => _RewatchLogSheetState();
 }
 
 class _RewatchLogSheetState extends State<RewatchLogSheet> {
-  late DateTime _watchedAt;
-  late TextEditingController _notesController;
-  // null means "no rating"; 1-10 when set
+  late DateTime _date;
+  late bool _known;
   int? _rating;
   bool? _recommended;
-  bool _saving = false;
-  MovieWatchPlanChoice? _selectedPlan;
-  late bool _includeWatchedDate;
-  bool _writeReview = false;
-  String? _saveError;
-
+  bool _saving = false, _writeReview = false;
+  late TextEditingController _notes;
+  List<FriendshipUser> _selectedCompanions = [];
+  FriendshipUser? get _companion => _selectedCompanions.firstOrNull;
+  set _companion(FriendshipUser? value) =>
+      _selectedCompanions = [if (value != null) value];
+  String? _externalName;
+  MovieWatchPlanChoice? _plan;
+  String? _error;
   @override
   void initState() {
     super.initState();
-    _watchedAt =
-        DateTime.tryParse(widget.initial?.watchedAt ?? '') ?? DateTime.now();
-    final existingRating = widget.initial?.rating;
-    _rating = existingRating?.round();
-    _includeWatchedDate =
-        widget.initial == null || widget.initial!.watchedAt != null;
+    _date = (DateTime.tryParse(
+                widget.initial?.watchedAt ?? widget.initialWatchedAt ?? '') ??
+            DateTime.now())
+        .toLocal();
+    _known = widget.initial != null
+        ? widget.initial!.watchedAt != null
+        : !widget.initialDateUnknown;
+    _rating = widget.initial?.rating?.round();
     _recommended = widget.initial?.recommended;
-    _notesController = TextEditingController(text: widget.initial?.notes ?? '')
-      ..addListener(_onNoteChanged);
-  }
-
-  void _onNoteChanged() {
-    if (mounted) setState(() {});
+    _selectedCompanions = widget.companions.isNotEmpty
+        ? [...widget.companions]
+        : widget.companion != null
+            ? [widget.companion!]
+            : [...?widget.initial?.allCompanions];
+    _notes = TextEditingController(text: widget.initial?.notes ?? '');
   }
 
   @override
   void dispose() {
-    _notesController.removeListener(_onNoteChanged);
-    _notesController.dispose();
+    _notes.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.colors.medium,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  widget.initial != null
-                      ? 'Edit Watch Entry'
-                      : widget.isRewatch
-                          ? 'Log Rewatch'
-                          : 'Log Watch',
-                  style: TextStyle(
-                    color: context.colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.close, color: context.colors.light),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          Divider(color: context.colors.tabBarBorder, height: 1),
-          // Form body
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.watchPlans != null)
-                    FutureBuilder<List<MovieWatchPlanChoice>>(
-                      future: widget.watchPlans,
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return const Padding(
-                            padding: EdgeInsets.only(bottom: 16),
-                            child: Text(
-                                'Couldn’t check your watch plans. Reopen this sheet to try again.'),
-                          );
-                        }
-                        if (!snapshot.hasData) {
-                          return const Padding(
-                              padding: EdgeInsets.only(bottom: 16),
-                              child: ContentPlaceholder(
-                                  label: 'Loading watch plans',
-                                  style: ContentPlaceholderStyle.compact));
-                        }
-                        if (snapshot.data!.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
-                        return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Was this part of a watch plan?'),
-                              const SizedBox(height: 8),
-                              Wrap(spacing: 8, runSpacing: 8, children: [
-                                FlixiePill.choice(
-                                    label: const Text('Separate watch'),
-                                    selected: _selectedPlan == null,
-                                    onSelected: _saving
-                                        ? null
-                                        : (_) => setState(() {
-                                              _selectedPlan = null;
-                                              widget.onPlanSelected?.call(null);
-                                            })),
-                                for (final plan in snapshot.data!)
-                                  FlixiePill.choice(
-                                      label: Text(plan.label),
-                                      selected: _selectedPlan?.id == plan.id,
-                                      onSelected: _saving
-                                          ? null
-                                          : (_) => setState(() {
-                                                _selectedPlan = plan;
-                                                _writeReview = false;
-                                                widget.onPlanSelected
-                                                    ?.call(plan);
-                                              })),
-                              ]),
-                              const SizedBox(height: 16),
-                            ]);
-                      },
-                    ),
-                  Text(
-                    'Rating (optional)',
-                    style: TextStyle(
-                      color: context.colors.light,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  LayoutBuilder(builder: (context, constraints) {
-                    final scale =
-                        MediaQuery.textScalerOf(context).scale(14) / 14;
-                    final columns =
-                        constraints.maxWidth >= 320 * scale ? 10 : 5;
-                    final width =
-                        (constraints.maxWidth - (columns - 1) * 3) / columns;
-                    return Wrap(
-                      spacing: 3,
-                      runSpacing: 8,
-                      children: List.generate(10, (i) {
-                        final value = i + 1;
-                        final selected = _rating == value;
-                        return SizedBox(
-                          width: width,
-                          child: Semantics(
-                            label: 'Rate $value out of 10',
-                            selected: selected,
-                            child: TextButton(
-                              style: TextButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                minimumSize: const Size(0, 56),
-                                foregroundColor: selected
-                                    ? Colors.white
-                                    : context.colors.primaryText,
-                                backgroundColor: selected
-                                    ? FlixieColors.primary
-                                    : context.colors.surfaceElevated,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                              onPressed: _saving
-                                  ? null
-                                  : () => setState(() {
-                                        _rating = selected ? null : value;
-                                        if (_rating == null) {
-                                          _recommended = null;
-                                        }
-                                      }),
-                              child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                        selected
-                                            ? Icons.star_rounded
-                                            : Icons.star_border_rounded,
-                                        size: 20),
-                                    const SizedBox(height: 4),
-                                    Text('$value',
-                                        style: const TextStyle(fontSize: 14)),
-                                  ]),
-                            ),
-                          ),
-                        );
-                      }),
-                    );
-                  }),
-                  const SizedBox(height: 4),
-                  Text(
-                    _rating != null ? '$_rating / 10' : 'No rating',
-                    style: TextStyle(
-                      color: context.colors.medium,
-                      fontSize: 13,
-                    ),
-                  ),
-                  if (widget.isRewatch) ...[
-                    const SizedBox(height: 8),
-                    _buildRewatchComparison(),
-                  ],
-                  const SizedBox(height: 12),
-                  _RecommendationPicker(
-                    recommended: _recommended,
-                    onChanged: (value) => setState(() => _recommended = value),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildDetailsSection(context),
-                  if (widget.showReviewOption && _selectedPlan == null) ...[
-                    const SizedBox(height: 10),
-                    _buildReviewOption(),
-                  ],
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: FlixieColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: _saving
-                          ? null
-                          : () async {
-                              final navigator = Navigator.of(context);
-                              setState(() => _saving = true);
-                              try {
-                                await widget.onSubmit(
-                                  watchedAt: _includeWatchedDate
-                                      ? _watchedAt.toUtc().toIso8601String()
-                                      : null,
-                                  rating: _rating?.toDouble(),
-                                  recommended: _recommended,
-                                  notes: _notesController.text.trim().isEmpty
-                                      ? null
-                                      : _notesController.text.trim(),
-                                );
-                                if (mounted) {
-                                  setState(() {
-                                    _saving = false;
-                                    _saveError = null;
-                                  });
-                                  widget.onReviewSelected?.call(_writeReview);
-                                  navigator.pop();
-                                }
-                              } catch (error) {
-                                if (mounted) {
-                                  setState(() {
-                                    _saving = false;
-                                    _saveError = error is ApiException
-                                        ? error.message
-                                        : 'Couldn’t confirm this watch entry was saved. Check your watch history before trying again.';
-                                  });
-                                }
-                              }
-                            },
-                      child: _saving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              widget.initial == null
-                                  ? _rating == null
-                                      ? 'Mark watched without rating'
-                                      : 'Rate & mark watched'
-                                  : 'Save Changes',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
-                    ),
-                  ),
-                  if (_saveError != null) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      _saveError!,
-                      style: TextStyle(
-                        color: context.colors.danger,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  void _details() => widget.onDetailsChanged?.call(WatchLogDetails(
+      companion: _companion,
+      companions: List.unmodifiable(_selectedCompanions),
+      externalCompanionName: _externalName,
+      reviewBody: widget.initial?.reviewBody ?? '',
+      containsSpoilers: widget.initial?.reviewContainsSpoilers ?? false));
+  Future<void> _pick() async {
+    final selected = await showModalBottomSheet<Object>(
+        context: context,
+        useRootNavigator: true,
+        useSafeArea: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        constraints: const BoxConstraints(maxWidth: 560),
+        builder: (_) => WatchCompanionPicker(
+            loadFriends: widget.loadFriends!,
+            selected: _selectedCompanions,
+            lockedIds: widget.initial?.planId != null
+                ? widget.initial!.allCompanions
+                    .map((friend) => friend.id)
+                    .toSet()
+                : const {}));
+    if (!mounted || _saving || selected == null) return;
+    setState(() {
+      _selectedCompanions = selected is List<FriendshipUser>
+          ? selected
+          : selected is FriendshipUser
+              ? [selected]
+              : [];
+      _externalName = selected is ExternalWatchCompanion ? selected.name : null;
+    });
+    _details();
   }
 
-  Widget _buildReviewOption() {
-    return Material(
-      color: Colors.transparent,
-      child: CheckboxListTile(
-        contentPadding: EdgeInsets.zero,
-        dense: true,
-        visualDensity: VisualDensity.compact,
-        value: _writeReview,
-        controlAffinity: ListTileControlAffinity.leading,
-        title: Text(
-          'Write a review after logging',
-          style: TextStyle(
-            color: context.colors.light,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        subtitle: Text(
-          'Your rating and recommendation will carry over.',
-          style: TextStyle(color: context.colors.medium, fontSize: 12),
-        ),
-        onChanged: (value) => setState(() => _writeReview = value ?? false),
-      ),
-    );
-  }
-
-  Widget _buildDetailsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.tune_rounded, color: context.colors.medium, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              widget.isPlanReview || _selectedPlan != null
-                  ? 'Review & date (optional)'
-                  : 'Details (optional)',
-              style: TextStyle(
-                color: context.colors.light,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.fromLTRB(12, 5, 12, 12),
-          decoration: BoxDecoration(
-            color: context.colors.surfaceElevated.withValues(alpha: .28),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: context.colors.tabBarBorder.withValues(alpha: .7),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Material(
-                color: Colors.transparent,
-                child: CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  value: _includeWatchedDate,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: Text(
-                    'Watch date',
-                    style: TextStyle(
-                      color: context.colors.light,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text(
-                    _includeWatchedDate
-                        ? 'Today by default - tap below to change it.'
-                        : 'Leave off to simply mark it watched.',
-                    style: TextStyle(
-                      color: context.colors.medium,
-                      fontSize: 12,
-                    ),
-                  ),
-                  onChanged: (value) =>
-                      setState(() => _includeWatchedDate = value ?? false),
-                ),
-              ),
-              if (_includeWatchedDate) ...[
-                InkWell(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: _watchedAt,
-                      firstDate: DateTime(1970),
-                      lastDate: DateTime.now(),
-                    );
-                    if (date != null) setState(() => _watchedAt = date);
-                  },
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 11,
-                    ),
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: context.colors.tabBarBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          color: context.colors.medium,
-                          size: 17,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          '${_watchedAt.day}/${_watchedAt.month}/${_watchedAt.year}',
-                          style: TextStyle(color: context.colors.light),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-              ],
-              Text(
-                widget.isPlanReview || _selectedPlan != null
-                    ? 'Review (optional)'
-                    : 'Personal note',
-                style: TextStyle(
-                  color: context.colors.light,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                widget.isPlanReview || _selectedPlan != null
-                    ? 'Saved with your rating on this watch plan'
-                    : 'Only visible to you and friends',
-                style: TextStyle(color: context.colors.medium, fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _notesController,
-                maxLines: 3,
-                style: TextStyle(color: context.colors.white),
-                decoration: InputDecoration(
-                  hintText: widget.isPlanReview || _selectedPlan != null
-                      ? 'What did you think?'
-                      : 'Add a personal note (optional)',
-                  hintStyle: TextStyle(color: context.colors.medium),
-                  filled: true,
-                  fillColor: context.colors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRewatchComparison() {
-    final previous = widget.previousWatch?.rating;
-    if (previous == null) {
-      return Text(
-        'Last time: Not rated',
-        style: TextStyle(color: context.colors.medium, fontSize: 12),
-      );
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    _details();
+    try {
+      await widget.onSubmit(
+          watchedAt: _known ? _date.toUtc().toIso8601String() : null,
+          rating: _rating?.toDouble(),
+          recommended: _recommended,
+          notes: _notes.text.trim().isEmpty ? null : _notes.text.trim());
+      if (!mounted) return;
+      widget.onReviewSelected?.call(_writeReview);
+      Navigator.of(context).pop();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = error is ApiException
+            ? error.message
+            : 'Couldn’t save your watch. Your details are still here. Try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
-    final difference = _rating == null ? null : _rating! - previous.round();
-    final comparisonColor = difference == null
-        ? context.colors.medium
-        : difference == 0
-            ? context.colors.warning
-            : difference > 0
-                ? context.colors.success
-                : context.colors.danger;
-    final comparisonLabel = difference == null
-        ? ''
-        : difference == 0
-            ? ' = Same rating'
-            : difference > 0
-                ? ' ↑${difference.abs()} Higher this time'
-                : ' ↓${difference.abs()} Lower this time';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: comparisonColor.withValues(alpha: .1),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: comparisonColor.withValues(alpha: .3)),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: TextStyle(
-            color: context.colors.medium,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-          children: [
-            const TextSpan(text: 'Last time: '),
-            TextSpan(
-              text: '${previous.toStringAsFixed(0)}/10',
-              style: TextStyle(
-                color: context.colors.light,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (_rating != null) ...[
-              const TextSpan(text: '  ·  This time: '),
-              TextSpan(
-                text: '$_rating/10',
-                style: TextStyle(
-                  color: context.colors.white,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              TextSpan(
-                text: comparisonLabel,
-                style: TextStyle(
-                  color: comparisonColor,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
   }
-}
 
-class _RecommendationButton extends StatelessWidget {
-  const _RecommendationButton({
-    required this.selected,
-    required this.positive,
-    required this.onTap,
-  });
+  Widget _label(String text) => Text(text,
+      style: Theme.of(context)
+          .textTheme
+          .titleSmall
+          ?.copyWith(fontWeight: FontWeight.w700));
+  Widget _hint(String text) => Text(text,
+      style:
+          TextStyle(color: context.colors.medium, fontSize: 12, height: 1.4));
+  Widget _dateField() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.calendar_today_outlined,
+              color: context.colors.primaryText, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                _label(_known
+                    ? MaterialLocalizations.of(context).formatMediumDate(_date)
+                    : 'Date unknown'),
+                if (_known) _hint('Watched on')
+              ])),
+          TextButton(
+              onPressed: _saving
+                  ? null
+                  : () async {
+                      final result = await showModalBottomSheet<DateTime>(
+                          context: context,
+                          useRootNavigator: true,
+                          useSafeArea: true,
+                          isScrollControlled: true,
+                          builder: (c) => SizedBox(
+                              height: MediaQuery.sizeOf(c).height * .72,
+                              child: Column(children: [
+                                Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Text('Watched on',
+                                        style:
+                                            Theme.of(c).textTheme.titleLarge)),
+                                Expanded(
+                                    child: CalendarDatePicker(
+                                        initialDate:
+                                            _date.isAfter(DateTime.now())
+                                                ? DateTime.now()
+                                                : _date,
+                                        firstDate: DateTime(1900),
+                                        lastDate: DateTime.now(),
+                                        onDateChanged: (d) =>
+                                            Navigator.pop(c, d)))
+                              ])));
+                      if (mounted && result != null) {
+                        setState(() {
+                          _date = result;
+                          _known = true;
+                        });
+                      }
+                    },
+              child: const Text('Change'))
+        ]),
+        CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: !_known,
+            onChanged:
+                _saving ? null : (v) => setState(() => _known = !(v ?? false)),
+            title: const Text('I don’t remember the date')),
+      ]);
+  Widget _companions() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: _label('Watched with')),
+          if (widget.loadFriends != null && _plan == null)
+            TextButton(
+                onPressed: _saving ? null : _pick,
+                child: Text(_companion == null && _externalName == null
+                    ? 'Add someone'
+                    : 'Add people'))
+        ]),
+        for (final friend in _selectedCompanions)
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+                padding: const EdgeInsets.all(3),
+                child: ProfileAvatarView(
+                    avatar: friend.avatar,
+                    profileBadges: friend.profileBadges,
+                    fallbackText: friend.displayName,
+                    fallbackColor: avatarColorFromIconColor(friend.iconColor),
+                    size: 44)),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  _label(friend.displayName),
+                  const SizedBox(height: 4),
+                  _hint(widget.isPlanReview || widget.initial?.planId != null
+                      ? 'Linked to your watch together'
+                      : 'They’ll get a prompt to log their own watch.')
+                ])),
+            if (widget.loadFriends != null &&
+                _plan == null &&
+                !(widget.initial?.allCompanions
+                        .any((person) => person.id == friend.id) ??
+                    false))
+              IconButton(
+                  tooltip: 'Remove companion',
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() {
+                            _selectedCompanions.removeWhere(
+                                (person) => person.id == friend.id);
+                            _details();
+                          }),
+                  icon: const Icon(Icons.close_rounded, size: 18))
+          ]),
+        if (_selectedCompanions.isEmpty &&
+            (_externalName != null || widget.initial?.externalInvite != null))
+          Row(children: [
+            const Icon(Icons.person_outline),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  _label(_externalName ??
+                      widget.initial!.externalInvite!.displayName),
+                  _hint('Save your watch, then share their invite to Flixie.')
+                ])),
+            if (_externalName != null)
+              IconButton(
+                  tooltip: 'Remove companion',
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() {
+                            _externalName = null;
+                            _details();
+                          }),
+                  icon: const Icon(Icons.close))
+          ])
+        else if (_selectedCompanions.isEmpty)
+          _hint(
+              _plan?.label ?? 'Just you for now. Adding friends is optional.'),
+      ]);
+  Widget _planChoices() => FutureBuilder<List<MovieWatchPlanChoice>>(
+      future: widget.watchPlans,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _hint(
+              'Couldn’t load watch plans. You can still save a separate watch.');
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _label('Was this part of a watch plan?'),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                FlixiePill.choice(
+                    label: const Text('Separate watch'),
+                    selected: _plan == null,
+                    onSelected: _saving
+                        ? null
+                        : (_) => setState(() {
+                              _plan = null;
+                              widget.onPlanSelected?.call(null);
+                            })),
+                for (final plan in snapshot.data!)
+                  FlixiePill.choice(
+                      label: Text(plan.label),
+                      selected: _plan?.id == plan.id,
+                      onSelected: _saving
+                          ? null
+                          : (_) => setState(() {
+                                _plan = plan;
+                                _externalName = null;
+                                _companion = plan.companion;
+                                _writeReview = false;
+                                widget.onPlanSelected?.call(plan);
+                                _details();
+                              }))
+              ])
+            ]));
+      });
+  void _selectRating(int value) =>
+      setState(() => _rating = _rating == value ? null : value);
 
-  final bool selected;
-  final bool positive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = positive ? context.colors.success : context.colors.danger;
-    final label = positive ? 'Recommend' : 'Don’t recommend';
-    return Tooltip(
-      message: label,
-      child: Semantics(
-        button: true,
-        selected: selected,
-        label: label,
-        child: Material(
-          color: selected ? color.withValues(alpha: .18) : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: 50,
-              height: 44,
-              decoration: BoxDecoration(
-                color: selected
-                    ? color.withValues(alpha: .22)
-                    : context.colors.surfaceElevated,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: selected ? color : context.colors.tabBarBorder,
-                  width: selected ? 1.5 : 1,
-                ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: color.withValues(alpha: .18),
-                          blurRadius: 10,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Icon(
-                positive
-                    ? Icons.thumb_up_alt_rounded
-                    : Icons.thumb_down_alt_rounded,
-                color: selected ? color : context.colors.light,
-                size: 22,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecommendationPicker extends StatelessWidget {
-  const _RecommendationPicker({
-    required this.recommended,
-    required this.onChanged,
-  });
-
-  final bool? recommended;
-  final ValueChanged<bool?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final buttons = [
-      _RecommendationButton(
-        selected: recommended == true,
-        positive: true,
-        onTap: () => onChanged(true),
-      ),
-      FlixiePill.choice(
-          label: const Text('No opinion'),
-          selected: recommended == null,
-          onSelected: (_) => onChanged(null)),
-      _RecommendationButton(
-        selected: recommended == false,
-        positive: false,
-        onTap: () => onChanged(false),
-      ),
-    ];
-    final label = Text(
-      'Would you recommend it?',
-      style: TextStyle(
-        color: context.colors.light,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        label,
+  Widget _ratingField() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: _label('Your rating')),
+          if (_rating != null)
+            TextButton(
+                onPressed:
+                    _saving ? null : () => setState(() => _rating = null),
+                child: const Text('Clear'))
+          else
+            _hint('Optional')
+        ]),
         const SizedBox(height: 8),
-        Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: buttons),
-      ],
-    );
-  }
+        LayoutBuilder(builder: (context, box) {
+          final scale = MediaQuery.textScalerOf(context).scale(1);
+          final columns = box.maxWidth >= 320 || scale < 1.3 ? 5 : 4;
+          final width = (box.maxWidth - (columns - 1) * 8) / columns;
+          return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: List.generate(10, (i) {
+                final n = i + 1;
+                return SizedBox(
+                    width: width,
+                    child: Semantics(
+                        label: 'Rate $n out of 10',
+                        selected: _rating == n,
+                        button: true,
+                        enabled: !_saving,
+                        excludeSemantics: true,
+                        onTap: _saving ? null : () => _selectRating(n),
+                        child: TextButton(
+                            onPressed: _saving ? null : () => _selectRating(n),
+                            style: TextButton.styleFrom(
+                                minimumSize: const Size(48, 48),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                backgroundColor: _rating == n
+                                    ? context.colors.warning
+                                        .withValues(alpha: .14)
+                                    : context.colors.surfaceElevated,
+                                foregroundColor: context.colors.primaryText,
+                                shape: RoundedRectangleBorder(
+                                    side: _rating == n
+                                        ? BorderSide(
+                                            color: context.colors.warning,
+                                            width: 1.5)
+                                        : BorderSide.none,
+                                    borderRadius: BorderRadius.circular(10))),
+                            child: n <= (_rating ?? 0)
+                                ? Icon(Icons.star_rounded,
+                                    color: context.colors.warning, size: 24)
+                                : Text('$n',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700)))));
+              }));
+        }),
+        const SizedBox(height: 8),
+        _hint(_rating == null
+            ? 'Out of 10 · You can rate it later.'
+            : '$_rating / 10'),
+        if (widget.isRewatch && widget.previousWatch?.rating != null) ...[
+          const SizedBox(height: 8),
+          _hint('Previous watch: ${widget.previousWatch!.rating!.round()}/10')
+        ],
+      ]);
+  Widget _writing() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _label('Would you recommend it?'),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final (text, value) in [
+            ('Recommend', true),
+            ('No opinion', null),
+            ('Not for me', false)
+          ])
+            FlixiePill.choice(
+                label: Text(text),
+                selected: _recommended == value,
+                onSelected: _saving
+                    ? null
+                    : (_) => setState(() => _recommended = value)),
+        ]),
+        const SizedBox(height: 24),
+        TextField(
+            controller: _notes,
+            enabled: !_saving,
+            minLines: 2,
+            maxLines: 4,
+            maxLength: 2000,
+            decoration: const InputDecoration(
+                labelText: 'Watch comment (optional)',
+                hintText: 'Anything to remember about this watch?')),
+        if (widget.showReviewOption && widget.onReviewSelected != null)
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _writeReview,
+            onChanged: _saving
+                ? null
+                : (value) => setState(() => _writeReview = value ?? false),
+            title: Text(widget.initial?.reviewBody?.isNotEmpty == true
+                ? 'Edit review next'
+                : 'Write a review next'),
+            subtitle: const Text(
+                'Save your watch, then add a title, review and spoiler warning.'),
+          ),
+      ]);
+  @override
+  Widget build(BuildContext context) =>
+      LayoutBuilder(builder: (context, constraints) {
+        final size = MediaQuery.sizeOf(context),
+            inset = MediaQuery.viewInsetsOf(context).bottom;
+        final tablet = size.shortestSide >= 600;
+        final availableHeight =
+            (constraints.maxHeight - inset).clamp(0.0, constraints.maxHeight);
+        final height = tablet
+            ? (size.height * .88).clamp(0.0, availableHeight)
+            : availableHeight;
+        final compactKeyboard = inset > 0 && height < 280;
+        return Padding(
+            padding: EdgeInsets.only(bottom: inset),
+            child: SizedBox(
+                height: height,
+                child: Material(
+                    color: context.colors.surface,
+                    borderRadius: tablet
+                        ? const BorderRadius.vertical(top: Radius.circular(24))
+                        : BorderRadius.zero,
+                    clipBehavior: Clip.antiAlias,
+                    child: SafeArea(
+                        top: false,
+                        child: Column(children: [
+                          if (!compactKeyboard)
+                            Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 12, 12, 12),
+                                child: Row(children: [
+                                  Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        Text(
+                                            widget.initial != null
+                                                ? 'Edit your watch'
+                                                : widget.isRewatch
+                                                    ? 'Log another watch'
+                                                    : 'Log your watch',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleLarge
+                                                ?.copyWith(
+                                                    fontWeight:
+                                                        FontWeight.w800)),
+                                        if (widget.movieTitle != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                              [
+                                                widget.movieTitle!,
+                                                if (widget.movieYear != null)
+                                                  widget.movieYear!
+                                              ].join(' · '),
+                                              style: TextStyle(
+                                                  color: context.colors.light))
+                                        ]
+                                      ])),
+                                  IconButton(
+                                      tooltip: 'Close',
+                                      onPressed: _saving
+                                          ? null
+                                          : () => Navigator.pop(context),
+                                      icon: const Icon(Icons.close_rounded))
+                                ])),
+                          Divider(
+                              height: 1, color: context.colors.tabBarBorder),
+                          Expanded(
+                              child: SingleChildScrollView(
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                                  padding: const EdgeInsets.all(20),
+                                  child: LayoutBuilder(builder: (context, box) {
+                                    final details = Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _dateField(),
+                                          Divider(
+                                              color:
+                                                  context.colors.tabBarBorder),
+                                          _companions(),
+                                          if (widget.watchPlans != null)
+                                            _planChoices()
+                                        ]);
+                                    final thoughts = Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          _ratingField(),
+                                          const SizedBox(height: 16),
+                                          _writing()
+                                        ]);
+                                    return box.maxWidth >= 620 &&
+                                            MediaQuery.textScalerOf(context)
+                                                    .scale(1) <=
+                                                1.2
+                                        ? Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                                Expanded(child: details),
+                                                const SizedBox(width: 28),
+                                                Expanded(child: thoughts)
+                                              ])
+                                        : Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                                details,
+                                                const SizedBox(height: 24),
+                                                thoughts
+                                              ]);
+                                  }))),
+                          Container(
+                              padding:
+                                  const EdgeInsets.fromLTRB(20, 12, 20, 14),
+                              decoration: BoxDecoration(
+                                  border: Border(
+                                      top: BorderSide(
+                                          color: context.colors.tabBarBorder))),
+                              child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (_error != null) ...[
+                                      Text(_error!,
+                                          style: TextStyle(
+                                              color: context.colors.danger)),
+                                      const SizedBox(height: 8)
+                                    ],
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                            child: FilledButton(
+                                                onPressed:
+                                                    _saving ? null : _save,
+                                                style: FilledButton.styleFrom(
+                                                    minimumSize:
+                                                        const Size.fromHeight(
+                                                            50)),
+                                                child: _saving
+                                                    ? const SizedBox(
+                                                        width: 22,
+                                                        height: 22,
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                                color: Colors
+                                                                    .white))
+                                                    : Text(
+                                                        _writeReview
+                                                            ? (widget
+                                                                        .initial
+                                                                        ?.reviewBody
+                                                                        ?.isNotEmpty ==
+                                                                    true
+                                                                ? 'Save & edit review'
+                                                                : 'Save & write review')
+                                                            : widget.initial ==
+                                                                    null
+                                                                ? 'Save watch'
+                                                                : 'Save changes',
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w700)))),
+                                      ],
+                                    ),
+                                    if (_companion != null && inset == 0) ...[
+                                      const SizedBox(height: 8),
+                                      _hint(
+                                          'Each person confirms their own watch.')
+                                    ]
+                                  ])),
+                        ])))));
+      });
 }

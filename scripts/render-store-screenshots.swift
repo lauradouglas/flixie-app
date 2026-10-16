@@ -4,6 +4,8 @@ import AppKit
 import CoreText
 
 struct Job: Decodable {
+    let pip: String?
+    let pipPosition: String?
     let source: String
     let output: String
     let headline: String
@@ -11,6 +13,7 @@ struct Job: Decodable {
     let height: Int
 }
 struct Plan: Decodable {
+    let pip: String?
     let font: String
     let background: String
     let accent: String
@@ -103,7 +106,23 @@ for job in plan.jobs {
         NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).addClip()
         source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1,
                     respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+        // Restore the screen clip so Pip can overlap the frame onto the canvas.
         NSGraphicsContext.restoreGraphicsState()
+        // Keep most of the mascot over the screen, with its left edge and feet outside.
+        if let path = job.pip ?? plan.pip {
+            guard let pip = NSImage(contentsOfFile: path) else {
+                throw RenderError.invalid("Cannot load Pip artwork")
+            }
+            let width = rect.width * (tablet ? 0.16 : 0.26)
+            let height = width * pip.size.height / pip.size.width
+            let perched = job.pipPosition == "top-right"
+            let pipRect = CGRect(x: perched ? rect.maxX - width * 0.88 : rect.minX - width * 0.40,
+                                 y: perched ? rect.minY - height * 0.76 : rect.maxY - height + height * 0.18,
+                                 width: width, height: height)
+            pip.draw(in: pipRect,
+                     from: .zero, operation: .sourceOver, fraction: 1,
+                     respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+        }
         NSGraphicsContext.restoreGraphicsState()
         guard let png = bitmap.representation(using: .png, properties: [:]) else {
             throw RenderError.invalid("PNG encoding failed")

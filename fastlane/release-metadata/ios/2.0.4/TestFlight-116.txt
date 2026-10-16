@@ -1,0 +1,7 @@
+Watch together: log a film with a friend, save a plan with or without a date, and invite someone new to Flixie to log their own viewing.
+
+Watch logging now includes cumulative gold stars, always-visible recommendation choices, and separate watch comments and optional reviews.
+
+Friends activity and watch history show who you watched with, including their avatar and “Watched with you” where appropriate. Companion details stay out of Around Flixie.
+
+Please test independent ratings, unknown watch dates, reopening/editing entries, and shared invite links through signup.

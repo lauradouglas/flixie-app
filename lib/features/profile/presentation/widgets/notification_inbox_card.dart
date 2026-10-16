@@ -1,3 +1,4 @@
+import 'notification_inbox/availability_notification_card.dart';
 import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
@@ -66,6 +67,7 @@ String? notificationPlanLabel(FlixieNotification n) {
 }
 
 String notificationHeadline(FlixieNotification n) {
+  if (n.type == FlixieNotification.availabilityAlert) return n.message;
   if (n.type == FlixieNotification.communityInvite) {
     final community = n.data?['communityName']?.toString() ?? 'the community';
     if (n.action == FlixieNotification.actionAccepted) {
@@ -158,6 +160,10 @@ class NotificationInboxCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = notification;
+    if (n.type == FlixieNotification.availabilityAlert) {
+      return AvailabilityNotificationCard(
+          notification: n, date: date, onOptions: onOptions, onOpen: onOpen);
+    }
     final needs = notificationNeedsResponse(n);
     final planLabel = notificationPlanLabel(n);
     final raw = n.link?['request'] ?? n.link?['groupRequest'];
@@ -184,7 +190,7 @@ class NotificationInboxCard extends StatelessWidget {
             : switch (n.watchPlanEvent) {
                 'PLAN_INVITED' => needs ? 'View invitation' : 'View plan',
                 'SCHEDULE_PROPOSED' => needs ? 'Review proposal' : 'View plan',
-                'PLAN_READY_TO_LOG' => 'Log watch',
+                'PLAN_READY_TO_LOG' || 'COMPANION_LOGGED' || 'COMPANION_RATED' => 'Log watch',
                 'ALL_PARTICIPANTS_LOGGED' || 'RECAP_UPDATED' => 'View recap',
                 _ => n.type == FlixieNotification.communityInvite
                     ? (n.action == FlixieNotification.actionAccepted

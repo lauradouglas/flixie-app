@@ -20,7 +20,10 @@ String notificationDestination(FlixieNotification n) {
     final groupId = n.groupWatchGroupId;
     destination = groupId != null
         ? '/groups/$groupId?tab=requests&requestId=${n.linkedRequestId}'
-        : '/watch-requests/${n.linkedRequestId}';
+        : '/watch-requests/${n.linkedRequestId}${const [
+            'COMPANION_LOGGED',
+            'COMPANION_RATED'
+          ].contains(n.watchPlanEvent) ? '?log=true' : ''}';
   } else {
     destination = notificationDeepLinkPath({
       ...?n.data,

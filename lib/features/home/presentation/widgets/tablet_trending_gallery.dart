@@ -41,12 +41,12 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
   Widget build(BuildContext context) {
     final movies = widget.movies.take(8).toList(growable: false);
     if (movies.isEmpty) return const SizedBox.shrink();
-    final movie =
-        movies.where((m) => m.id == _selectedId).firstOrNull ?? movies.first;
-    final hidden = context
-        .select<MovieRatingPrivacy?, bool>((p) => p?.hides(movie.id) ?? false);
-    final saved = widget.savedIds.contains(movie.id);
-    final pending = widget.pendingIds.contains(movie.id);
+    final movie = movies.where((m) => m.homeKey == _selectedId).firstOrNull ??
+        movies.first;
+    final hidden = context.select<MovieRatingPrivacy?, bool>(
+        (p) => p?.hides(movie.id, isShow: movie.isShow) ?? false);
+    final saved = widget.savedIds.contains(movie.homeKey);
+    final pending = widget.pendingIds.contains(movie.homeKey);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -68,6 +68,9 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                    Text(movie.isShow ? 'TV show' : 'Movie',
+                        style: TextStyle(
+                            fontSize: 12, color: context.colors.medium)),
                     TextButton(
                       onPressed: () => widget.onDetails(movie),
                       style: TextButton.styleFrom(
@@ -106,10 +109,10 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                     if (widget.friendActivity != null) ...[
                       const SizedBox(height: 16),
                       ListenableBuilder(
-                          listenable: widget.friendActivity!(movie.id),
+                          listenable: widget.friendActivity!(movie.homeKey),
                           builder: (_, __) {
                             final activity =
-                                widget.friendActivity!(movie.id).value;
+                                widget.friendActivity!(movie.homeKey).value;
                             return HomeFriendActivityFooter(
                                 interactions: activity.data,
                                 loading: activity.loading,
@@ -157,16 +160,16 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
               itemBuilder: (context, index) {
                 final item = movies[index];
                 return SizedBox(
-                    key: ValueKey('trending-poster-${item.id}'),
+                    key: ValueKey('trending-poster-${item.homeKey}'),
                     width: width,
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                               child: Semantics(
-                                  selected: item.id == movie.id,
+                                  selected: item.homeKey == movie.homeKey,
                                   child: _poster(context, item, onTap: () {
-                                    setState(() => _selectedId = item.id);
+                                    setState(() => _selectedId = item.homeKey);
                                     widget.onPageChanged?.call(index);
                                   }))),
                           const SizedBox(height: 8),
@@ -174,7 +177,7 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                  color: item.id == movie.id
+                                  color: item.homeKey == movie.homeKey
                                       ? context.colors.primaryText
                                       : context.colors.light,
                                   fontSize: 13,

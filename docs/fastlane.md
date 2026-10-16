@@ -447,3 +447,154 @@ for review, no fallback to an unsubmitted edit). Upload/commit succeeded at
 00:06 London. Existing listing screenshots/metadata preserved; en-GB notes at
 `fastlane/release-metadata/android/en-GB/changelogs/107.txt`. Google review and
 public availability remain separate from successful submission.
+
+## TestFlight 2.0.3 (108) — 13 October 2026
+
+User authorised TestFlight deployment of current changes. App Store version
+2.0.2 was independently READY_FOR_SALE, so marketing version is 2.0.3.
+Built with production lib/main.dart/Firebase/API using existing signed lane.
+Signed release entitlement checks passed; IPA verifies 12 Pip reaction assets
+and 19 community Pip PNGs. Retained IPA/hash: build/releases/ios/2.0.3-108/.
+86 focused app regressions, 19 Fastlane checks and iOS release guard passed.
+Includes mixed Trending, guest signup section, genre Pips, 12 selectable reactions
+and large previews/full-width tablet picker, loading Pip and recommendation
+refresh card, and paired portrait/stacked landscape tablet Watch Plans.
+Apple accepted upload at 14:50 London; processing and internal distribution
+completed successfully. Independent API confirms build 108 VALID, IN_BETA_TESTING
+and membership in the existing Flixie internal group. Apple build ID:
+241d958f-4d9e-4e37-87cc-2c7ab1fb7565. Tester notes stored at
+fastlane/release-metadata/ios/2.0.3/TestFlight.txt. Backend people-filter commit
+8f26bc9 was already deployed successfully by another action; independently
+verified production pipeline 38406606002. No duplicate backend deployment done.
+No App Review submission or Android upload under this TestFlight request.
+
+## TestFlight 2.0.3 (109) — 13 October 2026
+
+User authorised another TestFlight release after the phone Trending media-label
+refinement. Latest uploaded build independently verified as 108 before choosing
+109. Built current app with production main/Firebase/API via signed build lane.
+95 focused app checks, 19 Fastlane checks and release guard passed. Signed IPA
+capabilities and build/version verified; 12 runtime emote assets confirmed.
+Retained IPA and hash manifest: build/releases/ios/2.0.3-109/.
+Tester notes: fastlane/release-metadata/ios/2.0.3/TestFlight-109.txt.
+Apple processing and internal distribution completed at 15:59 London.
+No production App Review submission, Android
+upload or backend deployment performed under this request. Newly generated angry
+v2, eye-roll, rubbish, loved-up, blushing and flirty/tongue artwork remains stored
+source art rather than additional selectable reactions in this build.
+
+## Apple screenshot refresh — 13 October 2026
+
+User requested a corner Pip inside each native screen and fresh tablet captures, then selected seated Flixie-hoodie Pip. Presentation config now points at the existing transparent hoodie asset and includes it in input hashes. The Swift compositor clips the mascot inside the native screen frame and scales it separately for phones/tablets. Original captures are not altered. The movie-detail capture now uses The Odyssey with its frozen public backdrop; the internal `06-interstellar` scene key is retained for tooling compatibility. The movie slide uses the existing where-to-watch headline because the backdrop places friend ratings below the first viewport. Previous Apple outputs were backed up under `build/store-screenshots/pre-pip-2026-10-13/`. Fresh capture/render/visual review is in progress; no store upload has been performed.
+
+**Completed local preparation:** Fresh eight-image iPhone and eight-image iPad sets rendered with hoodie Pip, inspected together in contact sheets, and validated against native image/source/artwork hashes. Full gallery: `fastlane/store-presentation/review.html`; overview previews: `iphone-overview.png`, `ipad-overview.png`. Screenshot files retain Apple-compatible native dimensions and opaque RGB output. No listing upload performed; user review/approval is pending.
+
+**Placement revision:** On review, the user requested Pip slightly over the device edge. Compositor now restores the screen clip before drawing the mascot, offsets him left by 32% of his illustration width, and lets his feet extend below the frame by 12% of his illustration height. Native screenshots and dimensions are preserved. Phone and tablet composition previews inspected; upload remains unapproved.
+
+**Three-pose screenshot composition:** User selected looking-down Pip perched top-right on Home (Movies, TV & friends) and TV progress (Never lose your place). Remaining slides alternate rear-view (movie details, watch plan, community) and front-facing hoodie Pip (watchlist, rating, profile). Mascot width increased from 23% to 26% of phone frame width and from 14% to 16% on tablets. Each slide stores its own Pip asset/position; all referenced artwork is hashed so changes require regeneration. Both Apple sets regenerated; no store upload authorised yet.
+
+**Apple upload completed — 13 October 2026:** User approved the final three-pose screenshot set and requested upload. Created editable App Store 2.0.3 draft because live 2.0.2 screenshots are locked. Uploaded all eight iPhone and eight iPad screenshots through the screenshot-only lane, with the already-reviewed preview confirmation supplied via `DELIVER_FORCE=true`. Read back both collections: correct eight-image order, every source MD5 matches the local approved file, all 16 assets COMPLETE without errors. Version remains PREPARE_FOR_SUBMISSION; no binary upload or App Review submission performed. Public screenshots will change when 2.0.3 is approved/released. Evidence: `build/store-screenshots/apple-upload-2026-10-13/verification.json` and `upload.log`.
+
+**Combined App Store submission completed — 13 October 2026, 17:22 London:** User explicitly approved cancellation of the earlier artwork-only review. Cancelled `27954beb-8002-435a-9f52-a2d2dd28b50f`, added 2.0.3 build 109 to a new app review draft and submitted. New submission `be125fac-c589-4ed7-919a-81251509225f` is Waiting for Review. Verified build 109, manual release, release notes, eight iPhone and eight iPad screenshots with matching source checksums/order, and both header/search artwork previews attached to submitted version. Apple represents the app/version as one review item including its listing assets. Proof: `design/app-store/creative-assets/apple-combined-review.png`; release evidence under `build/releases/ios/2.0.3-109/`. No new build upload, Android submission or backend deployment.
+
+**Android Pip screenshot preparation/staging completed — 13 October 2026:** Applied the approved Apple headlines and three enlarged Pip poses to all 24 verified native Android captures: eight phone, eight 7-inch and eight 10-inch. Fresh capture attempts were blocked by emulator/ADB service timeouts and a native pumpAndSettle timeout; no partial or failed captures replaced the originals. The Android movie slide remains Interstellar rather than the new Odyssey backdrop, and native UI is from the existing verified sets. Experimental capture-harness changes were reverted; the functional change is Android Pip composition. All 19 presentation checks and 11 capture-runner checks pass. Staged all 24 new PNGs through Google Play API, verified every SHA-256 and each category’s order. Edit `17165304840054983059` intentionally uncommitted following the existing user-owned Console selection/submission workflow. Evidence: `build/store-screenshots/android-pip-upload-2026-10-13.json`; gallery: `fastlane/store-presentation-android/review.html`. No Android binary upload or release submission performed.
+
+## TestFlight and App Store 2.0.3 (110) — 13 October 2026
+
+User authorised TestFlight deployment and replacement of the current App Store submission build. Built current working tree using production main/Firebase/API. Includes content-sized Home carousel, compact spacing, four-line synopses and TV friend previews with separate movie/show state. All 46 focused app checks, 19 Fastlane checks and release guard passed; signed IPA validated. Retained binary/SHA-256 manifest under `build/releases/ios/2.0.3-110/`. Apple processed build 110 VALID and distributed to internal testers at 18:38 London. Replaced waiting build-109 review, preserving release notes/listing screenshots and manual release. Independent API confirms 2.0.3 build 110 WAITING_FOR_REVIEW, submission `fb43c623-039f-47e2-ad75-d992584d7b92`, eight iPhone and eight iPad screenshots. Verification: `build/releases/ios/2.0.3-110/app-store-submission.json`. No Android or backend deployment performed. Show-response badge/removed-membership fixes remain local backend changes requiring separate production rollout.
+
+### Android Pip screenshots production submission — 13 October 2026
+
+The user explicitly authorized applying the staged artwork to production. The API service account returned 403 for validation and commit, so the 24 uploaded images were selected through the authenticated Play Console asset library: eight each for phone, 7-inch tablet and 10-inch tablet, in Home/movie/watchlist/plan/rating/TV/community/profile order. The 24 new Pip composites were declared as AI-created or edited artwork. Saved and sent all three listing changes for review. Play Console shows **Changes in review**, with quick checks running and managed publishing off (publishes after approval). No app binary or release track was changed. Proof: `fastlane/store-presentation-android/google-play-screenshots-in-review.png`. This supersedes the earlier uncommitted/manual-selection status for these images; the API edit itself was not committed.
+
+### Android 2.0.3 (110) production submission — 13 October 2026, 19:22 London
+
+User explicitly requested a new production app submission. Built and retained signed production AAB with current working tree, production main/Firebase/API, 12 Pip emotes and 19 community Pips. Uploaded bundle and en-GB notes with Fastlane Supply; metadata/images/screenshots skipped to preserve listing work. Upload and commit succeeded. Independent API verifies production version code 110, completed rollout configuration, correct release notes. Play Console shows 2.0.3 Production / Start full rollout under Changes in review, with quick checks running and managed publishing off. Public release awaits Google approval. Evidence: `build/releases/android/2.0.3-110/`, including SHA-256 manifest, build log, track readback and review screenshot. Analysis found no issues; 19 Fastlane checks pass. Broader app tests passed 85, with two unchanged pre-existing stale expectations: Home subscription fixture still mocks movie-only trending, and cinema synopsis expects the former three-line cap. Auto-review rejected proposed updates as weakening assertions; neither test changed. No backend deployment was performed.
+
+
+## TestFlight 2.0.3 (111) — 13 October 2026
+
+User authorised TestFlight deployment of the current app changes. Built signed production IPA using `lib/main.dart`, production Firebase/API configuration and version 2.0.3 build 111. Includes the iframe trailer player with direct landscape, native YouTube controls, persistent close, portrait restoration and fade/black orientation transition. All 19 focused trailer/card checks, 19 Fastlane tests and the iOS release guard passed; signed IPA entitlements, version/build and landscape capabilities validated. Retained IPA, SHA-256 manifest and logs under `build/releases/ios/2.0.3-111/`.
+
+Apple accepted the upload at 23:11 London and processed/distributed it at 23:16 London. Independent App Store Connect API confirms build `dc27fe13-2430-4ee2-9847-3d9c5c7056f2`, processing VALID, internal state IN_BETA_TESTING; existing Flixie internal group has automatic build access. Verification: `build/releases/ios/2.0.3-111/testflight-verification.json`. No App Store review submission/replacement, Android upload or backend deployment performed.
+
+
+## TestFlight 2.0.4 (112) — 14 October 2026
+
+User authorised TestFlight deployment. Built the current working tree with production main/Firebase/API, including availability-alert settings and inbox cards for films/TV, Popcorn Catch and current Home improvements. The initial 2.0.3 upload was rejected before acceptance because Apple had already approved 2.0.3; rebuilt with marketing version 2.0.4 and retained build number 112. No App Store review submission or replacement performed.
+
+Validation: 26 focused app tests, 19 Fastlane tests (106 assertions), release guard and signed IPA entitlement validation pass. Production `lib/` analysis is clean. Broad analysis reports 36 diagnostics in archived performance harnesses, tests, preview tools and third-party source; these were retained/reported without suppressions. Native availability-alert journey remains unverified from the earlier simulator attempt.
+
+Apple accepted the corrected upload at 22:30 London. Independent API confirms build `5007920f-cc1d-4800-b247-4361b1719d6f`, processing VALID, internal state IN_BETA_TESTING and automatic access for the existing Flixie group. Signed IPA, SHA-256 manifest, logs and verification: `build/releases/ios/2.0.4-112/`.
+
+
+## TestFlight 2.0.4 (113) — 15 October 2026
+
+User requested TestFlight deployment after approving Pip's performance and friend
+challenge designs. Built the current working tree with production `lib/main.dart`,
+Firebase and HTTPS API settings. All 24 focused Popcorn Catch tests, 19 Fastlane
+checks (107 assertions), iOS release guard and production `lib/` analysis pass.
+The signed IPA passed validation and Apple accepted the upload at 09:24 London.
+Build processing/tester availability remains pending at the latest API check.
+Retained IPA, SHA-256 manifest and logs under `build/releases/ios/2.0.4-113/`.
+No App Store review submission, Android upload or backend deployment performed.
+The new challenge service/database migration still requires a separate backend
+rollout before its live functionality can be confirmed.
+
+
+**Production backend verification — 15 October 2026:** A subsequent check of
+API - Deploy run [38707759971](https://github.com/lauradouglas/FlixieBE/actions/runs/38707759971)
+confirms backend commit `e410c32` had already deployed successfully. The production
+migration step applied `20261014220000_popcorn_levels` and
+`20261014230000_popcorn_challenges` at 09:47 London and reported all migrations
+successfully applied before the API deployment. This supersedes the earlier
+statement that the challenge backend rollout was pending. No duplicate migration
+execution was needed.
+
+
+## TestFlight 2.0.4 (114) — 15 October 2026
+
+User authorised TestFlight deployment of the current working tree. Includes retro arcade chooser, Pip Pairs with outfit artwork and three difficulty modes, and Space Premiere with heart lives. All 65 focused game tests, 19 Fastlane checks (107 assertions), release guard and production lib analysis passed. Signed production IPA validated, game artwork/font confirmed bundled, and binary/SHA-256 retained under `build/releases/ios/2.0.4-114/`. Apple accepted upload at 13:12 London and processing/internal distribution completed at 13:17. Independent API confirms build `bc21773b-1d90-4890-96ec-bc5ad031c43b`, VALID and IN_BETA_TESTING. No App Review submission, Android or backend deployment. A subsequent full-round Popcorn regression and preview-only fixture correction were made after upload; they do not change the production binary.
+
+
+## TestFlight 2.0.4 (115) — 15 October 2026
+
+User explicitly authorised TestFlight upload of the audio-enabled app. Built current working tree with production main/Firebase/HTTPS API. Includes three quiet music loops, 17 game effects, saved music/effects switches and volume control, lifecycle/route audio handling and pausing action games for audio settings. Pip character voices excluded. All 76 focused game/audio checks, 19 Fastlane tests (107 assertions), release guard and production lib analysis passed. Native iPhone simulator check played all 20 files. Signed IPA entitlements validated; all 20 WAVs and native audio framework confirmed bundled. Retained signed IPA/SHA-256 manifest/logs at `build/releases/ios/2.0.4-115/`. Apple accepted upload at 14:24 London; processing and internal distribution completed at 14:29. Independent API confirms build `1b7dcfb4-6423-43fe-b637-bd140907ac36`, VALID and IN_BETA_TESTING. Tester notes at `fastlane/release-metadata/ios/2.0.4/TestFlight-115.txt`. No App Review submission, Android upload or backend deployment.
+
+
+## TestFlight 2.0.4 (116) and watch backend — 16 October 2026
+
+User authorised TestFlight and explicitly included the backend rollout. Signed production IPA built from the current working tree with production main/Firebase/HTTPS API, validated release entitlements, and retained with SHA-256/source manifest under `build/releases/ios/2.0.4-116/`. Includes independent watch-together logging, optional dates, favourite-first companions, external watch invites through signup, cumulative gold stars, separate watch comments, visible recommendation and companion avatars/personalised wording on Friends activity. Companion details remain excluded from Around Flixie. Review title/body redesign and movie-bestie statistics remain proposals.
+
+43 focused watch/invite/router tests, 19 Fastlane tests (107 assertions), release guard and lib analysis passed. Backend CI passed 658 tests; explicit released-client watch payload regressions also passed. Backend commit `cb57d823dfec0427f6f9c5bc16c81a05c9e1c183` deployed through https://github.com/lauradouglas/FlixieBE/actions/runs/38900426784; both additive migrations applied before Azure deployment. Live nonexistent invite lookup exercises the new table and returns INVITE_CLOSED; unauthenticated existing user routes still return 401. Unrelated backend safety/availability edits were excluded.
+
+Apple accepted the upload at 13:39 London, finished processing at 13:44, and confirmed internal distribution. Independent API verification: build `efa52ff0-e608-46d6-9e57-978cf298318d`, VALID and IN_BETA_TESTING. Tester notes: `fastlane/release-metadata/ios/2.0.4/TestFlight-116.txt`. No App Review submission or Android rollout.
+
+
+## TestFlight 2.0.4 (117) and multiple-companion backend — 16 October 2026
+
+User requested deployment after multiple-companion implementation. Backend commit `644a40bc1f36646824ca4cefc2de102051d6f681` deployed successfully through https://github.com/lauradouglas/FlixieBE/actions/runs/38909093629. All 660 deployed-source CI tests passed, migrations reported none pending, and production health/auth/external-invite read smoke checks passed. Unrelated backend changes remain excluded. Local working-tree verification passed 662 backend tests.
+
+Signed production IPA built from current working tree with production main/Firebase/HTTPS API. Includes multiple Flixie friend selection with favourites first, independent recipient log/rate prompts, plural avatar display in Friends activity and watch history, persistent review shortcut and keyboard layout improvements. External invites remain a separate single-person flow. TV season ratings were captured as an idea during deployment and are not included.
+
+All 27 focused watch UI checks, 19 Fastlane tests (107 assertions), iOS release guard and production lib analysis passed; signed entitlements/version/build validated. Native multi-watch Patrol test built but XCTest stalled before app launch on two attempts, so native end-to-end verification remains outstanding. Retained IPA, SHA-256/source manifest, logs and backend evidence: `build/releases/ios/2.0.4-117/`. Apple uploader reported successful transfer at 15:16 London (delivery `a468d74a-766f-4254-9950-2e0c444228e6`), alongside Apple API HTTP 500 responses which caused Fastlane to exit before processing/distribution. Subsequent upload-receipt API confirms COMPLETE with no errors/warnings and processed-build API confirms VALID (`a468d74a-766f-4254-9950-2e0c444228e6`). Finished metadata/distribution only, without reuploading: tester notes set and internal distribution succeeded at 15:31 London. Final independent API confirms VALID / IN_BETA_TESTING. Evidence retained in `apple-upload-state.json`, `testflight-verification.json` and `distribution.log`. No App Review or Android deployment performed.
+
+## TestFlight 2.0.4 (118) and guest-game backend — 16 October 2026
+
+User authorised TestFlight deployment, then explicitly included the guest-game backend rollout. Backend release was isolated from unrelated local safety/availability work in commit `963e21f290ac37ab9ec8a82d971c2cc8c4b85bdc`. Build, TypeScript checking and all 662 backend tests passed locally; production CI also passed 662 tests. Workflow https://github.com/lauradouglas/FlixieBE/actions/runs/38930481384 applied additive migration `20261016160000_guest_popcorn_rounds` before deploying Azure. Live smoke checks confirm health 200, guest-round issuance 201 with version 3/600 ticks/claim token/expiry, and unauthenticated claim/ranked starts 401. No real-account claims or leaderboard scores were posted by release checks.
+
+Signed production IPA uses main/Firebase/HTTPS API, version 2.0.4 build 118. Includes Cinema notebook reviews and the optional watch-save-to-review continuation, plus playing games before signup and carrying a guest Popcorn round through signup for explicit score posting. 83 focused app tests, 19 Fastlane tests (107 assertions), release guard and production lib analysis pass. Native review-posting Patrol journey passes; phone/landscape/tablet/large-text keyboard coverage passes. Native iPad visual review and complete native guest signup/score posting remain unverified. Signing, version/build and bundled Pip artwork verified. Runtime source/artwork hashes remained unchanged during build. Retained IPA, SHA-256, source manifest, tester notes, check logs and backend evidence under `build/releases/ios/2.0.4-118/`. Apple accepted the upload at 17:27 London and completed processing/internal distribution at 17:32. Independent API verification confirms build `1d4ce5a8-60a0-4220-9a1e-93299b649d61`, VALID / IN_BETA_TESTING. Tester notes are set. Evidence is retained in `testflight-verification.json`, `release.json` and `upload.log`. No App Store review submission or Android rollout performed.
+
+
+## Apple watch-entry screenshot refresh — 16 October 2026
+
+User requested replacement of the outdated “Every watch. Your own rating.” App Store screenshot. Captured the current watch-entry UI through the isolated native Patrol fixture on dedicated iPhone 17 Pro Max and iPad Pro 13-inch simulators. The fixture now uses reduced motion so decorative loops settle, and its action selects the current Recommend pill. Focused fixture regression passes; both native captures and all 16 presentation provenance checks pass. Existing headline, Flixie wordmark and hoodie Pip framing are preserved.
+
+Published 2.0.3 is locked, so created an editable 2.0.4 App Store draft. Replaced only the fifth (rating) screenshot in each en-GB device set. Read back all eight assets per set: replacement delivery COMPLETE, all source checksums match the local files, original order retained and the other seven screenshots per set byte-identical. Version remains PREPARE_FOR_SUBMISSION; no App Review submission or binary selection. Public screenshots change with the next approved release. Before/after API evidence, original-image backups and upload log: `build/store-screenshots/rating-refresh-2026-10-16/`.
+
+
+## TestFlight 2.0.4 (120) — 16 October 2026
+
+User authorised a TestFlight build and initially requested App Review, then explicitly revoked review submission and instructed immediate stop. Signed production main/Firebase/HTTPS API build 120 validated, with source integrity unchanged during build. Includes smaller Griddy Pip and removal of the signed-in Home catch-up banner. Guest Home design exploration is separate and is not in this binary. Apple processing and internal distribution succeeded: build `162854d5-fee8-4bbe-9deb-66bc6c8dddde`, VALID / IN_BETA_TESTING.
+
+The submission command was interrupted at the user's stop instruction. Independent Apple read confirms version 2.0.4 is DEVELOPER_REJECTED, manual release, with no active review submission. Build 120 remains on TestFlight. Release notes and build selection were staged before interruption; existing screenshots were preserved. Do not restart or submit for App Review without a new explicit user request. Evidence: `build/releases/ios/2.0.4-120/review-stop-verification.json`. No backend or Android deployment.

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/profile/presentation/widgets/watched_with_row.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
@@ -67,18 +68,29 @@ class MovieWatchHistorySection extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      subtitle: Text(
-                        [
-                          if (entry.rating != null)
-                            'Rating: ${entry.rating!.toStringAsFixed(0)}/10',
-                          if (entry.notes != null && entry.notes!.isNotEmpty)
-                            entry.notes!,
-                        ].join(' • '),
-                        style: TextStyle(
-                          color: context.colors.medium,
-                          fontSize: 14,
-                          height: 1.35,
-                        ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (entry.allCompanions.isNotEmpty)
+                            WatchedWithRow(companions: entry.allCompanions),
+                          Text(
+                            [
+                              if (entry.allCompanions.isEmpty &&
+                                  entry.externalInvite != null)
+                                'With ${entry.externalInvite!.displayName} · Invited to Flixie',
+                              if (entry.rating != null)
+                                'Rating: ${entry.rating!.toStringAsFixed(0)}/10',
+                              if (entry.notes != null &&
+                                  entry.notes!.isNotEmpty)
+                                entry.notes!,
+                            ].join(' • '),
+                            style: TextStyle(
+                              color: context.colors.medium,
+                              fontSize: 14,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
                       ),
                       trailing: PopupMenuButton<String>(
                         iconColor: context.colors.light,

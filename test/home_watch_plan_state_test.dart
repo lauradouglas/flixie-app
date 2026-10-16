@@ -60,6 +60,47 @@ WatchPlanCandidate candidate(
     );
 
 void main() {
+  test('shared Home card keeps all names and waits for the third response', () {
+    WatchRequest shared(List<Map<String, dynamic>> confirmations) =>
+        WatchRequest.fromJson({
+          'id': 'shared',
+          'requesterId': 'actor',
+          'recipientId': 'first',
+          'type': 'MOVIE_WATCH_REQUEST',
+          'status': 'ACCEPTED',
+          'lightweight': true,
+          'movie': {'id': 348, 'title': 'Alien'},
+          'participants': [
+            {
+              'user': {'id': 'actor', 'username': 'Casey'}
+            },
+            {
+              'user': {'id': 'first', 'username': 'Robin'}
+            },
+            {
+              'user': {'id': 'me', 'username': 'Ellis'}
+            },
+          ],
+          'watchConfirmations': confirmations,
+        });
+    final two = [
+      {'userId': 'actor', 'watched': true},
+      {'userId': 'first', 'watched': true}
+    ];
+    final request = shared(two);
+    final state = homeWatchPlanStates([request], 'me').single;
+    expect(state.type, HomeWatchPlanStateType.logAfterOther);
+    expect(state.supportingText, contains('Casey, Robin'));
+    expect(state.supportingText, contains('2 of 3 responded'));
+    expect(state.requiresAttention, isTrue);
+    expect(WatchPlanDisplayState.isCompleted(request), isFalse);
+    final complete = shared([
+      ...two,
+      {'userId': 'me', 'watched': false}
+    ]);
+    expect(WatchPlanDisplayState.isCompleted(complete), isTrue);
+  });
+
   test('today precedes actions, which precede ordinary upcoming plans', () {
     final now = DateTime(2026, 9, 23, 9);
     final states = homeWatchPlanStates([

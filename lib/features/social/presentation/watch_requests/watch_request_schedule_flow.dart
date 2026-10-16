@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/api/api_client.dart';
 import '../widgets/social_account_sheet.dart';
 import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -40,6 +41,22 @@ class WatchRequestScheduleFlow extends WatchRequestActionContext {
       return;
     }
     if (!context.mounted || !controller.owns) return;
+    if (request.lightweight) {
+      await runAction(request, FriendWatchPlanAction.scheduling, () async {
+        final viewer = controller.viewer;
+        if (viewer == null) return;
+        await ApiClient.patch('/watch-requests/${request.id}/together-schedule',
+            body: {
+              'userId': viewer,
+              'scheduledFor': selected.proposedFor.toUtc().toIso8601String(),
+              'dateOnly': selected.dateOnly
+            });
+        final state = await RequestService.getWatchRequestState(
+            watchRequestId: request.id, userId: viewer);
+        if (context.mounted && controller.owns) replaceRequest(state.request);
+      });
+      return;
+    }
     await submitScheduleProposal(
       request,
       FriendAcceptanceScheduleDraft(

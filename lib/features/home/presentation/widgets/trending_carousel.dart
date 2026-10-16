@@ -1,3 +1,4 @@
+import 'content_sized_carousel.dart';
 import 'tablet_trending_gallery.dart';
 import '../models/home_section.dart';
 import 'package:flixie_app/models/friend_media_interaction.dart';
@@ -43,7 +44,8 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
   @override
   void didUpdateWidget(covariant TrendingCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.movies.firstOrNull?.id != widget.movies.firstOrNull?.id) {
+    if (oldWidget.movies.firstOrNull?.homeKey !=
+        widget.movies.firstOrNull?.homeKey) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.onPageChanged?.call(_selected);
       });
@@ -74,12 +76,46 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
             onSave: widget.onSave,
             onTrailer: widget.onTrailer);
       }
+      Widget card(int index, {bool contentSized = true}) {
+        final movie = movies[index];
+        return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: HomeHeroCard(
+                movie: movie,
+                contentSized: contentSized,
+                posterHeight: 280,
+                inWatchlist: widget.savedIds.contains(movie.homeKey),
+                isUpdating: widget.pendingIds.contains(movie.homeKey),
+                showFriendActivity: widget.friendActivity != null,
+                interactions:
+                    widget.friendActivity?.call(movie.homeKey).value.data ??
+                        const [],
+                friendActivityLoading:
+                    widget.friendActivity?.call(movie.homeKey).value.loading ??
+                        false,
+                friendActivityFailed:
+                    widget.friendActivity?.call(movie.homeKey).value.error !=
+                        null,
+                onOpen: () => widget.onDetails(movie),
+                onDetails: () => widget.onDetails(movie),
+                onWatchlist: () => widget.onSave(movie),
+                onTrailer: () => widget.onTrailer(movie),
+                onFriendsRetry: () => widget.onFriendsRetry?.call(movie)));
+      }
+
       return Column(children: [
-        SizedBox(
-            height: 280 +
-                225 +
-                (widget.friendActivity != null ? 45 : 0) +
-                280 * (scale - 1).clamp(0.0, double.infinity),
+        ContentSizedCarousel(
+            viewportFraction: .84,
+            measurements: [
+              for (var index = 0; index < movies.length; index++)
+                if (widget.friendActivity?.call(movies[index].homeKey)
+                    case final activity?)
+                  ListenableBuilder(
+                      listenable: activity,
+                      builder: (_, __) => card(index, contentSized: true))
+                else
+                  card(index, contentSized: true),
+            ],
             child: PageView.builder(
                 controller: _pages,
                 padEnds: false,
@@ -90,40 +126,12 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
                 itemCount: movies.length,
                 itemBuilder: (context, index) {
                   final movie = movies[index];
-                  Widget card() => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: HomeHeroCard(
-                          movie: movie,
-                          posterHeight: 280,
-                          inWatchlist: widget.savedIds.contains(movie.id),
-                          isUpdating: widget.pendingIds.contains(movie.id),
-                          showFriendActivity: widget.friendActivity != null,
-                          interactions: widget.friendActivity
-                                  ?.call(movie.id)
-                                  .value
-                                  .data ??
-                              const [],
-                          friendActivityLoading: widget.friendActivity
-                                  ?.call(movie.id)
-                                  .value
-                                  .loading ??
-                              false,
-                          friendActivityFailed: widget.friendActivity
-                                  ?.call(movie.id)
-                                  .value
-                                  .error !=
-                              null,
-                          onOpen: () => widget.onDetails(movie),
-                          onDetails: () => widget.onDetails(movie),
-                          onWatchlist: () => widget.onSave(movie),
-                          onTrailer: () => widget.onTrailer(movie),
-                          onFriendsRetry: () =>
-                              widget.onFriendsRetry?.call(movie)));
-                  final activity = widget.friendActivity?.call(movie.id);
+                  final activity = widget.friendActivity?.call(movie.homeKey);
                   return activity == null
-                      ? card()
+                      ? card(index)
                       : ListenableBuilder(
-                          listenable: activity, builder: (_, __) => card());
+                          listenable: activity,
+                          builder: (_, __) => card(index));
                 })),
         if (movies.length > 1) ...[
           const SizedBox(height: 10),

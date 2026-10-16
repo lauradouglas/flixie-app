@@ -1,5 +1,66 @@
 # Regression testing
 
+## Release 119 rollout — 16 October 2026
+
+User authorised a new TestFlight build and website publication after the release
+118 journey checks. TestFlight 2.0.4 (119) includes the game exit after signup,
+shared-watch Home continuation cleanup and saved-viewing editor guard. Signed
+app/widget versions, production capabilities and source integrity validated.
+Production lib analysis, release guard and 19 Fastlane tests (106 assertions)
+passed, alongside the focused/native evidence below. Apple accepted upload at
+20:40 London and completed processing/notes at 20:44. Independent API confirms
+VALID / IN_BETA_TESTING (`3bd692eb-fb6c-4379-b567-35f478b0fc37`).
+Evidence: `build/releases/ios/2.0.4-119/`.
+
+Website commit `fe7ccf95c37cf20eda2e4ced03044cfd06871579` deployed successfully
+through https://github.com/lauradouglas/flixie-corp/actions/runs/38955118894.
+Production browser verification confirms watch-invite landing content, exact
+app-link token and phone layout without horizontal overflow. No App Store review,
+Android rollout or backend deployment was performed. Earlier local/pending
+statements describe the pre-rollout state and are superseded here.
+
+## Release 118 guest and shared-watch verification — 16 October 2026
+
+User requested testing both journeys and fixing reproduced issues. The paired
+physical iPhone reports Flixie 2.0.4 (118). Live guest arcade entry, server-issued
+Popcorn Catch play (130 points), cancellation and reopening of the account prompt
+were exercised on that installed build. User completed authentication with
+disposable gamer account. The same 130-point
+run returned with Post still available; explicit posting succeeded and the live
+leaderboard displayed gamer (you), 130, Round 1.
+
+The 118 source manifest has 881 entries. Guest-game sources matched before the exit fix below; nine
+shared-watch files have changed since the signed build. Therefore native Patrol
+shared-watch results below cover the current working tree, not the immutable IPA.
+Four native tests passed on dedicated Flixie Review Patrol (iOS 27.0): multi-select
+companions, third participant logging exactly their own watch, creating/copying an
+external invite, and an invited member rating/saving before optional onboarding.
+Evidence: `build/ios_results_1792176747152.xcresult`.
+
+Twenty focused guest/multi-companion/external-invite tests passed. Extended the
+phone/tablet guest UI test beyond the simulated signup boundary to restore the
+finished score, assert signup itself makes no claim/publication, explicitly post
+once and verify pending score cleanup. Both extended cases pass, and targeted
+analysis is clean. The original native continuation passed
+(`build/ios_results_1792177067069.xcresult`). Added
+`patrol_test/guest_score_continuation_test.dart` for the
+same native journey. A subsequent physical-device finding exposed a missing
+exit after signup: the game is the root route, so the header hid Close. Extended
+phone/tablet regressions fail against the old code. The fix always shows Close,
+popping an existing route or routing Home when no route can pop. Six guest/game
+UI checks plus a separate pushed-route return check pass. First fixed native run failed before signup because its fixed pump count did
+not wait for the native round to finish
+(`build/ios_results_1792177363738.xcresult`). The native test now waits for
+a finished round and resumes the existing frame-hitch pause state. Fixed native
+continuation including Close returning Home passed on rerun
+(`build/ios_results_1792177651823.xcresult`); build 118 itself remains unchanged. Authentication/API fixtures
+use fictional accounts and cannot establish real Firebase or production write
+behaviour. The exit defect is fixed locally and requires a new release build.
+
+Live shared-watch owner flow also passed on installed 118 with disposable gamer:
+Alien saved with fictional external companion Sophie; the post-save invite sheet
+appeared and Copy confirmed Invite copied. Live second-account claim/logging also passed; see website section below. No messages or invites were sent to real members.
+
 ## Android Firebase session persistence
 
 Android explicitly uses `firebase-auth:24.0.1`: FlutterFire 5.x otherwise resolves
@@ -1282,3 +1343,263 @@ Native share method intercepted; no real messages sent. First attempt rejected a
 slash in a test description and ran zero tests; corrected rerun passes.
 Temporary native Firebase config restored. Result:
 `build/ios_results_1791832493459.xcresult`. No production/browser store launch claim.
+
+## In-app trailers
+
+Fullscreen route checks include landscape requests and restoring orientation/system UI on close.
+
+Focused checks: `flutter test test/features/movies/trailers/trailer_player_sheet_test.dart test/video_card_test.dart test/launch_video_fixture_test.dart test/features/home/home_hero_card_test.dart`.
+
+Native smoke journey: `scripts/test-patrol.sh -d <dedicated-test-device> -t patrol_test/trailer_player_test.dart`. Uses a public YouTube API demo video and isolated metadata, with no sign-in/database. Verifies native player construction and dismissal; it does not prove network playback. Manually verify a real trailer plays, fullscreen/back restores layout, backgrounding pauses audio, sheet dismissal stops audio, and restricted/offline videos offer YouTube recovery on Android and iOS. Adding the WebView dependency requires a native rebuild, rather than hot reload alone.
+
+### Pip’s Popcorn Catch
+
+Run `flutter test test/features/popcorn_catch` for deterministic scoring vectors,
+account-bound posting, offline practice, interruption/pause, full-screen bottom
+finger dragging, keyboard movement, leaderboard posting/sheet navigation, and
+phone/landscape/tablet layouts at increased text scale. Native journey:
+`scripts/test-patrol.sh -d <dedicated-simulator> --target patrol_test/popcorn_catch_test.dart`
+It uses fictional in-memory accounts,
+never real leaderboard entries. Preview with `flutter run -t tool/preview_popcorn_catch.dart`.
+Backend focused tests and the guarded local database check are in
+`../FlixieBE/src/routes/popcornCatch.test.ts` and
+`../FlixieBE/scripts/test-popcorn-catch-local.ts`; fictional local leaderboard
+fixtures use `scripts/seed-dev-popcorn-catch.ts` in that repository.
+
+Popcorn Catch levels refinement: 16 focused Flutter tests now include early
+three-life endings, version-1/v2 vectors, five-level difficulty, motion anxiety,
+blink/catch/burn frames, Reduced Motion, capped actual bucket contents/reset,
+explicit posting and leaderboard navigation. Responsive checks exercise ready,
+playing and paused states on narrow phone, landscape and tablet at 2× text.
+Four backend API/simulation tests cover both protocols; the real local DB check
+also verifies early-score timing, unfinished replay rejection, concurrent v2
+posting, old/new board isolation and removal. The additive v2 migration and
+fictional fixture scores were applied to localhost only. New-rules native Patrol
+rerun, native Android/tablet appearance and physical-device profiling remain open.
+
+
+Popcorn Catch performance and friend challenges: 24 focused Flutter tests and
+five backend tests pass, with scoped Flutter analysis and backend typecheck clean.
+The real local SQL checks `scripts/test-popcorn-catch-local.ts` and
+`scripts/test-popcorn-challenges-local.ts` pass in FlixieBE.
+`scripts/test-popcorn-firestore-local.ts` also passes against the isolated
+Firestore emulator on 127.0.0.1:8185 using Java 21 and demo-flixie-popcorn: actual
+conversation creation, typed invite, linked first-result reply, duplicate retry
+idempotency, unread counts and no automatic public leaderboard posting. It
+requires the guarded local database target and exact emulator host, creates only
+fictional accounts and cleans them up. No live messages were sent.
+Native iOS phone result/card captures were reviewed; the performance video is
+`output/popcorn-catch/pip-victory-performance.mp4`. The new native journey is
+`patrol_test/popcorn_challenge_test.dart`; it is added and analyzes cleanly but
+has not been run. Native Android/tablet appearance and physical-device frame
+pacing remain unverified. No full regression suite or deployment was performed.
+
+
+Round-run protocol v3 (15 October): 30 focused Flutter tests pass, including actual
+swipes over Pip, round completion/next-round actions, refill/cumulative score,
+one-second burnt recovery and Dart/server replay vectors. Seven focused backend
+tests cover v1/v2/v3 route compatibility, private verification, public posting,
+round metadata and delivery. Both v2/v3 guarded real localhost challenge checks
+pass; fixtures are fictional and external message delivery is replaced. Migration
+`20261015110000_popcorn_round_runs` and v3 local leaderboard fixtures are applied
+only to localhost. Native `popcorn_catch_test.dart` includes a v3 journey; not run.
+Leaderboard design remains an image mockup pending user review.
+
+
+Leaderboard mockup implementation: 31 focused Flutter tests now pass. The new
+leaderboard test verifies actual score/round data, long names, each user's own
+avatar badges and safe-area Play/Remove actions at small-phone, portrait,
+landscape and tablet widths with 1×/2× text. Feature/test/preview/Patrol analysis
+is clean. Actual iPhone native leaderboard reviewed after hot restart, with a
+fictional highlighted own row and no live network score writes. Native Android,
+iPad and Patrol journey execution remain outstanding. This supersedes the
+mockup-only status immediately above; no deployment performed.
+
+## Pip Pairs — 15 October 2026
+
+`flutter test --no-pub test/features/pip_pairs` covers matching/completion/replay,
+manual versus 1.5s/0.5s mismatch deadlines, reset cancellation, all 24 bundled
+outfit assets, Home navigation to both games, screen-reader semantic activation,
+and small-phone/landscape/tablet reflow at doubled text scaling. Final focused
+run: 14 passed. The existing Popcorn Catch screen checks also passed in the
+combined 17-check run before the additional semantics regression was added.
+
+`patrol_test/pip_pairs_test.dart` provides an offline, seeded outfit-matching
+journey through completion and replay, with no account or database dependency.
+Run only on a dedicated simulator with `scripts/test-patrol.sh -d <device-id>
+-t patrol_test/pip_pairs_test.dart`. The dedicated simulator created for this work was **Flixie Pairs Patrol**, UUID
+`97142326-79A4-4550-B0D7-7BC576E2BF7B`. It was removed during the user-requested
+disk cleanup on 15 October 2026. Create or select another dedicated test simulator
+before rerunning Patrol; never use the everyday development installation.
+Native test build succeeded, but simulator startup stalled: interrupted after
+5m42s with zero tests executed. Not a device pass. Result bundle:
+`build/ios_results_1792059657595.xcresult`. Final focused analysis is clean.
+Native initial phone/tablet and mid-round tablet preview captures were reviewed;
+Android and device interactions remain unverified.
+See [Pip Pairs](pip-pairs.md) for behaviour and artwork provenance.
+
+
+Pip Pairs follow-up: 12-pair cards use a compact responsive grid; regressions
+verify every card remains inside standard 390×844 and 440×956 phone viewports
+and retains at least 48px touch targets. Home now routes through `/play`, owned
+by `features/pip_games`, with both game routes verified. A chooser layout test
+covers a 320px phone at doubled text. These are widget checks; the earlier native
+captures predate the compact-grid/chooser changes.
+
+
+Arcade chooser/exit fix follow-up: all 19 focused game tests passed, and the four
+chooser navigation/large-text/exit checks passed again after the typography
+adjustment. Root/direct Pairs entry closes to `/play`; pushed entry pops back to
+the chooser. The offline preview now uses these same GoRouter routes. Final
+focused analysis is clean. Fresh normal-text native iPhone/iPad arcade chooser
+captures are in `output/pip-pairs/arcade-phone-final.png` and
+`arcade-tablet-final.png`; independently reviewed with the title-hierarchy finding
+resolved. The new explicit-exit Patrol journey is present in
+`patrol_test/pip_pairs_test.dart`, but has not been rerun after the earlier native
+startup stall. Do not infer a device interaction pass from the screenshots.
+
+
+## Space Premiere — 15 October 2026
+
+Run `flutter test test/features/space_premiere
+ test/features/pip_pairs/pip_pairs_entry_test.dart` (on one line). All 18 focused
+checks pass: collisions, shields/lives/recovery, invasion/practice, wave bonus and
+progress, fixed-step consistency, steering, pause/resume/backgrounding,
+chooser entry/exit including direct-root entry, assets and responsive large-text
+layouts. Focused analysis is clean. No full regression run requested or performed.
+
+`patrol_test/space_premiere_test.dart` adds a dedicated-device start/steer/pause
+journey; it has not been executed, and the previous Patrol startup stall is not
+counted as a pass. `tool/preview_space_premiere.dart` is a local offline preview:
+live by default, or deterministic/frozen at 1.2s with
+`--dart-define=SPACE_CAPTURE=true`. The native iPad fixture capture was reviewed
+at `output/space-premiere/tablet-gameplay.png`; it establishes layout only.
+Phone captures show an OS open-link confirmation and are invalid game evidence.
+See [Space Premiere](space-premiere.md) for gameplay and artwork provenance.
+
+
+### Shared viewings without a permanent group
+
+New retrospective logs with multiple friends create one Request with explicit
+membership. Focused checks:
+
+```sh
+flutter test test/friend_watch_plan_flow_test.dart test/features/movies/watch_companion_log_test.dart test/features/movies/watch_companion_activity_test.dart test/home_watch_plan_state_test.dart test/watch_plan_display_state_test.dart
+scripts/test-patrol.sh -d <dedicated-test-device> -t patrol_test/shared_viewing_test.dart
+```
+
+The backend regression `src/routes/sharedViewing.test.ts` exercises the real HTTP
+state/confirmation routes for the third participant, independent watch creation,
+blocked/outsider rejection, missed responses and all-participant completion.
+`src/services/watchTogetherService.test.ts` checks one shared request, duplicate
+selection/retry handling and adding people to that same viewing.
+
+After applying the additive backend migration locally, run from FlixieBE:
+
+```sh
+NODE_ENV=development node --env-file=.env.local -r ts-node/register scripts/seed-dev-shared-viewing.ts --dry-run
+NODE_ENV=development node --env-file=.env.local -r ts-node/register scripts/seed-dev-shared-viewing.ts
+```
+
+The seed requires existing fictional `dev_movie_casey`, `dev_movie_robin` and
+`dev_movie_ellis` accounts from the movie-opinions seed, plus Alien (348). It
+creates one shared Alien viewing owned by Casey, with only Casey's initial watch;
+Robin and Ellis can each log independently. Reruns preserve their responses. It
+refuses remote databases, creates no permanent group and sends no notifications.
+Migration must precede backend rollout; the client update is also required for the
+full participant card/recap. Existing historical separate plans remain separate.
+
+Verification on 16 October 2026: 57 focused Flutter checks and 14 backend checks
+passed; changed-source analysis and backend TypeScript checking passed. A real
+localhost PostgreSQL read verified that Ellis receives one shared viewing with
+three members and only Casey's initial confirmation. Development hot reload passed.
+A separate `watch_request_model_test.dart` run retains two existing failures:
+“parses direct scheduling lifecycle fields” and “copies top-level confirmation
+flag onto parsed request” omit requester/recipient IDs while expecting a
+participant-only confirmation action to be available. Those fixtures/assertions
+were not weakened as part of this change.
+
+The dedicated iPhone native regression passed on Flixie Companion iPhone (iOS
+26.5): third-member access, all participants in the editor and only that viewer's
+watch saved back to the same viewing. Report:
+`build/ios_results_1792171556087.xcresult`. Initial test launch stalled before any
+tests ran; one bounded retry completed successfully. The daily development app
+was not reinstalled.
+
+
+Shared-viewing persistence E2E (16 October 2026): run from FlixieBE with
+`NODE_ENV=development node --env-file=.env.local -r ts-node/register scripts/test-shared-viewing-e2e.ts`.
+The script refuses remote databases, creates fresh fictional accounts, calls real
+HTTP routes/services and PostgreSQL, and cleans up its UUID-scoped data afterwards.
+Only Firebase identity at the test HTTP boundary and external chat transport are
+isolated; persistence and notification creation are real. Six scenarios passed:
+multiple companion selection creates one viewing with only the actor's initial
+watch/review; duplicate selection and retry; same-viewing list/state access for all
+three members with badges and outsider denial; concurrent independent watches,
+ratings and spoiler-aware reviews; adding a fourth person and an explicit missed
+response; and rejection of a block between companions without partial writes.
+The native companion picker and third-participant journeys run separately against
+isolated API fixtures, rather than claiming a single simulator-to-SQL test.
+
+Native rerun for this E2E request passed all four journeys (zero failures/skips)
+on Flixie Companion iPhone, iOS 26.5, using
+`-t patrol_test/shared_viewing_test.dart -t patrol_test/watch_together_test.dart`.
+Includes selecting two companions and saving, third-participant shared-viewing
+logging, external invite sharing and invite-first rating continuation.
+Evidence: `build/ios_results_1792171893282.xcresult`.
+Backend TypeScript checking also passed. No production data or daily development
+installation was changed.
+
+
+Shared-viewing screenshots: `flutter test tool/render_shared_viewing_screenshots_test.dart`
+renders ten actual Flutter screen states at 390×844 and 3× resolution, with
+fictional people and the existing local Alien poster fixture. Output is under
+`output/shared-viewing-screenshots/`, including gallery, PNGs, provenance manifest
+and ZIP. Covers three selected companions plus the viewer, the editor, one shared
+card, one rating, all ratings, the missed-attendance action and completed recap.
+The missed response must produce “Everyone who watched has rated” and “Everyone
+has responded”, without a watch entry or a rating for the absent person.
+29 focused page/recap checks and the render journey passed. The native screenshot
+attempt built successfully but its test runner exited 65 before any capture tests
+launched; these delivered images are widget renders, not native simulator captures.
+The optional native capture harness remains `scripts/capture-shared-viewing.py`.
+
+## Website fallback defect — release 118
+
+A fresh external-watch invite opened in Safari displayed “This invite link isn’t
+valid”. The website's `InviteView.tsx` only reads `?code=` referrals and treats
+`?watch=` as missing input. Isolated source checkout:
+`/tmp/flixie-release118-website` (lauradouglas/flixie-corp).
+Prepared a focused fix preserving referral behavior and adding a watch-invite
+landing state with explicit Open in Flixie, exact token preservation, iOS scheme
+and Android intent/store fallback, and install/reopen guidance. The app remains
+the authority for expiry, ownership and claim eligibility. No automatic claim or
+watch creation. TypeScript, production build, SEO/HTTP/media-share and new token
+regressions pass. Browser checks pass for valid watch, existing referral and malformed watch
+states. Inspected 375px phone and 1280px desktop screenshots; no horizontal
+overflow. Mechanical design detector has no findings. Durable website patch and
+screenshots: `output/release-118-verification/`. Existing website dependency audit
+reports 9 advisories (5 moderate, 3 high, 1 critical); dependencies unchanged.
+Direct app handoff of the same live token shows the correct guest preview
+“gamer says you watched Alien together”, confirming the token itself is valid.
+Live second-account authentication/claim/logging passed after direct app
+handoff: Alien resumed with gamer linked; recipient independently selected 8/10
+and saved. Confirmation and recap show two watched, one rating, recipient 8/10
+and gamer unrated (the owner was deliberately saved without a score). Website is not published; installed build 118 is not replaced.
+
+## Shared-watch recap Home loop — 16 October 2026
+
+User reproduced Home returning to the same recap on installed build 118 after
+recipient signup/save. The router's pending invited-viewing marker redirects `/`
+back to the viewing. Focused standalone-viewing Home now clears that marker and
+guest continuation before routing Home (completed account) or the established
+setup flow (incomplete account). An already-saved invited viewing also no longer auto-opens its log editor
+over the recap; unlogged recipients still get the editor. A focused regression
+reproduced this obstruction before the guard was added. Pushed Back behavior
+remains unchanged. Original account and mounted checks guard asynchronous navigation. Both exit tests and the
+real invite-router startup test pass; focused analysis is clean. Native
+`patrol_test/watch_together_test.dart` now covers saved confirmation -> View my
+watch -> recap -> Home -> setup and verifies the marker is cleared. The first native rerun was interrupted before any tests ran after the
+additional editor obstruction was reproduced in a widget test; final native
+rerun passed all three journeys, including saved recap -> Home -> setup.
+Evidence: `build/ios_results_1792178527684.xcresult`. Installed 118 still has this defect; no new release uploaded.

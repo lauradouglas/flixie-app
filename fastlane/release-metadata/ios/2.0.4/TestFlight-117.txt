@@ -1,0 +1,7 @@
+Log a film with multiple Flixie friends. Favourites appear first, and each person gets their own prompt to log and rate independently.
+
+Watch history and Friends activity show everyone’s avatars, with “you” where appropriate.
+
+The review shortcut stays visible beside Save, and typing in watch comments or reviews works better with the keyboard open on phones and tablets.
+
+Please test adding several people, reopening and editing a shared watch, individual ratings, and keyboard behaviour. External invitations remain a separate single-person flow.

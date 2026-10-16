@@ -1,3 +1,9 @@
+import 'package:flixie_app/features/movies/presentation/widgets/watch_entry_review_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/external_watch_invite_sheet.dart';
+import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
+import 'package:uuid/uuid.dart';
+import 'package:flixie_app/features/movies/models/watch_log_details.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
@@ -170,13 +176,21 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
       {MovieWatchEntry? initial}) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (userId == null) return;
-    await showModalBottomSheet<void>(
+    final draftId = const Uuid().v4();
+    var details = const WatchLogDetails();
+    ExternalWatchInvite? invite = initial?.externalInvite;
+    var writeReview = false;
+    MovieWatchEntry? reviewWatch;
+    await showMovieWatchLogSheet<void>(
       context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
+        movieTitle: entry.movie?.title,
+        showReviewOption: true,
+        onReviewSelected: (value) => writeReview = value,
+        loadFriends: (initial?.externalInvite == null)
+            ? () async => (await FriendService.getFriends(userId)).friendships
+            : null,
+        onDetailsChanged: (value) => details = value,
         initial: initial,
         onSubmit: ({
           required String? watchedAt,
@@ -184,10 +198,20 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
           required bool? recommended,
           required String? notes,
         }) async {
+          if (!context.mounted ||
+              context.read<AuthProvider>().dbUser?.id != userId) {
+            throw StateError('Your session has changed. Reopen the watch log.');
+          }
           if (initial == null) {
-            await WatchlistActionsController.instance.logMovieWatch(
+            final savedWatch =
+                await WatchlistActionsController.instance.logMovieWatch(
               userId,
               LogMovieWatchRequest(
+                draftId: draftId,
+                companionId: details.companion?.id,
+                companionIds:
+                    details.companions.map((friend) => friend.id).toList(),
+                externalCompanionName: details.externalCompanionName,
                 movieId: entry.movieId,
                 watchedAt: watchedAt,
                 rating: rating,
@@ -195,22 +219,53 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
                 notes: notes,
               ),
             );
+            reviewWatch = savedWatch;
+            invite = savedWatch.externalInvite;
           } else {
-            await WatchlistActionsController.instance.updateMovieWatch(
+            final updatedWatch =
+                await WatchlistActionsController.instance.updateMovieWatch(
               userId,
               initial.id,
               UpdateMovieWatchRequest(
+                companionIds:
+                    details.companions.map((friend) => friend.id).toList(),
+                companionId:
+                    initial.planId == null ? details.companion?.id : null,
+                externalCompanionName: details.externalCompanionName,
+                draftId: draftId,
+                movieId: entry.movieId,
                 watchedAt: watchedAt,
                 rating: rating,
                 recommended: recommended,
                 notes: notes,
               ),
             );
+            reviewWatch = updatedWatch;
+            invite = updatedWatch.externalInvite;
           }
           if (mounted) context.read<AuthProvider>().markActivityChanged();
         },
       ),
     );
+    if (mounted && writeReview && reviewWatch != null) {
+      await showWatchEntryReviewSheet(context,
+          userId: userId,
+          movieId: entry.movieId,
+          mediaTitle: entry.movie?.title,
+          watchedAt: reviewWatch!.watchedAt,
+          watchEntryId: reviewWatch!.id,
+          rating: reviewWatch!.rating,
+          recommended: reviewWatch!.recommended,
+          initialTitle: initial?.reviewTitle,
+          initialBody: initial?.reviewBody,
+          initialContainsSpoilers: initial?.reviewContainsSpoilers ?? false);
+    }
+    if (mounted &&
+        context.read<AuthProvider>().dbUser?.id == userId &&
+        invite?.available == true) {
+      await showExternalWatchInviteSheet(
+          context, invite!, entry.movie?.title ?? 'this film');
+    }
     if (mounted) await _load();
   }
 
@@ -226,6 +281,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => WriteReviewSheet(
         movieId: entry.movieId,
+        mediaTitle: entry.movie?.title,
         initialRating: entry.rating,
         userId: userId,
         onSubmitted: (_) {

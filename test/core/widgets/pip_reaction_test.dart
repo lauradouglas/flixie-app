@@ -47,9 +47,9 @@ Future<void> pipReactionJourney(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('ten Pip options and reply fit a small phone with large text',
+  testWidgets('twelve Pip options and reply fit a small phone with large text',
       pipReactionJourney);
-  testWidgets('review picker sends stable keys for all ten Pip reactions',
+  testWidgets('review picker sends stable keys for all twelve Pip reactions',
       (tester) async {
     String? selected;
     await tester.pumpWidget(MaterialApp(
@@ -70,6 +70,8 @@ void main() {
       'hmm',
       'fire',
       'agree',
+      'interested',
+      'surprised',
     ]) {
       final emoji = reviewActivityReactions[key]!.emoji;
       final option = find.byWidgetPredicate(
@@ -78,7 +80,7 @@ void main() {
       await tester.tap(option);
       expect(selected, key);
     }
-    expect(find.byType(PipReaction), findsNWidgets(10));
+    expect(find.byType(PipReaction), findsNWidgets(12));
   });
   testWidgets('legacy Interested and Surprised counts retain their meaning',
       (tester) async {

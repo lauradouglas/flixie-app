@@ -1,3 +1,7 @@
+import 'package:flixie_app/features/movies/presentation/widgets/watch_entry_review_sheet.dart';
+import 'package:flixie_app/core/auth/pending_watch_invite_store.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flixie_app/models/friendship.dart';
 import '../widgets/social_account_sheet.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -35,33 +39,59 @@ class WatchRequestCompletionFlow extends WatchRequestActionContext {
         .where((c) => c.userId == userId && c.watched)
         .firstOrNull;
     var saved = false;
+    var writeReview = false;
+    String? reviewWatchEntryId, reviewWatchedAt;
     int? savedRating;
     bool? savedRecommended;
     String? savedNote;
-    await showModalBottomSheet<void>(
+    await showMovieWatchLogSheet<void>(
       context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      useSafeArea: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      backgroundColor: Colors.transparent,
       builder: (_) => SocialAccountSheet(
           viewer: controller.viewer,
           child: RewatchLogSheet(
             isPlanReview: true,
+            movieTitle: request.movie?.title,
+            companions: request.isSharedViewing
+                ? [
+                    for (final person
+                        in request.viewingPeople.where((p) => p.id != userId))
+                      FriendshipUser(
+                          id: person.id,
+                          username: person.username,
+                          avatar: person.avatar,
+                          profileBadges: person.profileBadges)
+                  ]
+                : const [],
+            companion: request.otherUser(userId) == null
+                ? null
+                : FriendshipUser(
+                    id: request.otherUser(userId)!.id,
+                    username: request.otherUser(userId)!.username,
+                    avatar: request.otherUser(userId)!.avatar,
+                    profileBadges: request.otherUser(userId)!.profileBadges),
+            initialWatchedAt: request.watchConfirmations
+                .where((c) => c.userId != userId)
+                .firstOrNull
+                ?.watchedAt,
+            initialDateUnknown: request.watchConfirmations.isNotEmpty &&
+                request.watchConfirmations.first.watchedAt == null,
             initial: existing == null
                 ? null
                 : MovieWatchEntry(
-                    id: existing.id,
+                    id: existing.watchEntryId ?? existing.id,
+                    watchedAt: existing.watchedAt,
+                    reviewBody: existing.reviewBody,
+                    reviewTitle: existing.reviewTitle,
+                    reviewContainsSpoilers: existing.reviewContainsSpoilers,
                     userId: userId,
                     movieId: request.movieId ?? 0,
                     rating: existing.rating?.toDouble(),
                     recommended: existing.recommended,
-                    notes: existing.reviewText,
+                    notes: existing.watchComment,
                     removed: false,
                   ),
-            showReviewOption: false,
+            showReviewOption: request.movieId != null,
+            onReviewSelected: (value) => writeReview = value,
             onSubmit: ({
               required watchedAt,
               required rating,
@@ -78,10 +108,16 @@ class WatchRequestCompletionFlow extends WatchRequestActionContext {
                   userId: userId,
                   watched: true,
                   rating: rating?.round(),
-                  reviewText: notes,
+                  reviewText: notes ?? '',
+                  watchComment: notes,
                   watchedAt: watchedAt,
                   recommended: recommended,
                 );
+                final savedConfirmation = state.request.watchConfirmations
+                    .where((item) => item.userId == userId && item.watched)
+                    .firstOrNull;
+                reviewWatchEntryId = savedConfirmation?.watchEntryId;
+                reviewWatchedAt = savedConfirmation?.watchedAt;
                 if (!context.mounted || !controller.owns) return;
                 // The watch-plan endpoint also performs this sync, but verify it
                 // through the movie endpoint as a compatibility safeguard for
@@ -148,6 +184,27 @@ class WatchRequestCompletionFlow extends WatchRequestActionContext {
           )),
     );
     if (!context.mounted || !controller.owns || !saved) return;
+    if (writeReview && request.movieId != null) {
+      await showWatchEntryReviewSheet(context,
+          userId: userId,
+          movieId: request.movieId!,
+          mediaTitle: request.movie?.title,
+          watchedAt: reviewWatchedAt,
+          watchEntryId: reviewWatchEntryId,
+          rating: savedRating?.toDouble(),
+          recommended: savedRecommended,
+          initialTitle: existing?.reviewTitle,
+          initialBody: existing?.reviewBody,
+          initialContainsSpoilers: existing?.reviewContainsSpoilers ?? false);
+      if (!context.mounted || !controller.owns) return;
+    }
+    final pendingInviteLog = await PendingWatchInviteStore.readLog(userId);
+    if (!context.mounted || !controller.owns) return;
+    if (pendingInviteLog == request.id) {
+      context.go('/watch-entry-saved/${request.id}',
+          extra: {'movieTitle': request.movie?.title, 'rating': savedRating});
+      return;
+    }
     ScaffoldMessenger.of(context).showFlixieToast(
       FlixieToast(
         type: FlixieToastType.success,

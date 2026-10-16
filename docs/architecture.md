@@ -652,3 +652,30 @@ recipient caches and checks ownership between send preparation steps. The friend
 and group composers under `features/sharing/presentation/widgets/` own their text
 controllers. `models/chat_share_media.dart` owns the shared movie/TV wire payload;
 its model remains exported from the original entry point.
+
+## Watch logging and watch-together plans
+
+`movies/presentation/widgets/rewatch_log_sheet.dart` owns the account-bound editor draft, responsive full-height phone/bounded tablet layout and persistent Save footer. `showMovieWatchLogSheet` is the common presentation entry point; caller action flows retain API writes and cache publication. `watch_companion_picker.dart` reuses `FriendSearchScope`/`StarredPeople` for private favourite-first search and preserves every selected user's badges. `models/watch_log_details.dart` carries the additional editor fields to its owning flow. Movie Detail, Watchlist, History and direct-plan completion share the editor.
+
+Direct single-title plans use the additive `lightweight` flag and exist without an acceptance/date step; multi-title and group planning keep their existing agreement flows. Retrospective companion logs and standalone/edited movie logs use `/watch-requests/log-watch`, with a stable draft ID and a transaction for the actor's watch, rating, spoiler-aware review and optional shared-plan link. Notification log routes point to the precise plan/person viewing, never an unrelated watch of the same film. Backend migration must precede client rollout.
+
+External companions use `movies/models/external_watch_invite.dart`, `data/external_watch_invite_service.dart`, the shared companion picker, and the post-save `external_watch_invite_sheet.dart`. Backend `ExternalWatchInvite` links to the actor’s permanent viewing; it does not model a fake user. Only an authenticated owner can retrieve its sharing token. Recipient preview/claim routes return limited film/date/inviter context, and claiming atomically reserves a single recipient and creates the direct-plan link without creating their watch. `ExternalWatchInviteScreen` then hands off to existing plan completion. `PendingWatchInviteStore` retains the token across account setup/restarts; `/invite?watch=…` reuses the installed app’s existing universal-link path and `/watch-invites/:token` is an internal setup destination. App-store deferred-link attribution is not provided; share copy tells new installs to reopen the link.
+
+Invite-first onboarding: `/guest/watch-invites/:token` is an anonymous read-only preview of the explicitly shared film and inviter; it is not a watch-history endpoint. `WatchInviteSignupContext` keeps that context alongside the established signup form. `PendingWatchInviteStore` retains the explicit Rate now intent, then binds the claimed request ID to the actor account. Required auth/profile creation and current terms still precede claim. The router permits only the invite, its exact viewing and its saved confirmation before optional onboarding; it never marks setup complete. `WatchInviteSavedScreen` hands back to ordinary onboarding afterwards. Other app destinations keep their existing setup guard.
+
+
+Multi-companion retrospective logs now use one direct Request with explicit
+`WatchRequestParticipant` membership, independently of permanent Groups. Single
+companion logs retain their existing direct identity; adding another person upgrades
+that same viewing. List/state reads include member profiles and badges. Completion
+serializes responses per Request and waits for every participant's own response.
+`WatchRequest.viewingPeople`/`viewingPersonIds` unify direct and ad hoc membership
+for recap, Home and watch-history projection. Existing separately linked historical
+requests are preserved; no automatic historical merge or permanent group creation.
+
+
+## Signed-out Home discovery
+
+`features/guest/presentation/guest_home_screen.dart` owns existing guest feed loading, refresh, title/signup/search routes and section order. `guest_home_welcome.dart` owns the compact hoodie Pip introduction; `guest_signup_section.dart` owns the lower account-benefit explanation and existing account actions. `guest_trending_carousel.dart` owns guest catalogue presentation and complete-image poster slots, using existing MovieShort metadata only. Both trending and regional cinema releases use this presentation; InCinemasSection accepts an optional media builder while preserving its existing loading/region/retry behavior and signed-in renderer.
+
+Keep guest posters and Pip fitted with BoxFit.contain. A reserved poster slot does not change the source aspect ratio or crop the image; do not stretch a portrait poster into a wide hero. Narrow/large-text featured titles stack, and meaningful titles wrap. Guest Home retains the existing public community projection and badge pipeline; no personalised recommendations or invented mood collections are implied.

@@ -1,3 +1,4 @@
+import 'watched_with_row.dart';
 import 'package:flixie_app/core/widgets/pip_reaction.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -272,6 +273,10 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                               ])),
                   ])),
             ])),
+        if (item.allCompanions.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          WatchedWithRow(companions: item.allCompanions),
+        ],
         if (body?.trim().isNotEmpty == true) ...[
           const SizedBox(height: 12),
           if (spoiler)
@@ -347,7 +352,8 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                                     : Colors.transparent),
                           ),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            PipReaction(entry.key),
+                            PipReaction(entry.key,
+                                previewable: true, count: entry.value),
                             const SizedBox(width: 6),
                             Text('${entry.value}',
                                 style:

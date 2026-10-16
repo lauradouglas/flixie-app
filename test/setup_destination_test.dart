@@ -2,6 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/core/auth/setup_destination.dart';
 
 void main() {
+  test(
+      'game signup returns to the game without carrying arbitrary query values',
+      () {
+    expect(setupDestination('/play/popcorn-catch?next=https://example.com'),
+        '/play/popcorn-catch');
+    expect(setupDestination('/play/unknown'), isNull);
+  });
   test('Watchlist shortcut survives setup', () {
     expect(setupDestination('/watchlist'), '/watchlist');
     expect(

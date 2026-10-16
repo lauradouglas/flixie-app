@@ -1,0 +1,6 @@
+New in Flixie:
+• Log a film with several friends, with independent watches and ratings.
+• Invite someone to share a viewing and continue after signup.
+• New Pip games and smoother guest play.
+• Clearer shared-watch recaps and improved navigation.
+• Better watch comments, reviews and keyboard layouts.

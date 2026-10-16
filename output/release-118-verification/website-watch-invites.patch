@@ -1,0 +1,116 @@
+diff --git a/flixie/package.json b/flixie/package.json
+index aa55cbd..cafdd0c 100644
+--- a/flixie/package.json
++++ b/flixie/package.json
+@@ -9,7 +9,7 @@
+     "preview": "node scripts/preview.mjs",
+     "clean": "rm -rf dist server.js",
+     "lint": "tsc --noEmit",
+-    "check:seo": "node scripts/check-seo.mjs && node scripts/check-http.mjs && tsx scripts/check-media-share.ts"
++    "check:seo": "node scripts/check-seo.mjs && node scripts/check-http.mjs && tsx scripts/check-media-share.ts && tsx scripts/check-watch-invite.ts"
+   },
+   "dependencies": {
+     "@google/genai": "^2.4.0",
+diff --git a/flixie/scripts/check-watch-invite.ts b/flixie/scripts/check-watch-invite.ts
+new file mode 100644
+index 0000000..ef887de
+--- /dev/null
++++ b/flixie/scripts/check-watch-invite.ts
+@@ -0,0 +1,15 @@
++import assert from 'node:assert/strict';
++import { watchInviteOpenLink } from '../src/watchInvite';
++
++const token = 'a'.repeat(43);
++for (const device of ['ios', null] as const) {
++  assert.equal(watchInviteOpenLink(`?watch=${token}`, device), `flixie:///invite?watch=${token}`);
++}
++const android = watchInviteOpenLink(`?watch=${token}`, 'android')!;
++assert.ok(android.startsWith(`intent:///invite?watch=${token}#Intent;scheme=flixie;package=com.flixie.app;`));
++assert.ok(android.includes('S.browser_fallback_url=' + encodeURIComponent('https://play.google.com/store/apps/details?id=com.flixie.app')));
++for (const search of ['', '?code=referral', '?watch=', '?watch=short', `?watch=${'a'.repeat(44)}`, `?watch=${token}&watch=${token}`, `?watch=${'a'.repeat(42)}%2F`, '?watch=https://evil.example', '?watch=javascript:alert(1)']) {
++  assert.equal(watchInviteOpenLink(search, 'ios'), null, search);
++}
++assert.equal(watchInviteOpenLink(`?code=referral&watch=${token}`, 'ios'), `flixie:///invite?watch=${token}`);
++console.log('Watch invites retain their exact token and safely open iOS/Android; malformed and duplicate tokens are rejected.');
+diff --git a/flixie/src/components/InviteView.tsx b/flixie/src/components/InviteView.tsx
+index 198e93f..d272f67 100644
+--- a/flixie/src/components/InviteView.tsx
++++ b/flixie/src/components/InviteView.tsx
+@@ -1,5 +1,8 @@
+ import { useEffect, useState } from 'react';
+ import { site } from '../site';
++import DownloadLinks from './DownloadLinks';
++import { watchInviteOpenLink } from '../watchInvite';
++import { sharedMediaStore } from '../mediaShare';
+ import { Check, Copy, Smartphone, Users } from 'lucide-react';
+ 
+ type InviteDetails = {
+@@ -14,11 +17,20 @@ const apiBase =
+ export default function InviteView() {
+ 
+   const [invite, setInvite] = useState<InviteDetails | null>(null);
++  const [watchLink, setWatchLink] = useState<string | null>(null);
+   const [invalid, setInvalid] = useState(false);
+   const [copied, setCopied] = useState(false);
+ 
+   useEffect(() => {
+-    const code = new URLSearchParams(window.location.search).get('code')?.trim() ?? '';
++    const params = new URLSearchParams(window.location.search);
++    if (params.has('watch')) {
++      const device = sharedMediaStore(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
++      const link = watchInviteOpenLink(window.location.search, device);
++      setWatchLink(link);
++      setInvalid(link === null);
++      return;
++    }
++    const code = params.get('code')?.trim() ?? '';
+     if (!code) {
+       setInvalid(true);
+       return;
+@@ -57,6 +69,27 @@ export default function InviteView() {
+                 Ask your friend to share a fresh invite from Flixie.
+               </p>
+             </>
++          ) : watchLink ? (
++            <>
++              <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-white">
++                Log your shared watch
++              </h1>
++              <p className="text-text-secondary leading-relaxed">
++                Someone you watched with has invited you to log your own watch on Flixie.
++                Choose your own date, rating and review in the app.
++              </p>
++              <a href={watchLink} className="w-full inline-flex min-h-12 items-center justify-center gap-3 rounded-2xl bg-flixie-purple hover:bg-flixie-light px-5 py-4 text-white font-bold transition-colors">
++                <Smartphone className="h-5 w-5" aria-hidden="true" />
++                Open in Flixie
++              </a>
++              <h2 className="font-display text-xl font-bold">Need the app?</h2>
++              <DownloadLinks />
++              <p className="text-text-secondary leading-relaxed">
++                After installing Flixie, reopen this invite. If you already have the app,
++                tap Open in Flixie above. The app checks whether the invite is still available
++                before you choose to log your watch.
++              </p>
++            </>
+           ) : !invite ? (
+             <div className="space-y-3"><h1 className="font-display text-2xl font-bold">Your Flixie invitation</h1><p className="text-text-secondary" role="status">Loading your invite…</p><noscript>Enable JavaScript to check your invitation, or ask your friend for the referral code.</noscript></div>
+           ) : (
+diff --git a/flixie/src/watchInvite.ts b/flixie/src/watchInvite.ts
+new file mode 100644
+index 0000000..5feccee
+--- /dev/null
++++ b/flixie/src/watchInvite.ts
+@@ -0,0 +1,13 @@
++import { site } from './site';
++
++// The app checks ownership, expiry and claim state. The landing page only builds
++// a safe destination and never claims an invite or creates somebody's watch.
++export function watchInviteOpenLink(search: string, device: 'ios' | 'android' | null): string | null {
++  const tokens = new URLSearchParams(search).getAll('watch');
++  if (tokens.length !== 1 || !/^[A-Za-z0-9_-]{43}$/.test(tokens[0])) return null;
++  const appLink = `flixie:///invite?watch=${encodeURIComponent(tokens[0])}`;
++  if (device !== 'android') return appLink;
++  return appLink.replace('flixie:', 'intent:') +
++    '#Intent;scheme=flixie;package=com.flixie.app;S.browser_fallback_url=' +
++    encodeURIComponent(site.androidUrl) + ';end';
++}

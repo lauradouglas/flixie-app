@@ -1,6 +1,15 @@
+import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
+import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/watchlist_movie.dart';
 
 class MovieWatchEntry {
+  final FriendshipUser? companion;
+  final List<FriendshipUser> companions;
+  List<FriendshipUser> get allCompanions =>
+      companions.isNotEmpty ? companions : [if (companion != null) companion!];
+  final ExternalWatchInvite? externalInvite;
+  final String? planId, reviewBody, reviewTitle;
+  final bool reviewContainsSpoilers;
   final String id;
   final String userId;
   final int movieId;
@@ -14,6 +23,13 @@ class MovieWatchEntry {
   final WatchlistMovieDetails? movie;
 
   const MovieWatchEntry({
+    this.companion,
+    this.companions = const [],
+    this.externalInvite,
+    this.planId,
+    this.reviewBody,
+    this.reviewTitle,
+    this.reviewContainsSpoilers = false,
     required this.id,
     required this.userId,
     required this.movieId,
@@ -28,7 +44,55 @@ class MovieWatchEntry {
   });
 
   factory MovieWatchEntry.fromJson(Map<String, dynamic> json) {
+    final confirmations =
+        (json['watchPlanConfirmations'] as List? ?? []).whereType<Map>();
+    final request = confirmations.firstOrNull?['request'] as Map?;
+    final other = request == null
+        ? json['companion'] as Map?
+        : request[request['requesterId'] == json['userId']
+            ? 'recipient'
+            : 'requester'] as Map?;
+    final people = <String, FriendshipUser>{};
+    for (final confirmation in confirmations) {
+      final plan = confirmation['request'] as Map?;
+      for (final participant
+          in (plan?['participants'] as List? ?? const []).whereType<Map>()) {
+        final user = participant['user'];
+        if (user is Map && user['id'] != json['userId']) {
+          final friend =
+              FriendshipUser.fromJson(Map<String, dynamic>.from(user));
+          people[friend.id] = friend;
+        }
+      }
+      final person = plan?[
+          plan['requesterId'] == json['userId'] ? 'recipient' : 'requester'];
+      if (person is Map) {
+        final friend =
+            FriendshipUser.fromJson(Map<String, dynamic>.from(person));
+        people[friend.id] = friend;
+      }
+    }
+    for (final person in (json['companions'] as List? ?? []).whereType<Map>()) {
+      final friend = FriendshipUser.fromJson(Map<String, dynamic>.from(person));
+      people[friend.id] = friend;
+    }
+    final review =
+        (json['reviews'] as List? ?? []).whereType<Map>().firstOrNull;
     return MovieWatchEntry(
+      externalInvite: json['externalInvite'] is Map<String, dynamic>
+          ? ExternalWatchInvite.fromJson(
+              json['externalInvite'] as Map<String, dynamic>)
+          : null,
+      companions: people.values.toList(),
+      companion: other == null
+          ? null
+          : FriendshipUser.fromJson(Map<String, dynamic>.from(other)),
+      planId: request?['id']?.toString() ?? json['planId']?.toString(),
+      reviewTitle:
+          review?['title']?.toString() ?? json['reviewTitle']?.toString(),
+      reviewBody: review?['body']?.toString() ?? json['reviewBody']?.toString(),
+      reviewContainsSpoilers: review?['containsSpoilers'] == true ||
+          json['reviewContainsSpoilers'] == true,
       id: json['id'] as String,
       userId: json['userId'] as String,
       movieId: _parseInt(json['movieId']) ?? 0,
@@ -48,6 +112,32 @@ class MovieWatchEntry {
 
   Map<String, dynamic> toJson() {
     return {
+      if (externalInvite != null) 'externalInvite': externalInvite!.toJson(),
+      if (allCompanions.isNotEmpty)
+        'companions': [
+          for (final friend in allCompanions)
+            {
+              'id': friend.id,
+              'username': friend.username,
+              'firstName': friend.firstName,
+              'avatar': friend.avatar?.toJson(),
+              'iconColor': friend.iconColor,
+              'profileBadges': friend.profileBadges
+            }
+        ],
+      if (companion != null)
+        'companion': {
+          'id': companion!.id,
+          'username': companion!.username,
+          'firstName': companion!.firstName,
+          'iconColor': companion!.iconColor,
+          'avatar': companion!.avatar?.toJson(),
+          'profileBadges': companion!.profileBadges
+        },
+      if (planId != null) 'planId': planId,
+      if (reviewTitle != null) 'reviewTitle': reviewTitle,
+      if (reviewBody != null) 'reviewBody': reviewBody,
+      'reviewContainsSpoilers': reviewContainsSpoilers,
       'id': id,
       'userId': userId,
       'movieId': movieId,
@@ -64,6 +154,10 @@ class MovieWatchEntry {
 }
 
 class LogMovieWatchRequest {
+  final String? draftId, companionId, reviewBody, externalCompanionName;
+  final List<String>? companionIds;
+  final bool containsSpoilers;
+
   final int movieId;
   final String? watchedAt;
   final double? rating;
@@ -71,6 +165,12 @@ class LogMovieWatchRequest {
   final String? notes;
 
   const LogMovieWatchRequest({
+    this.draftId,
+    this.externalCompanionName,
+    this.companionId,
+    this.companionIds,
+    this.reviewBody,
+    this.containsSpoilers = false,
     required this.movieId,
     this.watchedAt,
     this.rating,
@@ -80,6 +180,14 @@ class LogMovieWatchRequest {
 
   Map<String, dynamic> toJson() {
     return {
+      if (draftId != null) 'draftId': draftId,
+      if (externalCompanionName != null)
+        'externalCompanionName': externalCompanionName,
+      if (draftId != null) 'watchedAt': watchedAt,
+      if (companionId != null) 'companionId': companionId,
+      if (companionIds != null) 'companionIds': companionIds,
+      if (reviewBody != null) 'reviewBody': reviewBody,
+      'containsSpoilers': containsSpoilers,
       'movieId': movieId,
       if (watchedAt != null) 'watchedAt': watchedAt,
       'rating': rating,
@@ -90,12 +198,24 @@ class LogMovieWatchRequest {
 }
 
 class UpdateMovieWatchRequest {
+  final String? draftId, companionId, reviewBody, externalCompanionName;
+  final List<String>? companionIds;
+  final bool containsSpoilers;
+  final int? movieId;
+
   final double? rating;
   final bool? recommended;
   final String? notes;
   final String? watchedAt;
 
   const UpdateMovieWatchRequest({
+    this.draftId,
+    this.externalCompanionName,
+    this.companionId,
+    this.companionIds,
+    this.reviewBody,
+    this.containsSpoilers = false,
+    this.movieId,
     this.rating,
     this.recommended,
     this.notes,
@@ -104,6 +224,15 @@ class UpdateMovieWatchRequest {
 
   Map<String, dynamic> toJson() {
     return {
+      if (draftId != null) 'draftId': draftId,
+      if (externalCompanionName != null)
+        'externalCompanionName': externalCompanionName,
+      if (draftId != null) 'watchedAt': watchedAt,
+      if (companionId != null) 'companionId': companionId,
+      if (companionIds != null) 'companionIds': companionIds,
+      if (reviewBody != null) 'reviewBody': reviewBody,
+      'containsSpoilers': containsSpoilers,
+      if (movieId != null) 'movieId': movieId,
       if (watchedAt != null) 'watchedAt': watchedAt,
       'rating': rating,
       'recommended': recommended,

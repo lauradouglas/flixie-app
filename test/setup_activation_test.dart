@@ -25,6 +25,9 @@ class ActivationAuth extends TestAuth {
 }
 
 class ActivationFixture extends SetupFixture {
+  ActivationFixture() {
+    sharingEnabled = true;
+  }
   final favourites = <String>[];
   final joins = <int>[];
   int favouriteRefreshes = 0;
@@ -178,7 +181,7 @@ void main() {
     expect(find.text('Added to your profile'), findsOneWidget);
   });
   testWidgets(
-      'quick add reuses taste movies and sharing requires a separate opt-in',
+      'quick add preserves sharing and the final signup toggle allows opt-out',
       (t) async {
     final service = ActivationFixture();
     await mount(t, service);
@@ -199,11 +202,25 @@ void main() {
     await t.ensureVisible(toggle);
     await t.pumpAndSettle();
     await captureActivation(t, 'signup-sharing');
-    expect(t.widget<SwitchListTile>(toggle).value, false);
+    expect(t.widget<SwitchListTile>(toggle).value, true);
     await t.tap(toggle);
     await t.pumpAndSettle();
-    expect(service.sharingWrites, [true]);
-    expect(t.widget<SwitchListTile>(toggle).value, true);
+    expect(service.sharingWrites, [false]);
+    expect(t.widget<SwitchListTile>(toggle).value, false);
+  });
+  testWidgets('resumed signup retains a previously saved sharing opt-out',
+      (t) async {
+    final service = ActivationFixture()..sharingEnabled = false;
+    await mount(t, service);
+    await picks(t);
+    await tap(t, 'Continue to favourites');
+    await tap(t, 'Continue to sharing');
+    final toggle =
+        find.widgetWithText(SwitchListTile, 'Share on Around Flixie');
+    await t.ensureVisible(toggle);
+    await t.pumpAndSettle();
+    expect(t.widget<SwitchListTile>(toggle).value, false);
+    expect(service.sharingWrites, isEmpty);
   });
   testWidgets('joining is explicit; skipping setup can reach Home', (t) async {
     final service = ActivationFixture();

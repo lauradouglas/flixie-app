@@ -77,7 +77,12 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       _isCreator || _reviewMovies || r.proposedCandidateId != null;
   WatchRequest get r => widget.request;
   WatchRequestUser? get other => r.otherUser(widget.myUserId);
-  String get friend => other?.username ?? 'your friend';
+  String get friend => r.isSharedViewing
+      ? r.viewingPeople
+          .where((p) => p.id != widget.myUserId)
+          .map((p) => p.displayName)
+          .join(', ')
+      : other?.username ?? 'your friend';
   WatchPlanCandidate? get chosen => r.candidates
       .where((c) => c.id == (r.selectedCandidateId ?? r.proposedCandidateId))
       .firstOrNull;
@@ -116,7 +121,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
 
   bool get complete =>
       r.isCompleted ||
-      [r.requesterId, r.recipientId]
+      r.viewingPersonIds
           .every((id) => r.watchConfirmations.any((c) => c.userId == id));
   bool get due =>
       r.watchConfirmations.isNotEmpty ||
@@ -128,6 +133,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       r.candidates.length > 1 && r.selectedCandidateId == null;
   String get stage {
     if (complete) return 'Your recap';
+    if (r.isSharedViewing) return 'Shared viewing';
     if (r.isDeclined || r.isCancelled || r.isExpired) return 'Plan closed';
     if (r.isPending) {
       return r.requesterId == widget.myUserId
@@ -148,7 +154,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
     if (r.scheduledFor != null && r.normalizedScheduleStatus == 'AGREED') {
       return 'Scheduled';
     }
-    return 'Agree on a date';
+    return r.lightweight ? 'Date to decide' : 'Agree on a date';
   }
 
   @override
@@ -176,7 +182,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               Divider(color: context.colors.tabBarBorder),
               const SizedBox(height: 16),
             ],
-            if (complete)
+            if (complete || (r.isSharedViewing && !r.isTerminal))
               _recap()
             else if (r.isDeclined || r.isCancelled || r.isExpired) ...[
               const SizedBox(height: 16),
@@ -198,8 +204,9 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               _stage(FriendPlanStage.scheduled)
             else
               _stage(FriendPlanStage.schedule),
-            if (!complete) _message(),
+            if (!complete && !r.isSharedViewing) _message(),
             if (!complete &&
+                (!r.isSharedViewing || _isCreator) &&
                 !r.isPending &&
                 !r.isDeclined &&
                 !r.isCancelled &&
@@ -240,11 +247,7 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                         ? context.colors.success
                         : context.colors.primaryText),
                 const SizedBox(height: 10),
-                Row(children: [
-                  _avatar(true, 28),
-                  const SizedBox(width: 6),
-                  _avatar(false, 28)
-                ]),
+                Wrap(spacing: 6, runSpacing: 6, children: _viewingAvatars(28)),
               ])),
           Icon(Icons.chevron_right, color: context.colors.medium),
         ])),
@@ -454,7 +457,8 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
                       const SizedBox(height: 14),
                       Wrap(
                           spacing: 8,
-                          children: [_avatar(true, 38), _avatar(false, 38)]),
+                          runSpacing: 8,
+                          children: _viewingAvatars(38)),
                     ])),
               ],
             )),
@@ -468,7 +472,25 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       myProfileBadges: widget.myProfileBadges,
       busy: widget.busy,
       onConfirmWatched: widget.onConfirmWatched,
-      onNewPlan: widget.onNewPlan);
+      onNewPlan: widget.onNewPlan,
+      onNotThisTime: widget.onNotThisTime);
+
+  List<Widget> _viewingAvatars(double size) => r.isSharedViewing
+      ? [
+          for (final person in r.viewingPeople)
+            Tooltip(
+                message:
+                    person.id == widget.myUserId ? 'You' : person.displayName,
+                child: ProfileAvatarView(
+                    avatar: person.avatar,
+                    profileBadges: person.profileBadges,
+                    fallbackText: person.displayName.isEmpty
+                        ? '?'
+                        : person.displayName[0],
+                    fallbackColor: FlixieColors.primary,
+                    size: size))
+        ]
+      : [_avatar(true, size), _avatar(false, size)];
 
   Widget _avatar(bool mine, double size) => ProfileAvatarView(
         avatar: mine ? widget.myAvatar : other?.avatar,

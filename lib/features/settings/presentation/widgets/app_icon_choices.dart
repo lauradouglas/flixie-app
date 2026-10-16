@@ -4,7 +4,8 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/app_icon/app_icon_service.dart';
 
 class AppIconChoices extends StatefulWidget {
-  const AppIconChoices({super.key});
+  const AppIconChoices({super.key, this.service});
+  final AppIconService? service;
   @override
   State<AppIconChoices> createState() => _AppIconChoicesState();
 }
@@ -12,7 +13,9 @@ class AppIconChoices extends StatefulWidget {
 class _AppIconChoicesState extends State<AppIconChoices> {
   String? _selected;
   bool _supported = false;
+  bool _loaded = false;
   bool _busy = false;
+  AppIconService get _service => widget.service ?? AppIconService.instance;
 
   @override
   void initState() {
@@ -22,10 +25,11 @@ class _AppIconChoicesState extends State<AppIconChoices> {
 
   Future<void> _load() async {
     try {
-      final status = await AppIconService.instance.status();
+      final status = await _service.status();
       if (mounted) {
         setState(() {
           _supported = status['supported'] == true;
+          _loaded = true;
           _selected = status['selected'] as String?;
         });
       }
@@ -37,7 +41,7 @@ class _AppIconChoicesState extends State<AppIconChoices> {
   Future<void> _select(String icon) async {
     setState(() => _busy = true);
     try {
-      final service = AppIconService.instance;
+      final service = _service;
       service.updateUser(context.read<AuthProvider>().dbUser);
       await service.select(icon);
       if (mounted) setState(() => _selected = icon);
@@ -55,7 +59,7 @@ class _AppIconChoicesState extends State<AppIconChoices> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().dbUser;
-    if (!_supported || !AppIconService.eligible(user)) {
+    if (!_loaded || !AppIconService.eligible(user)) {
       return const SizedBox.shrink();
     }
     return Column(
@@ -66,9 +70,14 @@ class _AppIconChoicesState extends State<AppIconChoices> {
         const SizedBox(height: 4),
         const Text('A little thank-you for our First 100 and Founder members.'),
         const SizedBox(height: 12),
+        if (!_supported) ...[
+          const Text('This device doesn’t support changing the app icon.'),
+          const SizedBox(height: 12),
+        ],
         for (final choice in [
           ('default', 'Flixie', 'assets/icon/flixie_icon_1024.png'),
           ('pipGlasses', 'Pip in 3D', 'assets/icon/pip_glasses.png'),
+          ('pipHoodie', 'Pip in a hoodie', 'assets/icon/pip_hoodie.png'),
         ])
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -81,7 +90,8 @@ class _AppIconChoicesState extends State<AppIconChoices> {
             trailing: Icon(_selected == choice.$1
                 ? Icons.radio_button_checked
                 : Icons.radio_button_off),
-            onTap: _busy ? null : () => _select(choice.$1),
+            enabled: _supported,
+            onTap: !_supported || _busy ? null : () => _select(choice.$1),
           ),
         if (_busy) const LinearProgressIndicator(),
       ],

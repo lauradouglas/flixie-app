@@ -175,6 +175,54 @@ HomeWatchPlanState? _stateFor(
       ? plan.groupName!.trim()
       : other;
   final group = plan.groupName?.trim().isNotEmpty == true;
+  if (plan.isSharedViewing) {
+    final names = plan.viewingPeople
+        .where((p) => p.id != userId)
+        .map((p) => p.displayName)
+        .join(', ');
+    final mine =
+        plan.watchConfirmations.where((c) => c.userId == userId).firstOrNull;
+    final responded = plan.viewingPersonIds
+        .where((id) => plan.hasCurrentUserConfirmed(id))
+        .length;
+    final everyone = responded == plan.viewingPersonIds.length;
+    return _state(
+        plan,
+        everyone
+            ? HomeWatchPlanStateType.recap
+            : mine != null
+                ? HomeWatchPlanStateType.waitingForLogs
+                : HomeWatchPlanStateType.logAfterOther,
+        mine == null ? 7 : 11,
+        everyone
+            ? 'SHARED RECAP'
+            : mine == null
+                ? 'SHARED VIEWING'
+                : mine.watched
+                    ? 'YOUR WATCH IS LOGGED'
+                    : 'YOUR RESPONSE IS SAVED',
+        plan.watchPlanTitle,
+        'With $names · $responded of ${plan.viewingPersonIds.length} responded',
+        mine == null
+            ? 'Log your watch'
+            : everyone
+                ? 'View recap'
+                : 'View watch',
+        mine == null);
+  }
+  if (plan.lightweight &&
+      plan.scheduledFor == null &&
+      plan.watchConfirmations.isEmpty) {
+    return _state(
+        plan,
+        HomeWatchPlanStateType.planning,
+        8,
+        'DATE TO DECIDE',
+        plan.watchPlanTitle,
+        'With $companion · Saved, no reply needed',
+        'We watched it',
+        false);
+  }
   final options = plan.candidates.length;
   final selectedByMe =
       plan.candidates.where((candidate) => candidate.selectedBy(userId)).length;
@@ -382,7 +430,7 @@ HomeWatchPlanState? _stateFor(
         'View plan',
         false);
   }
-  if (logged && plan.scheduledFor != null) {
+  if (logged && (plan.scheduledFor != null || plan.lightweight)) {
     return _state(
         plan,
         HomeWatchPlanStateType.waitingForLogs,
@@ -395,7 +443,7 @@ HomeWatchPlanState? _stateFor(
         'View plan',
         false);
   }
-  if (anotherLogged && plan.scheduledFor != null) {
+  if (anotherLogged && (plan.scheduledFor != null || plan.lightweight)) {
     return _state(
         plan,
         HomeWatchPlanStateType.logAfterOther,

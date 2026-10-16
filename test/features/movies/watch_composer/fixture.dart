@@ -105,7 +105,7 @@ class ComposerFixture extends WatchComposerService {
       required String message,
       String? proposedDate,
       required bool dateOnly,
-      String? location}) async {
+      String? location, String? draftId}) async {
     if (failSend) {
       failSend = false;
       throw StateError('Save unavailable');

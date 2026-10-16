@@ -78,9 +78,9 @@ void verifyScheduleEffects(WatchPlanFixture api, {required bool dateOnly}) {
 void main() {
   for (final timed in [false, true]) {
     patrolTest(
-        'creation sends a ${timed ? 'timed' : 'date-only'} invitation and closes only after save',
+        'creation sends a ${timed ? 'timed' : 'date-only'} plan without agreement and closes only after save',
         ($) async {
-      final api = WatchPlanFixture()..failNextPath = '/requests';
+      final api = WatchPlanFixture()..failNextPath = '/watch-requests/together';
       // ignore: invalid_use_of_visible_for_testing_member
       SharedPreferences.setMockInitialValues({});
       useApiFixture(api.client);
@@ -122,22 +122,24 @@ void main() {
       addTearDown(() => expect(api.unexpected, isEmpty));
       await $.pumpWidgetAndSettle(storeScreenshotApp(auth, router));
       await $('Create plan').tap();
-      await tapVisible($, 'Choose when to watch');
+      await tapVisible($, 'Date to decide');
       if (timed) await tapVisible($, 'Date & time');
       await tapVisible($, 'Tomorrow');
       await tapVisible($, 'Save schedule');
-      await tapVisible($, 'Send watch plan');
+      await tapVisible($, 'Save watch plan');
       expect(created, 0);
       expect(errors, 1);
       expect(api.writes, isEmpty);
       expect(find.byType(MovieWatchRequestSheet), findsOneWidget);
-      await tapVisible($, 'Send watch plan');
+      await tapVisible($, 'Save watch plan');
       await $('Create plan').waitUntilVisible();
       expect(created, 1);
-      expect(api.writes.single['proposedDateOnly'], !timed);
+      expect(api.writes.single['dateOnly'], !timed);
       expect(api.writes.single['recipientId'], 'fixture-robin');
-      expect(api.writes.single['candidateMovieIds'], [348]);
-      final saved = DateTime.parse(api.writes.single['proposedDate'] as String);
+      expect(api.writes.single['movieId'], 348);
+      expect(api.plan['status'], 'ACCEPTED');
+      expect(api.plan['lightweight'], true);
+      final saved = DateTime.parse(api.writes.single['scheduledFor'] as String);
       final tomorrow = DateTime.now().add(const Duration(days: 1));
       expect(
           saved,
@@ -444,12 +446,29 @@ void main() {
         (w) => w is Semantics && w.properties.label == 'Rate 8 out of 10');
     await $.tester.ensureVisible(rating);
     await $(rating).tap();
+    await tapVisible($, 'Write a review next');
+    await tapVisible($, 'Recommend');
     final note = find.byType(TextField).last;
     await $.tester.ensureVisible(note);
     await $(note).enterText('Alien is perfect for movie night.');
     await $.tester.testTextInput.receiveAction(TextInputAction.done);
-    await tapVisible($, 'Rate & mark watched');
+    await tapVisible($, 'Save & write review');
+    await $('Dear movie diary…').waitUntilVisible();
+    expect(api.reviews, isEmpty);
+    final title =
+        find.widgetWithText(TextFormField, 'Still thinking about that ending');
+    await $.tester.ensureVisible(title);
+    await $(title).enterText('A perfect movie night');
+    final body =
+        find.widgetWithText(TextFormField, 'What made this one memorable?');
+    await $.tester.ensureVisible(body);
+    await $(body).enterText('Alien builds tension brilliantly.');
+    await $.tester.testTextInput.receiveAction(TextInputAction.done);
+    await tapVisible($, 'Post review');
     await $('Your recap').waitUntilVisible();
+    expect(api.reviews.single['title'], 'A perfect movie night');
+    expect(api.reviews.single['body'], 'Alien builds tension brilliantly.');
+    expect(api.reviews.single['watchEntryId'], 'fixture-watch');
     expect(api.diary.length, 1);
     expect(api.diary.values.single['rating'], 8);
     expect(api.diary.values.single['reviewText'],
@@ -464,6 +483,6 @@ void main() {
     await $.platform.mobile.openApp();
     await $('Your recap').waitUntilVisible();
     expect(api.diary.length, 1);
-    expect(find.text('Rate & mark watched'), findsNothing);
-  });
+    expect(find.text('Save watch'), findsNothing);
+  }, tags: ['review-continuation']);
 }

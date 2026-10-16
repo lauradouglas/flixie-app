@@ -14,11 +14,13 @@ class InCinemasSection extends StatefulWidget {
       required this.onTrailer,
       this.savedIds = const {},
       this.pendingIds = const {},
-      this.loader});
+      this.loader,
+      this.mediaBuilder});
   final String region;
   final ValueChanged<MovieShort> onDetails, onSave, onTrailer;
   final Set<int> savedIds, pendingIds;
   final Future<List<MovieShort>> Function(String region)? loader;
+  final Widget Function(List<MovieShort>)? mediaBuilder;
 
   @override
   State<InCinemasSection> createState() => InCinemasSectionState();
@@ -88,13 +90,14 @@ class InCinemasSectionState extends State<InCinemasSection> {
         if (!_loading && !_failed && _movies.isEmpty)
           const Text('No cinema releases available for this region right now.'),
         if (_movies.isNotEmpty)
-          TrendingCarousel(
-              key: ValueKey(widget.region),
-              movies: _movies,
-              savedIds: widget.savedIds,
-              pendingIds: widget.pendingIds,
-              onDetails: widget.onDetails,
-              onSave: widget.onSave,
-              onTrailer: widget.onTrailer),
+          widget.mediaBuilder?.call(_movies) ??
+              TrendingCarousel(
+                  key: ValueKey(widget.region),
+                  movies: _movies,
+                  savedIds: widget.savedIds,
+                  pendingIds: widget.pendingIds,
+                  onDetails: widget.onDetails,
+                  onSave: widget.onSave,
+                  onTrailer: widget.onTrailer),
       ]));
 }

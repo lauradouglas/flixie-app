@@ -226,32 +226,58 @@ class WatchScheduleProposalResponse {
 }
 
 class WatchConfirmation {
+  final String? watchedAt, watchEntryId, reviewBody, reviewTitle;
+  final bool reviewContainsSpoilers;
   final String id;
   final String userId;
   final bool watched;
   final int? rating;
   final bool? recommended;
   final String? reviewText;
+  final String? watchComment;
   final String? createdAt;
 
   const WatchConfirmation({
+    this.watchedAt,
+    this.watchEntryId,
+    this.reviewBody,
+    this.reviewTitle,
+    this.reviewContainsSpoilers = false,
     required this.id,
     required this.userId,
     required this.watched,
     this.rating,
     this.recommended,
     this.reviewText,
+    String? watchComment,
     this.createdAt,
-  });
+  }) : watchComment = watchComment ?? reviewText;
 
   factory WatchConfirmation.fromJson(Map<String, dynamic> json) {
     return WatchConfirmation(
+      reviewTitle: ((json['watchEntry'] as Map?)?['reviews'] as List?)
+          ?.whereType<Map>()
+          .firstOrNull?['title']
+          ?.toString(),
+      reviewBody: ((json['watchEntry'] as Map?)?['reviews'] as List?)
+          ?.whereType<Map>()
+          .firstOrNull?['body']
+          ?.toString(),
+      reviewContainsSpoilers:
+          ((json['watchEntry'] as Map?)?['reviews'] as List?)
+                  ?.whereType<Map>()
+                  .firstOrNull?['containsSpoilers'] ==
+              true,
+      watchedAt: (json['watchEntry'] as Map?)?['watchedAt']?.toString(),
+      watchEntryId: json['watchEntryId']?.toString(),
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
       watched: _boolValue(json['watched']) ?? false,
       rating: _intValue(json['rating']),
       recommended: _boolValue(json['recommended']),
       reviewText: json['reviewText'] as String?,
+      watchComment: (json['watchEntry'] as Map?)?['notes'] as String? ??
+          json['reviewText'] as String?,
       createdAt: json['createdAt'] as String?,
     );
   }
@@ -350,6 +376,7 @@ class WatchRequestState {
 }
 
 class WatchRequest {
+  final bool lightweight;
   final String id;
   final String requesterId;
   final String recipientId;
@@ -404,6 +431,7 @@ class WatchRequest {
   final WatchRequestMovieDetails? movie;
 
   const WatchRequest({
+    this.lightweight = false,
     required this.id,
     required this.requesterId,
     required this.recipientId,
@@ -471,6 +499,7 @@ class WatchRequest {
         candidates.length > 1 && selectedCandidateId == null;
 
     return WatchRequest(
+      lightweight: json['lightweight'] == true,
       id: json['id']?.toString() ?? '',
       requesterId:
           (json['requesterId'] ?? json['createdById'] ?? createdBy?['id'])
@@ -538,6 +567,22 @@ class WatchRequest {
     );
   }
 
+  /// Everyone in this viewing, including the creator, without requiring a group.
+  List<WatchRequestUser> get viewingPeople => <String, WatchRequestUser>{
+        if (requester != null) requester!.id: requester!,
+        if (recipient != null) recipient!.id: recipient!,
+        for (final participant in participants)
+          if (participant.user != null) participant.user!.id: participant.user!,
+      }.values.toList();
+
+  Set<String> get viewingPersonIds => {
+        requesterId,
+        recipientId,
+        ...participants.map((p) => p.user?.id).whereType<String>(),
+      }..remove('');
+
+  bool get isSharedViewing => groupId == null && viewingPersonIds.length > 2;
+
   /// Returns the other user (not the current user) in this request.
   WatchRequestUser? otherUser(String myUserId) {
     if (participants.isNotEmpty) {
@@ -595,7 +640,7 @@ class WatchRequest {
   /// Total intended participants, including the creator. Direct requests are
   /// always one creator plus one friend. Group responses represent invitees.
   int get analyticsParticipantCount {
-    if (groupId == null) return 2;
+    if (groupId == null) return isSharedViewing ? viewingPersonIds.length : 2;
     final inviteeIds = participants
         .map((participant) => participant.user?.id)
         .whereType<String>()
@@ -616,6 +661,7 @@ class WatchRequest {
   bool get isDeclined => normalizedStatus == 'declined';
   bool get isTerminal => isCompleted || isCancelled || isExpired || isDeclined;
   bool get isAwaitingScheduleApproval =>
+      !lightweight &&
       normalizedScheduleStatus != 'AGREED' &&
       (isAccepted || proposedDate != null || latestPendingProposal != null);
 
@@ -630,6 +676,7 @@ class WatchRequest {
     }
     if (normalizedScheduleStatus == 'AGREED') return 'Scheduled';
     if (normalizedScheduleStatus == 'PROPOSED') return 'Proposed';
+    if (lightweight && scheduledFor == null) return 'Date to decide';
     if (isAccepted) return 'Accepted';
     if (isDeclined) return 'Declined';
     if (normalizedStatus == 'maybe') return 'Maybe';
@@ -677,7 +724,12 @@ class WatchRequest {
   }
 
   bool canConfirmWatchedFor(String userId) =>
-      needsWatchConfirmation == true && !hasCurrentUserConfirmed(userId);
+      (lightweight || needsWatchConfirmation == true) &&
+      viewingPersonIds.contains(userId) &&
+      !isCancelled &&
+      !isDeclined &&
+      !isExpired &&
+      !hasCurrentUserConfirmed(userId);
 
   /// Maps the persisted request and per-person response state to the single
   /// product state shown in Watch Plans. This deliberately does not mutate
@@ -691,6 +743,9 @@ class WatchRequest {
       return WatchPlanStage.past;
     }
 
+    if (isSharedViewing && watchConfirmations.isNotEmpty) {
+      return WatchPlanStage.past;
+    }
     final isIncoming = requesterId != userId &&
         (recipientId == userId || participantFor(userId) != null);
     if (isAccepted &&

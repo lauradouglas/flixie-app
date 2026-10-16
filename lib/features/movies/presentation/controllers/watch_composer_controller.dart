@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/core/utils/watch_plan_schedule.dart';
@@ -36,6 +37,7 @@ class WatchComposerController extends ChangeNotifier {
     providers.addListener(_notify);
   }
   final String requesterId;
+  final String _draftId = const Uuid().v4();
   final String? initialFriendId;
   final WatchComposerService service;
   final WatchComposerProviders providers;
@@ -228,7 +230,9 @@ class WatchComposerController extends ChangeNotifier {
       ?.displayName;
   String get sendButtonLabel =>
       (isGroupMode ? selectedGroupId : selectedFriendId) != null
-          ? 'Send watch plan'
+          ? !isGroupMode && _movieChoices.length == 1
+              ? 'Save watch plan'
+              : 'Send watch plan'
           : "Choose who's watching";
   String? get validationError {
     if ((isGroupMode ? selectedGroupId : selectedFriendId) == null) {
@@ -260,7 +264,8 @@ class WatchComposerController extends ChangeNotifier {
           message: message.trim(),
           proposedDate: proposedDate?.toUtc().toIso8601String(),
           dateOnly: scheduleMode == ScheduleMode.dateOnly,
-          location: locationLabel);
+          location: locationLabel,
+          draftId: _draftId);
       if (!active) return null;
       _sent = true;
       return ComposerSubmission(id, movieId, group, participantCount);

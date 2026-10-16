@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/presentation/widgets/movie_detail_hero.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,11 +29,17 @@ void main() {
       ('/watch-requests/store-movie-night', 'Alien'),
       ('/community/spaces/18', 'The shows that stay with you'),
       ('/movies/157336', 'Interstellar'),
+      ('/movies/1368337', 'The Odyssey'),
       ('/shows/15621', 'The Newsroom'),
     ]) {
       router.go(route);
       await tester.pumpAndSettle();
       expect(find.textContaining(label), findsWidgets, reason: route);
+      expect(
+          MediaQuery.disableAnimationsOf(
+              tester.element(find.textContaining(label).first)),
+          isTrue,
+          reason: 'Store stills must settle decorative animation loops');
       expect(fixture.unexpectedRequests, isEmpty, reason: route);
       expect(find.textContaining('Couldn’t load'), findsNothing, reason: route);
       expect(find.text('Episode details unavailable'), findsNothing,
@@ -55,6 +62,12 @@ void main() {
         expect(find.text('Both confirmed'), findsOneWidget);
         expect(find.text('Add to calendar'), findsOneWidget);
       }
+      if (route == '/movies/1368337') {
+        final hero =
+            tester.widget<MovieDetailHero>(find.byType(MovieDetailHero));
+        expect(hero.movie.title, 'The Odyssey');
+        expect(hero.movie.backdropPath, '/sSIzzVhhLfgLKVBcAUv0X6cLYz9.jpg');
+      }
       if (route == '/movies/157336') {
         expect(find.text('8.7  FlixScore'), findsOneWidget);
         expect(find.text('No ratings yet'), findsNothing);
@@ -75,7 +88,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, '9'));
     await tester.pumpAndSettle();
-    expect(find.text('Rate & mark watched'), findsOneWidget);
+    await tester.tap(find.text('Recommend'));
+    await tester.pumpAndSettle();
+    expect(find.text('Save watch'), findsOneWidget);
     expect(fixture.unexpectedRequests, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
     // Drain the production image/palette deadlines under the fake clock.

@@ -1,3 +1,5 @@
+import 'package:uuid/uuid.dart';
+import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/models/movie_short.dart';
 import 'search_service.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -38,7 +40,8 @@ class WatchComposerService {
       required String message,
       String? proposedDate,
       required bool dateOnly,
-      String? location}) async {
+      String? location,
+      String? draftId}) async {
     final Map<String, dynamic>? result;
     if (group) {
       result = await GroupService.sendWatchRequest(
@@ -49,6 +52,19 @@ class WatchComposerService {
           location: location);
       final request = result?['watchRequest'] as Map<String, dynamic>?;
       return (request?['pgGroupRequestId'] ?? request?['id'])?.toString();
+    }
+    if (movies.length == 1) {
+      final data = await ApiClient.post('/watch-requests/together', body: {
+        'userId': userId,
+        'id': draftId ?? const Uuid().v4(),
+        'recipientId': recipientId,
+        'movieId': movies.single,
+        'message': message,
+        'scheduledFor': proposedDate,
+        'dateOnly': dateOnly,
+        if (location != null) 'location': location,
+      }) as Map;
+      return (data['request'] as Map)['id'].toString();
     }
     result = await RequestService.sendRequest({
       'requesterId': userId,

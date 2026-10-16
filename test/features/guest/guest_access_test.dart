@@ -15,7 +15,11 @@ void main() {
       '/profile',
       '/movies/348',
       '/shows/1399',
-      '/people/1'
+      '/people/1',
+      '/play',
+      '/play/pip-pairs',
+      '/play/space-premiere',
+      '/play/popcorn-catch'
     ]) {
       expect(GuestAccess.isPublicPath(path), isTrue);
     }
@@ -24,7 +28,8 @@ void main() {
       '/watchlist',
       '/messages',
       '/community/settings',
-      '/movies/348/history'
+      '/movies/348/history',
+      '/play/unknown-game'
     ]) {
       expect(GuestAccess.isPublicPath(path), isFalse);
     }

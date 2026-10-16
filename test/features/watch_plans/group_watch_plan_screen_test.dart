@@ -142,10 +142,10 @@ void main() {
     }
 
     await tap('Already watched? Log your watch');
-    await tap('Mark watched without rating');
+    await tap('Save watch');
     expect(find.byType(BottomSheet), findsOneWidget);
     expect(writes, isEmpty);
-    await tap('Mark watched without rating');
+    await tap('Save watch');
     expect(writes.single['userId'], GroupWatchPlanFixture.viewer);
     expect(writes.single['watched'], true);
     expect(attempts, 2);

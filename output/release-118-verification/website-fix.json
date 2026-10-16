@@ -1,0 +1,20 @@
+{
+  "repository": "https://github.com/lauradouglas/flixie-corp",
+  "base_commit": "2b24abc5e10ebc265e48ebe5344dfa2f542d341f",
+  "checkout": "/tmp/flixie-release118-website",
+  "patch": "website-watch-invites.patch",
+  "status": "published; production browser verified",
+  "checks": [
+    "TypeScript",
+    "production browser and SSR build",
+    "SEO and HTTP preview",
+    "existing media-share link regressions",
+    "watch-token iOS/Android/invalid/duplicate regressions",
+    "browser valid-watch, valid-referral and malformed-watch states",
+    "375px phone and 1280px desktop screenshots with no horizontal overflow",
+    "Impeccable detector: no findings"
+  ],
+  "existing_dependency_audit": "npm ci reports 9 existing dependency advisories (5 moderate, 3 high, 1 critical); dependencies unchanged; no audit fix applied",
+  "commit": "fe7ccf95c37cf20eda2e4ced03044cfd06871579",
+  "deployment": "https://github.com/lauradouglas/flixie-corp/actions/runs/38955118894"
+}

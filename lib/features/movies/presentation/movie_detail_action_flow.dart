@@ -1,3 +1,8 @@
+import 'package:flixie_app/features/movies/presentation/widgets/external_watch_invite_sheet.dart';
+import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
+import 'package:uuid/uuid.dart';
+import 'package:flixie_app/features/movies/models/watch_log_details.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/features/movies/data/movie_watch_plan_choice.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
@@ -394,13 +399,17 @@ class MovieDetailActionFlow {
     double? reviewRating;
     bool? reviewRecommended;
     String? shareNote;
-    await showModalBottomSheet<void>(
-      useRootNavigator: true,
-      useSafeArea: true,
+    final draftId = const Uuid().v4();
+    var details = const WatchLogDetails();
+    ExternalWatchInvite? invite = entry?.externalInvite;
+    await showMovieWatchLogSheet<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
+        movieTitle: data.movie?.title,
+        loadFriends: (entry?.externalInvite == null)
+            ? () async => (await FriendService.getFriends(userId)).friendships
+            : null,
+        onDetailsChanged: (value) => details = value,
         initial: entry,
         watchPlans: plans,
         onPlanSelected: (plan) => selectedPlan = plan,
@@ -408,7 +417,7 @@ class MovieDetailActionFlow {
         previousWatch: entry == null && data.movieWatchHistory.isNotEmpty
             ? data.movieWatchHistory.first
             : null,
-        showReviewOption: entry == null,
+        showReviewOption: true,
         onReviewSelected: (selected) => writeReview = selected,
         onSubmit: ({
           required String? watchedAt,
@@ -416,6 +425,9 @@ class MovieDetailActionFlow {
           required bool? recommended,
           required String? notes,
         }) async {
+          if (!isCurrent) {
+            throw StateError('Your session has changed. Reopen the watch log.');
+          }
           try {
             reviewRating = rating;
             reviewRecommended = recommended;
@@ -431,6 +443,11 @@ class MovieDetailActionFlow {
                 final savedWatch = await data.actions.logMovieWatch(
                   userId,
                   LogMovieWatchRequest(
+                    draftId: draftId,
+                    companionId: details.companion?.id,
+                    companionIds:
+                        details.companions.map((friend) => friend.id).toList(),
+                    externalCompanionName: details.externalCompanionName,
                     movieId: movieId,
                     watchedAt: watchedAt,
                     rating: rating,
@@ -439,7 +456,9 @@ class MovieDetailActionFlow {
                   ),
                 );
                 reviewWatchEntryId = savedWatch.id;
+                invite = savedWatch.externalInvite;
               }
+              didSubmit = true;
               // Also mark the movie as watched in the main watched list and
               // update local user state, then offer to remove from watchlist.
               final watchedResult =
@@ -500,16 +519,24 @@ class MovieDetailActionFlow {
                 }
               }
             } else {
-              await data.actions.updateMovieWatch(
+              final updatedWatch = await data.actions.updateMovieWatch(
                 userId,
                 entry.id,
                 UpdateMovieWatchRequest(
+                  companionIds:
+                      details.companions.map((friend) => friend.id).toList(),
+                  companionId:
+                      entry.planId == null ? details.companion?.id : null,
+                  externalCompanionName: details.externalCompanionName,
+                  draftId: draftId,
+                  movieId: movieId,
                   watchedAt: watchedAt,
                   rating: rating,
                   recommended: recommended,
                   notes: notes,
                 ),
               );
+              invite = updatedWatch.externalInvite;
               didSubmit = true;
             }
             if (entry == null) {
@@ -535,6 +562,13 @@ class MovieDetailActionFlow {
             }
             if (!context.mounted || !isCurrent) return;
             await data.loadWatchHistory(userId, movieId);
+            if (selectedPlan != null) {
+              final planId = selectedPlan!.id.split(':').last;
+              reviewWatchEntryId = data.movieWatchHistory
+                  .where((watch) => watch.planId == planId)
+                  .firstOrNull
+                  ?.id;
+            }
             // Evict the cache and re-fetch the movie so the updated
             // community rating (voteAverage / voteCount) is reflected.
             movieService.evictMovie(movieId);
@@ -555,6 +589,13 @@ class MovieDetailActionFlow {
               );
             }
           } catch (e) {
+            if (didSubmit) {
+              logger.w('Watch saved; a follow-up refresh was unavailable: $e');
+              if (context.mounted && isCurrent) {
+                authProvider.markActivityChanged();
+              }
+              return;
+            }
             didSubmit = false;
             if (context.mounted && isCurrent) {
               ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
@@ -567,6 +608,22 @@ class MovieDetailActionFlow {
       ),
     );
     if (!context.mounted || !isCurrent) return didSubmit;
+    if (context.mounted && didSubmit && writeReview && isCurrent) {
+      await showWriteReviewSheet(
+        context,
+        watchEntryId: reviewWatchEntryId,
+        initialRating: reviewRating,
+        initialRecommended: reviewRecommended,
+        initialReview: entry,
+      );
+    }
+    if (context.mounted &&
+        isCurrent &&
+        didSubmit &&
+        invite?.available == true) {
+      await showExternalWatchInviteSheet(
+          context, invite!, data.movie?.title ?? 'this film');
+    }
     if (didSubmit) {
       final user = authProvider.dbUser;
       if (user != null) {
@@ -575,14 +632,6 @@ class MovieDetailActionFlow {
           hasCompletedSetup: user.completedSetup,
         );
       }
-    }
-    if (context.mounted && didSubmit && writeReview && isCurrent) {
-      await showWriteReviewSheet(
-        context,
-        watchEntryId: reviewWatchEntryId,
-        initialRating: reviewRating,
-        initialRecommended: reviewRecommended,
-      );
     }
     if (context.mounted && didSubmit && reviewRating != null && isCurrent) {
       final user = authProvider.dbUser;
@@ -645,6 +694,7 @@ class MovieDetailActionFlow {
     String? watchEntryId,
     double? initialRating,
     bool? initialRecommended,
+    MovieWatchEntry? initialReview,
   }) async {
     if (!await GuestAccess.require(context,
         title: 'Share your thoughts',
@@ -668,8 +718,16 @@ class MovieDetailActionFlow {
       backgroundColor: Colors.transparent,
       builder: (ctx) => WriteReviewSheet(
         movieId: movieId,
+        mediaTitle: data.movie?.title,
+        initialWatchedAt: data.movieWatchHistory
+            .where((entry) => entry.id == watchEntryId)
+            .firstOrNull
+            ?.watchedAt,
         watchEntryId: watchEntryId,
         watchEntries: data.movieWatchHistory,
+        initialTitle: initialReview?.reviewTitle ?? '',
+        initialBody: initialReview?.reviewBody ?? '',
+        initialContainsSpoilers: initialReview?.reviewContainsSpoilers ?? false,
         userId: user.id,
         initialRating: initialRating ?? data.userRating?.toDouble(),
         initialRecommended: initialRecommended,

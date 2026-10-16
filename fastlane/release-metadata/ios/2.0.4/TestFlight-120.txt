@@ -1,0 +1,5 @@
+A smaller Griddy Pip on startup and a cleaner Home screen.
+
+- Reduced Pip’s splash-screen size.
+- Removed the Home catch-up banner; unread updates remain on the notification bell.
+- Includes the guest-play and shared-watch navigation fixes from build 119.

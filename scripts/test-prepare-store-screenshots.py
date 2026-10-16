@@ -67,6 +67,22 @@ class PresentationTest(unittest.TestCase):
         self.assertEqual(presentation.headline(screen, 'ios'), 'Apple\nCopy')
         self.assertEqual(presentation.headline(screen, 'android'), 'Android\nCopy')
 
+    def test_pip_artwork_is_hashed(self):
+        asset = self.root / "pip.png"
+        asset.write_bytes(b"pip")
+        self.config["pip"] = "pip.png"
+        before = presentation.inputs(self.config)
+        asset.write_bytes(b"new pip")
+        self.assertNotEqual(before, presentation.inputs(self.config))
+
+    def test_each_slide_pip_artwork_is_hashed(self):
+        asset = self.root / "rear.png"
+        asset.write_bytes(b"rear")
+        self.config["screens"][0]["pip"] = "rear.png"
+        before = presentation.inputs(self.config)
+        asset.write_bytes(b"updated rear")
+        self.assertNotEqual(before, presentation.inputs(self.config))
+
     def test_current_complete_presentation_is_uploadable(self):
         self.validate()
 

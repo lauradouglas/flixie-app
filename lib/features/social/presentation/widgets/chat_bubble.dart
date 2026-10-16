@@ -27,8 +27,10 @@ class ChatBubble extends StatelessWidget {
     this.replyTo,
     this.onLongPress,
     this.onSenderTap,
+    this.richContent,
   });
 
+  final Widget? richContent;
   final String? currentUserId;
   final String? currentUsername;
   final String message;
@@ -45,7 +47,8 @@ class ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasRichContent = parseActivityReplyPayload(message) != null ||
+    final hasRichContent = richContent != null ||
+        parseActivityReplyPayload(message) != null ||
         parseMovieSharePayload(message) != null;
     return GestureDetector(
       onLongPress: onLongPress,
@@ -142,14 +145,18 @@ class ChatBubble extends StatelessWidget {
                       maxWidth: MediaQuery.of(context).size.width *
                           (hasRichContent ? 0.86 : 0.62),
                     ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
+                    padding: richContent != null
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: hasRichContent
-                          ? context.colors.surface
-                          : isMe
-                              ? FlixieColors.primary
-                              : context.colors.surface,
+                      color: richContent != null
+                          ? Colors.transparent
+                          : hasRichContent
+                              ? context.colors.surface
+                              : isMe
+                                  ? FlixieColors.primary
+                                  : context.colors.surface,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
                         topRight: const Radius.circular(16),
@@ -203,6 +210,7 @@ class ChatBubble extends StatelessWidget {
   }
 
   Widget _buildMessageBody(BuildContext context) {
+    if (richContent != null) return richContent!;
     final activityReply = parseActivityReplyPayload(message);
     if (activityReply != null) {
       return _buildActivityReplyCard(context, activityReply);

@@ -1,0 +1,7 @@
+New in Flixie:
+• Trending movies and TV shows together on Home.
+• More Pip reactions and larger reaction previews.
+• Genre Pips in Communities and animated loading moments.
+• Improved tablet Watch Plans and reaction picker.
+• A clearer welcome for new members, including episode tracking.
+• Refined Home cards, movie and TV labels, friend previews and reliability improvements.

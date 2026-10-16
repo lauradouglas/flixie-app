@@ -1,3 +1,7 @@
+import 'package:flixie_app/features/guest/presentation/guest_home_screen.dart';
+import 'package:flixie_app/features/pip_games/presentation/pages/pip_games_screen.dart';
+import 'package:flixie_app/features/pip_games/audio/game_audio.dart';
+import '../../support/fake_game_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flixie_app/features/guest/data/first_open_store.dart';
 import 'package:flutter/services.dart';
@@ -41,6 +45,12 @@ class GuestReferrals implements ReferralAttributionStore {
 }
 
 void main() {
+  setUp(() {
+    GameAudioSession.backendFactory = FakeGameAudioBackend.new;
+  });
+  tearDown(() {
+    GameAudioSession.backendFactory = NativeGameAudioBackend.new;
+  });
   setUp(() => SharedPreferences.setMockInitialValues(
       {FirstOpenStore.welcomeSeenKey: true}));
   setUpAll(() async {
@@ -77,7 +87,11 @@ void main() {
                     'activity': [
                       {
                         'id': 'fixture-review',
-                        'movie': {'id': 348, 'title': 'Alien'},
+                        'movie': {
+                          'id': 348,
+                          'title': 'Alien',
+                          'mediaType': 'MOVIE'
+                        },
                         'user': {
                           'username': 'FilmFriend',
                           'avatar': null,
@@ -90,7 +104,7 @@ void main() {
                     ]
                   }
                 : [
-                    {'id': 348, 'title': 'Alien'}
+                    {'id': 348, 'title': 'Alien', 'mediaType': 'MOVIE'}
                   ]),
             200);
       }));
@@ -108,11 +122,14 @@ void main() {
                   routerConfig: router,
                   theme: AppTheme.darkTheme,
                   builder: (context, child) => MediaQuery(
-                      data: MediaQuery.of(context)
-                          .copyWith(textScaler: TextScaler.linear(scale)),
+                      data: MediaQuery.of(context).copyWith(
+                          textScaler: TextScaler.linear(scale),
+                          disableAnimations: true),
                       child: child!)))));
       await tester.pumpAndSettle();
-      await tester.widget<RefreshIndicator>(find.byType(RefreshIndicator).first).onRefresh();
+      await tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator).first)
+          .onRefresh();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.text('Home'), findsOneWidget);
@@ -140,6 +157,23 @@ void main() {
           image.dispose();
         });
       }
+      // All three games are genuinely reachable without a signup redirect.
+      await tester.tap(find.byTooltip('Play with Pip'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PipGamesScreen), findsOneWidget);
+      for (final path in [
+        '/play/pip-pairs',
+        '/play/space-premiere',
+        '/play/popcorn-catch'
+      ]) {
+        router.go(path);
+        await tester.pumpAndSettle();
+        expect(router.routeInformationProvider.value.uri.path, path);
+        expect(find.text('Create account'), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
+      router.go('/');
+      await tester.pumpAndSettle();
       await tester.tap(find.text('You'));
       await tester.pumpAndSettle();
       expect(find.text('Create your account'), findsOneWidget);
@@ -148,7 +182,17 @@ void main() {
       expect(find.text('Already a member? Sign in'), findsOneWidget);
       await tester.tap(find.text('Home'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Join Flixie'));
+      await tester.scrollUntilVisible(find.text('Create account'), 500,
+          scrollable: find
+              .descendant(
+                  of: find.byType(GuestHomeScreen),
+                  matching: find.byType(Scrollable))
+              .first);
+      // Independent loading/decoration can animate after the scroll; only
+      // the button layout needs a frame before the navigation tap.
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('Create account').hitTestable(), findsOneWidget);
+      await tester.tap(find.text('Create account'));
       await tester.pumpAndSettle();
       expect(find.text('Already have an account?'), findsOneWidget);
       await tester.ensureVisible(find.text('Sign In'));

@@ -9,6 +9,7 @@ class ChatMessage {
   final DateTime createdAt;
   final String? replyToMessageId;
   final String? imageUrl;
+  final Map<String, dynamic>? game;
 
   /// Message type: 'text' | 'watch_request' | 'system'
   final String type;
@@ -28,6 +29,7 @@ class ChatMessage {
     required this.createdAt,
     this.replyToMessageId,
     this.imageUrl,
+    this.game,
     this.type = 'text',
     this.watchRequestId,
     this.watchRequestPayload,
@@ -60,6 +62,9 @@ class ChatMessage {
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       replyToMessageId: data['replyToMessageId'] as String?,
       imageUrl: data['imageUrl'] as String?,
+      game: data['game'] is Map
+          ? Map<String, dynamic>.from(data['game'] as Map)
+          : null,
       type: type,
       watchRequestId: (data['watchRequestId'] ??
           (data['metadata'] as Map<String, dynamic>?)?['watchRequestId'] ??

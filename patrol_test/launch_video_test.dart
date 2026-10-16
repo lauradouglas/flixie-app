@@ -74,7 +74,7 @@ void main() {
         await $.pumpAndSettle();
         await $.tester.tap(find.byTooltip('Recommend'));
         await $.pumpAndSettle();
-        expect(find.text('Rate & mark watched'), findsOneWidget);
+        expect(find.text('Save watch'), findsOneWidget);
       } else if (target.hitTestable().evaluate().isEmpty) {
         await $.tester.ensureVisible(target);
         await $.pumpAndSettle();

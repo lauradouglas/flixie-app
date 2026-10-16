@@ -1,0 +1,4 @@
+Home Trending improvements:
+• Carousel height follows the tallest card's content.
+• Tighter spacing and four-line synopses.
+• Friends' watchlist and favourite previews on trending TV shows, with separate movie/show state.

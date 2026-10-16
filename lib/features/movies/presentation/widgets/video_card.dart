@@ -1,12 +1,10 @@
+import 'package:flixie_app/features/movies/presentation/trailers/trailer_player_sheet.dart';
 import 'package:flixie_app/app/theme/flixie_typography.dart';
-import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import 'package:flixie_app/models/movie_video.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/core/utils/app_logger.dart';
 
 class VideoCard extends StatelessWidget {
   const VideoCard({super.key, required this.video});
@@ -39,38 +37,8 @@ class VideoCard extends StatelessWidget {
     return 146 + 8 + titleHeight.ceilToDouble();
   }
 
-  Future<void> _launchVideo(BuildContext context) async {
-    final url = video.youtubeUrl;
-    final uri = Uri.parse(url);
-
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showFlixieToast(
-            FlixieToast(
-              type: FlixieToastType.error,
-              content: const Text('Could not open video'),
-              backgroundColor: const Color(0xFFEF4444),
-            ),
-          );
-        }
-        logger.w('Could not launch YouTube URL: $url');
-      }
-    } catch (e) {
-      logger.e('Error launching video', error: e);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showFlixieToast(
-          FlixieToast(
-            type: FlixieToastType.error,
-            content: const Text('Error opening video'),
-            backgroundColor: const Color(0xFFEF4444),
-          ),
-        );
-      }
-    }
-  }
+  Future<void> _launchVideo(BuildContext context) =>
+      showTrailerPlayerSheet(context, source: video.key, title: video.name);
 
   @override
   Widget build(BuildContext context) {

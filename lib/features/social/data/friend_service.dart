@@ -102,4 +102,16 @@ class FriendService {
             (interaction) => interaction.onWatchlist || interaction.favourited)
         .toList(growable: false);
   }
+
+  static Future<List<FriendMediaInteraction>> getFriendsShowInteractions(
+      String userId, int showId) async {
+    final data =
+        await ApiClient.get('/friends/$userId/interactions/show/$showId');
+    return (data as List<dynamic>)
+        .whereType<Map<String, dynamic>>()
+        .map(FriendMediaInteraction.fromJson)
+        .where(
+            (interaction) => interaction.onWatchlist || interaction.favourited)
+        .toList(growable: false);
+  }
 }

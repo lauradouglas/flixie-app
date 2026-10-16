@@ -16,7 +16,7 @@ const storeScreenshotScenes = [
   ('03-watchlist', '/watchlist', 'Interstellar'),
   ('04-watch-plan', '/watch-requests/store-movie-night', 'Alien'),
   ('05-community', '/community/spaces/18', 'The shows that stay with you'),
-  ('06-interstellar', '/movies/157336', 'Interstellar'),
+  ('06-interstellar', '/movies/1368337', 'The Odyssey'),
   ('07-the-newsroom', '/shows/15621', 'The Newsroom'),
   ('08-rating', '/movies/157336', 'Interstellar'),
 ];
@@ -72,9 +72,9 @@ void main() {
         await $.pumpAndSettle();
         await $.tester.tap(find.widgetWithText(TextButton, '9'));
         await $.pumpAndSettle();
-        await $.tester.tap(find.byTooltip('Recommend'));
+        await $.tester.tap(find.text('Recommend'));
         await $.pumpAndSettle();
-        expect(find.text('Rate & mark watched'), findsOneWidget);
+        expect(find.text('Save watch'), findsOneWidget);
       } else if (target.hitTestable().evaluate().isEmpty) {
         await $.tester.ensureVisible(target);
         await $.pumpAndSettle();

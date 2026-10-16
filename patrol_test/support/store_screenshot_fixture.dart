@@ -58,6 +58,11 @@ const screenshotMovies = <Map<String, dynamic>>[
   {
     'id': 1368337,
     'title': 'The Odyssey',
+    'backdropUrl': '/sSIzzVhhLfgLKVBcAUv0X6cLYz9.jpg',
+    'runtime': 173,
+    'voteAverage': 8.7,
+    'overview':
+        'Odysseus embarks on a perilous journey home following the Trojan War, confronting gods, monsters and trials of courage.',
     'posterPath': '/5rhTDKUhPYvpdQIijFIs5VoWsON.jpg',
     'releaseDate': '2026-07-15',
     'genres': [
@@ -452,6 +457,19 @@ class StoreScreenshotFixture {
 
   Object? response(http.Request request) {
     final path = request.url.path;
+    if (path == '/trending/all/day') {
+      return [
+        for (final movie in screenshotMovies) {...movie, 'mediaType': 'MOVIE'},
+        {...screenshotShow, 'mediaType': 'SHOW'}
+      ];
+    }
+    if (path == '/movies/id/1368337') return screenshotMovies[2];
+    if (path.contains('/1368337')) {
+      final alias = http.Request(request.method,
+          request.url.replace(path: path.replaceAll('/1368337', '/157336')))
+        ..body = request.body;
+      return response(alias);
+    }
     if (request.method == 'POST' && path == '/shows/by-ids') {
       return [screenshotShow];
     }
@@ -706,6 +724,9 @@ GoRouter storeScreenshotRouter({bool tabletReview = false}) =>
           path: '/community/spaces/18',
           builder: (_, __) => const CommunitySpaceScreen(communityId: 18)),
       GoRoute(
+          path: '/movies/1368337',
+          builder: (_, __) => const MovieDetailScreen(movieId: '1368337')),
+      GoRoute(
           path: '/movies/157336',
           builder: (_, __) => tabletReview
               ? const FlixieTabletRouteFrame(
@@ -737,7 +758,12 @@ Widget storeScreenshotApp(StoreScreenshotAuth auth, GoRouter router) =>
           builder: (context, child) => ColoredBox(
                 key: const ValueKey('screenshot-app-background'),
                 color: context.colors.background,
-                child: child ?? const SizedBox.shrink(),
+                // Store captures are stills: use the app's reduced-motion
+                // treatment so decorative loops can reach a settled frame.
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
           routerConfig: router),
     );

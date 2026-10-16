@@ -7,6 +7,33 @@ import '../../../support/api_fixture.dart';
 
 void main() {
   test(
+      'an already arranged single-film watch saves directly without a date or invitation response',
+      () async {
+    final requests = <http.Request>[];
+    useApiFixture(MockClient((request) async {
+      requests.add(request);
+      return http.Response(
+          '{"request":{"id":"saved-plan","status":"ACCEPTED","lightweight":true}}',
+          200);
+    }));
+    final result = await const WatchComposerService().send(
+        userId: 'fixture-viewer',
+        recipientId: 'fixture-friend',
+        group: false,
+        movies: [348],
+        message: 'Cinema on Saturday',
+        dateOnly: false,
+        draftId: 'b4eacbd7-4471-47ef-8d8e-79131444d077');
+    expect(result, 'saved-plan');
+    expect(requests, hasLength(1));
+    expect(requests.single.url.path, '/watch-requests/together');
+    final body = jsonDecode(requests.single.body) as Map;
+    expect(body['recipientId'], 'fixture-friend');
+    expect(body['movieId'], 348);
+    expect(body['scheduledFor'], isNull);
+    expect(body.containsKey('decision'), isFalse);
+  });
+  test(
       'friend send identifies the current first candidate and preserves schedule payload',
       () async {
     final requests = <http.Request>[];

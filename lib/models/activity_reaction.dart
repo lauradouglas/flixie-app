@@ -26,6 +26,8 @@ enum ActivityReaction {
     sus,
     greatPick,
     agree,
+    interested,
+    surprised,
   ];
   static ActivityReaction? fromEmoji(String value) {
     for (final reaction in values) {

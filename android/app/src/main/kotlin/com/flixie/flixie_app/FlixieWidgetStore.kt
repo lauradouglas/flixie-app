@@ -84,8 +84,28 @@ object FlixieWidgetStore {
     fun poster(context: Context, item: JSONObject): Bitmap? = synchronized(lock) {
         val name = item.optString("file")
         if (!name.matches(Regex("[a-f0-9-]+-[0-3]\\.jpg"))) return null
-        BitmapFactory.decodeFile(File(directory(context), name).path)
+        decodePoster { options -> BitmapFactory.decodeFile(File(directory(context), name).path, options) }
     }
+
+    // Match the existing TMDB w185 thumbnail budget, including old cached files.
+    // Read dimensions first so the full-size bitmap is never allocated.
+    private fun decodePoster(decode: (BitmapFactory.Options) -> Bitmap?): Bitmap? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        decode(options)
+        if (options.outWidth <= 0 || options.outHeight <= 0 ||
+            options.outWidth.toLong() * options.outHeight > 1_000_000) return null
+        var sample = 1
+        while ((options.outWidth + sample - 1) / sample > 185 ||
+            (options.outHeight + sample - 1) / sample > 278) {
+            sample *= 2
+        }
+        options.inJustDecodeBounds = false
+        options.inSampleSize = sample
+        return decode(options)
+    }
+
+    internal fun decodePosterBytes(bytes: ByteArray): Bitmap? =
+        decodePoster { options -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) }
 
     private fun downloadPoster(path: String): Bitmap? {
         if (!path.matches(Regex("/[A-Za-z0-9._-]+"))) return null
@@ -107,11 +127,7 @@ object FlixieWidgetStore {
                 }
                 output.toByteArray()
             }
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0 ||
-                bounds.outWidth.toLong() * bounds.outHeight > 1_000_000) return null
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            decodePosterBytes(bytes)
         } catch (_: Exception) { null } finally { connection?.disconnect() }
     }
 }

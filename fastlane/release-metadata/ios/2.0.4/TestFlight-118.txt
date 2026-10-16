@@ -1,0 +1,10 @@
+Cinema notebook reviews
+- Choose “Write a review next” while logging a watch, then continue to the full review editor after saving.
+- Write a separate title and review on lavender notebook paper, with Pip, compact gold ratings and a Post review button that stays above the keyboard.
+- Keep your rating, recommendation, watch link and spoiler preference when continuing or editing.
+- Cancelling a review keeps your watch saved.
+
+Games before signup
+- Try Pip’s games without an account.
+- Sign up or sign in to post a Popcorn Catch leaderboard score; posting remains your choice.
+- A completed guest round can continue through signup for up to 24 hours.

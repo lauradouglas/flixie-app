@@ -3,6 +3,7 @@ import 'package:flixie_app/models/watch_request.dart';
 
 class FlixieNotification {
   // Notification type constants
+  static const String availabilityAlert = 'AVAILABILITY_ALERT';
   static const String friendRequest = 'FRIEND_REQUEST';
   static const String groupRequest = 'GROUP_REQUEST';
   static const String groupInvite = 'GROUP_INVITE';

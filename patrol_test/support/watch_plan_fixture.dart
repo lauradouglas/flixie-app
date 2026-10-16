@@ -45,6 +45,7 @@ class WatchPlanFixture {
   final unexpected = <String>[];
   final writes = <Map<String, dynamic>>[];
   final diary = <String, Map<String, dynamic>>{};
+  final reviews = <Map<String, dynamic>>[];
   final searches = <Map<String, String>>[];
   String? failNextPath;
   bool failRatingSync = false;
@@ -173,6 +174,20 @@ class WatchPlanFixture {
       plan['movie'] = movie['movie'];
       return json(plan);
     }
+    if (request.method == 'POST' && path == '/watch-requests/together') {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      writes.add(body);
+      plan = {
+        ...plan,
+        ...body,
+        'id': 'patrol-plan',
+        'status': 'ACCEPTED',
+        'lightweight': true,
+        'scheduledDateOnly': body['dateOnly'],
+        'scheduleStatus': body['scheduledFor'] == null ? 'NONE' : 'AGREED'
+      };
+      return json({'request': plan});
+    }
     if (request.method == 'POST' && path == '/requests') {
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       writes.add(body);
@@ -239,13 +254,22 @@ class WatchPlanFixture {
         {
           ...body,
           'id': 'fixture-entry',
+          'watchEntryId': 'fixture-watch',
           'reviewText': body['reviewText'],
         }
       ];
       plan['status'] = 'COMPLETED';
       return json(state);
     }
-    if (request.method == 'POST' && path == '/movies/348/user/rating') {
+    if (request.method == 'POST' && path == '/users/add/MOVIE/review') {
+      final review = Map<String, dynamic>.from(
+          (jsonDecode(request.body) as Map<String, dynamic>)['review'] as Map);
+      reviews.add(review);
+      return json({...review, 'id': 'fixture-review', 'movieId': 348});
+    }
+    if (request.method == 'POST' &&
+        (path == '/movies/348/user/rating' ||
+            path == '/movies/348/add/rating')) {
       if (failRatingSync) return json({'message': 'Sync unavailable'}, 503);
       return json({'rating': diary.values.firstOrNull?['rating']});
     }

@@ -39,22 +39,25 @@ void main() {
     for (final badge in ['FOUNDER', 'EARLY_ADOPTER']) {
       final service = AppIconService(channel: channel);
       service.updateUser(member('fixture-$badge', [badge]));
-      await service.select('pipGlasses');
-      expect(selected, 'pipGlasses');
+      for (final icon in ['pipGlasses', 'pipHoodie']) {
+        await service.select(icon);
+        expect(selected, icon);
+      }
     }
   });
   test('Other badges cannot select Pip', () async {
     final service = AppIconService(channel: channel);
     service.updateUser(member('other', ['OG_USER', 'FOUNDING_FILM_FRIEND']));
     await expectLater(service.select('pipGlasses'), throwsStateError);
+    await expectLater(service.select('pipHoodie'), throwsStateError);
     expect(calls, isEmpty);
   });
   test('Sign out restores the default and rejects a queued selection',
       () async {
     final service = AppIconService(channel: channel);
     service.updateUser(member('founder', ['FOUNDER']));
-    await service.select('pipGlasses');
-    final queued = service.select('pipGlasses');
+    await service.select('pipHoodie');
+    final queued = service.select('pipHoodie');
     service.updateUser(null);
     await expectLater(queued, throwsStateError);
     await service.select('default');

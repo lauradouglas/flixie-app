@@ -10,6 +10,41 @@ class TrendingService {
   /// Per-timeWindow cache for trending shows (same day-level TTL as movies).
   static final Map<String, _CachedTrendingShows> _showsCache = {};
 
+  static final Map<String, Future<List<MovieShort>>> _mixedRequests = {};
+  static final Map<String, (DateTime, List<MovieShort>)> _mixedCache = {};
+  static Future<List<MovieShort>> getTrendingMedia(
+      {String timeWindow = 'day', bool refresh = false}) async {
+    final cached = _mixedCache[timeWindow];
+    if (!refresh &&
+        cached != null &&
+        DateTime.now().difference(cached.$1) < const Duration(hours: 6)) {
+      return cached.$2;
+    }
+    final pending = _mixedRequests[timeWindow];
+    if (pending != null) return pending;
+    final request = _fetchMixed(timeWindow);
+    _mixedRequests[timeWindow] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(_mixedRequests[timeWindow], request)) {
+        _mixedRequests.remove(timeWindow);
+      }
+    }
+  }
+
+  static Future<List<MovieShort>> _fetchMixed(String timeWindow) async {
+    final data = await ApiClient.get('/trending/all/$timeWindow');
+    final media = (data as List)
+        .whereType<Map<String, dynamic>>()
+        .where((item) => const {'MOVIE', 'SHOW', 'movie', 'tv'}
+            .contains(item['mediaType'] ?? item['media_type']))
+        .map(MovieShort.fromJson)
+        .toList(growable: false);
+    _mixedCache[timeWindow] = (DateTime.now(), List.unmodifiable(media));
+    return media;
+  }
+
   static Future<List<MovieShort>> getTrendingMovies(
       {String timeWindow = 'day', bool refresh = false}) async {
     // Check cache first

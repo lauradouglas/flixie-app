@@ -1,0 +1,31 @@
+{
+  "installed_release": {
+    "version": "2.0.4",
+    "build": 118,
+    "device": "paired physical iPhone",
+    "guest_journey": "live server-issued 130-point round; cancel/reopen account prompt; user-authenticated disposable gamer; restored same score without publication; explicit post; leaderboard gamer (you) 130",
+    "shared_watch": "gamer saved Alien with fictional external Sophie and no score; copied invite; same token opened native preview; user-authenticated second disposable account; precise linked viewing resumed; explicit independent 8/10 save; confirmation and recap show two watches, one rating, owner unrated",
+    "website_defect": "fresh watch invite rejected by referral-only web fallback",
+    "navigation_defects": [
+      "game root after signup has no Close",
+      "Home redirects back to invited recap while resume marker is retained"
+    ]
+  },
+  "local_fixes": [
+    "Always show game Close and route Home when there is no back stack",
+    "Clear owning invited-viewing continuation on standalone Home; completed account to Home, incomplete to setup",
+    "Skip automatic log editor when current viewer already logged the viewing",
+    "Website watch-invite fallback with safe iOS/Android app-open links"
+  ],
+  "checks": {
+    "focused_initial_flutter_tests": 20,
+    "guest_and_existing_game_ui": 6,
+    "pushed_game_back_navigation": 1,
+    "shared_watch_exit_and_router": 3,
+    "analysis": "clean",
+    "native_shared_before_fix": "4/4 passed; build/ios_results_1792176747152.xcresult",
+    "native_guest_fixed": "1/1 passed; build/ios_results_1792177651823.xcresult",
+    "native_shared_final": "3/3 passed; build/ios_results_1792178527684.xcresult"
+  },
+  "release_status": "Fixes shipped in internal TestFlight 2.0.4 (119); website invite fallback published and production-verified"
+}

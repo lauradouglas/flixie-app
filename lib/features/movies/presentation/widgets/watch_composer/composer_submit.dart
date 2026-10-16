@@ -46,7 +46,10 @@ class ComposerSubmit extends StatelessWidget {
           maxLines: 2,
           style: TextStyle(color: context.colors.light),
           decoration: InputDecoration(
-            hintText: 'e.g. Want to watch this together?',
+            hintText:
+                !controller.isGroupMode && controller.movieChoices.length == 1
+                    ? 'e.g. Cinema on Saturday'
+                    : 'e.g. Want to watch this together?',
             hintStyle: TextStyle(color: context.colors.medium, fontSize: 13),
             filled: true,
             fillColor: context.colors.surfaceElevated,
@@ -96,7 +99,9 @@ class ComposerSubmit extends StatelessWidget {
         const SizedBox(height: 14),
         Center(
           child: Text(
-            'The plan stays in Planning until a movie and time are agreed.',
+            !controller.isGroupMode && controller.movieChoices.length == 1
+                ? 'Already planned outside Flixie? Save it here. No accept or decline needed. A date is optional.'
+                : 'Choose the film and arrange a date together.',
             textAlign: TextAlign.center,
             style: TextStyle(color: context.colors.medium, fontSize: 12),
           ),

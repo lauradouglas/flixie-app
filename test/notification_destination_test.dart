@@ -3,6 +3,18 @@ import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/core/utils/notification_destination.dart';
 
 void main() {
+  for (final event in ['COMPANION_LOGGED', 'COMPANION_RATED']) {
+    test('$event opens the linked viewing editor', () {
+      expect(
+          notificationDestination(FlixieNotification(
+              userId: 'me',
+              type: 'MOVIE_WATCH_REQUEST',
+              message: '',
+              data: {'watchPlanId': 'shared-viewing', 'event': event})),
+          '/watch-requests/shared-viewing?log=true');
+    });
+  }
+
   test(
       'new clients use the Community destination alongside a build 70 fallback',
       () {

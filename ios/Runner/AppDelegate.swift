@@ -59,15 +59,17 @@ import UserNotifications
       switch call.method {
       case "status":
         result(["supported": app.supportsAlternateIcons,
-                "selected": app.alternateIconName == "PipGlasses" ? "pipGlasses" : "default"])
+                "selected": app.alternateIconName == "PipHoodie" ? "pipHoodie" :
+                  (app.alternateIconName == "PipGlasses" ? "pipGlasses" : "default")])
       case "set":
         guard let name = call.arguments as? String,
-              name == "default" || name == "pipGlasses",
+              name == "default" || name == "pipGlasses" || name == "pipHoodie",
               app.supportsAlternateIcons else {
           result(FlutterError(code: "ICON_UNAVAILABLE", message: "App icon unavailable", details: nil))
           return
         }
-        let target: String? = name == "default" ? nil : "PipGlasses"
+        let target: String? = name == "default" ? nil :
+          (name == "pipHoodie" ? "PipHoodie" : "PipGlasses")
         if app.alternateIconName == target { result(nil); return }
         app.setAlternateIconName(target) { error in
           DispatchQueue.main.async {

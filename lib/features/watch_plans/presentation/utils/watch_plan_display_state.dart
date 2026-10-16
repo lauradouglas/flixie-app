@@ -50,7 +50,10 @@ class WatchPlanDisplayState {
   const WatchPlanDisplayState._();
 
   static bool isCompleted(WatchRequest request) =>
-      request.isCompleted || request.normalizedWatchedStatus == 'WATCHED';
+      request.isCompleted ||
+      request.normalizedWatchedStatus == 'WATCHED' ||
+      (request.isSharedViewing &&
+          request.viewingPersonIds.every(request.hasCurrentUserConfirmed));
 
   static bool isPostWatchDue(WatchRequest request, {DateTime? now}) {
     final time = request.scheduledFor ?? request.proposedDate;
@@ -73,6 +76,10 @@ class WatchPlanDisplayState {
 
   static bool needsAttention(WatchRequest request, String currentUserId) {
     if (!isActive(request)) return false;
+    if (request.lightweight) {
+      return request.watchConfirmations.any((c) => c.userId != currentUserId) &&
+          !request.hasCurrentUserConfirmed(currentUserId);
+    }
     final isCreator = request.requesterId == currentUserId;
     final isIncoming = request.requesterId != currentUserId &&
         (request.recipientId == currentUserId ||

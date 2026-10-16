@@ -1,0 +1,5 @@
+Play with Pip now opens a retro arcade with Pip Pairs, Popcorn Catch and Space Premiere.
+
+Pip Pairs: match Pip in different outfits, with Easy, Medium and Hard modes and compact boards for phones.
+Space Premiere: steer Pip through a retro space shooter with waves, shields, Practice mode, pause/resume and heart lives.
+Improved game navigation and close controls.

@@ -1,0 +1,8 @@
+More Pip, and more ways to find your next watch.
+
+• Discover trending movies and TV shows together on Home, with clearer title labels.
+• React with more Pip expressions and tap received reactions for a larger preview.
+• Meet genre-themed Pip characters in Communities and animated Pip loading moments on Home.
+• Enjoy improved iPad layouts for Watch Plans and the reaction picker.
+• Get a clearer introduction to watchlists, episode tracking and friends when browsing without an account.
+• Includes interface refinements and reliability improvements.

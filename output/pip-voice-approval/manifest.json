@@ -1,0 +1,129 @@
+{
+  "description": "Pip voice v2: original formant synthesis, not a recording or AI voice-model performance. Nonverbal vocal auditions; no cloned or third-party voice.",
+  "status": "Awaiting approval; not integrated into app",
+  "sample_rate": 24000,
+  "items": [
+    {
+      "file": "pip-curious.wav",
+      "seconds": 0.56,
+      "peak": 0.72,
+      "label": "Curious little \u201cooh?\u201d"
+    },
+    {
+      "file": "pip-hello.wav",
+      "seconds": 0.67,
+      "peak": 0.72,
+      "label": "Friendly \u201coh-oh!\u201d"
+    },
+    {
+      "file": "pip-happy.wav",
+      "seconds": 0.59,
+      "peak": 0.702,
+      "label": "Happy little squeak"
+    },
+    {
+      "file": "pip-giggle.wav",
+      "seconds": 0.62,
+      "peak": 0.69,
+      "label": "Tiny breathy giggle"
+    },
+    {
+      "file": "pip-excited.wav",
+      "seconds": 0.79,
+      "peak": 0.72,
+      "label": "Excited little celebration"
+    },
+    {
+      "file": "pip-eep.wav",
+      "seconds": 0.36,
+      "peak": 0.371,
+      "label": "Startled \u201ceep!\u201d"
+    },
+    {
+      "file": "pip-uh-oh.wav",
+      "seconds": 0.74,
+      "peak": 0.72,
+      "label": "Gentle \u201cuh-oh\u201d"
+    },
+    {
+      "file": "pip-grumble.wav",
+      "seconds": 0.71,
+      "peak": 0.72,
+      "label": "Tiny disappointed grumble"
+    },
+    {
+      "file": "pip-proud.wav",
+      "seconds": 0.69,
+      "peak": 0.72,
+      "label": "Proud contented hum"
+    },
+    {
+      "file": "pip-effort.wav",
+      "seconds": 0.43,
+      "peak": 0.71,
+      "label": "Little effort squeak"
+    },
+    {
+      "file": "pip-sad.wav",
+      "seconds": 0.77,
+      "peak": 0.72,
+      "label": "Soft disappointed whimper"
+    },
+    {
+      "file": "pip-win.wav",
+      "seconds": 0.81,
+      "peak": 0.494,
+      "label": "Happy victory chatter"
+    }
+  ],
+  "sampler_order": [
+    {
+      "label": "Curious little \u201cooh?\u201d",
+      "start": 0.05
+    },
+    {
+      "label": "Friendly \u201coh-oh!\u201d",
+      "start": 1.26
+    },
+    {
+      "label": "Happy little squeak",
+      "start": 2.57
+    },
+    {
+      "label": "Tiny breathy giggle",
+      "start": 3.81
+    },
+    {
+      "label": "Excited little celebration",
+      "start": 5.09
+    },
+    {
+      "label": "Startled \u201ceep!\u201d",
+      "start": 6.53
+    },
+    {
+      "label": "Gentle \u201cuh-oh\u201d",
+      "start": 7.54
+    },
+    {
+      "label": "Tiny disappointed grumble",
+      "start": 8.93
+    },
+    {
+      "label": "Proud contented hum",
+      "start": 10.29
+    },
+    {
+      "label": "Little effort squeak",
+      "start": 11.63
+    },
+    {
+      "label": "Soft disappointed whimper",
+      "start": 12.71
+    },
+    {
+      "label": "Happy victory chatter",
+      "start": 14.13
+    }
+  ]
+}

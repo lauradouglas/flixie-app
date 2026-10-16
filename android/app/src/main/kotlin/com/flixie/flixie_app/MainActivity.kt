@@ -13,23 +13,28 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 val normal = ComponentName(this, "$packageName.DefaultIcon")
                 val pip = ComponentName(this, "$packageName.PipGlassesIcon")
+                val hoodie = ComponentName(this, "$packageName.PipHoodieIcon")
+                val icons = mapOf("default" to normal, "pipGlasses" to pip, "pipHoodie" to hoodie)
                 when (call.method) {
                     "status" -> result.success(mapOf(
                         "supported" to true,
-                        "selected" to if (packageManager.getComponentEnabledSetting(pip) ==
-                            PackageManager.COMPONENT_ENABLED_STATE_ENABLED) "pipGlasses" else "default"))
+                        "selected" to (icons.entries.firstOrNull { (_, component) ->
+                            packageManager.getComponentEnabledSetting(component) ==
+                                PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        }?.key ?: "default")))
                     "set" -> {
                         val name = call.arguments as? String
-                        if (name != "default" && name != "pipGlasses") {
+                        val target = icons[name]
+                        if (target == null) {
                             result.error("ICON_UNAVAILABLE", "Unknown app icon", null)
                         } else {
                             try {
-                                val target = if (name == "pipGlasses") pip else normal
-                                val previous = if (name == "pipGlasses") normal else pip
                                 packageManager.setComponentEnabledSetting(target,
                                     PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
-                                packageManager.setComponentEnabledSetting(previous,
-                                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+                                icons.values.filter { it != target }.forEach { previous ->
+                                    packageManager.setComponentEnabledSetting(previous,
+                                        PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+                                }
                                 result.success(null)
                             } catch (error: Exception) {
                                 result.error("ICON_FAILED", "Could not change app icon", null)

@@ -1,4 +1,9 @@
 class MovieShort {
+  bool get isShow => const {'SHOW', 'TV'}.contains(mediaType?.toUpperCase());
+
+  /// Namespace Home membership/selection to avoid movie and show ID collisions.
+  int get homeKey => isShow ? -id : id;
+
   final int id;
   final String name;
   final String? originalLanguage;

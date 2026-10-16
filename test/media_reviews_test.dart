@@ -85,7 +85,7 @@ void main() {
     expect(
         find.byWidgetPredicate(
             (widget) => widget is PipReaction && widget.value == '👀'),
-        findsNothing);
+        findsOneWidget);
     expect(find.byType(PipReaction), findsWidgets);
     expect(
         find.byWidgetPredicate(

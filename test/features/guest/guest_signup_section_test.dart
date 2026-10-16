@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/core/widgets/pip_startup_illustration.dart';
 import 'package:flixie_app/features/guest/presentation/widgets/guest_signup_section.dart';
 
 void main() {
@@ -28,8 +27,8 @@ void main() {
                               onSignup: () => signup++,
                               onSignin: () => signin++)))))));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.byType(PipStartupIllustration), findsOneWidget);
-      expect(find.textContaining('episodes, seasons'), findsOneWidget);
+      expect(find.text('Make it yours.'), findsOneWidget);
+      expect(find.text('Log watches and rate favourites'), findsOneWidget);
       await tester.ensureVisible(find.text('Create account'));
       await tester.tap(find.text('Create account'));
       expect(signup, 1);

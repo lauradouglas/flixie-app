@@ -1,0 +1,1 @@
+Phone Trending cards now show a tidy Movie or TV show pill in the content below the poster. Includes mixed movie/show Trending, the latest Pip reactions and previews, Home loading animation, community Pips and tablet Watch Plans improvements.

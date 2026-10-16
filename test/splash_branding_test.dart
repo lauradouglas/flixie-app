@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/core/widgets/pip_startup_brand.dart';
-import 'package:flixie_app/core/widgets/pip_startup_illustration.dart';
+import 'package:flixie_app/core/widgets/pip_griddy.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -35,8 +35,7 @@ void main() {
         home: RepaintBoundary(
             key: boundary,
             child: const Scaffold(body: HomeBootLoadingScreen()))));
-    await tester.runAsync(() => precacheImage(
-        AssetImage(PipStartupArtwork.launchAsset),
+    await tester.runAsync(() => precacheImage(const AssetImage(PipGriddy.asset),
         tester.element(find.byType(HomeBootLoadingScreen))));
     await tester.pump();
     expect(find.byType(PipStartupBrand), findsOneWidget);
@@ -78,25 +77,17 @@ void main() {
                 ),
             home: const SplashScreen()),
       ));
-      await tester.runAsync(() => precacheImage(
-          AssetImage(PipStartupArtwork.launchAsset),
+      await tester.runAsync(() => precacheImage(const AssetImage(PipGriddy.asset),
           tester.element(find.byType(SplashScreen))));
       await tester.pump(const Duration(seconds: 1));
       expect(find.bySemanticsLabel('Flixie'), findsOneWidget);
       expect(tester.takeException(), isNull);
       expect(find.byType(PipStartupBrand), findsOneWidget);
-      final splashAsset = tester
-          .widget<PipStartupIllustration>(find.byType(PipStartupIllustration))
-          .asset;
+      expect(find.byType(PipGriddy), findsOneWidget);
       await tester.pumpWidget(
           const MaterialApp(home: Scaffold(body: HomeBootLoadingScreen())));
       await tester.pump();
-      expect(
-          tester
-              .widget<PipStartupIllustration>(
-                  find.byType(PipStartupIllustration))
-              .asset,
-          splashAsset);
+      expect(find.byType(PipGriddy), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

@@ -1,3 +1,9 @@
+import 'package:flixie_app/features/movies/presentation/widgets/watch_entry_review_sheet.dart';
+import 'package:flixie_app/features/movies/presentation/widgets/external_watch_invite_sheet.dart';
+import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
+import 'package:uuid/uuid.dart';
+import 'package:flixie_app/features/movies/models/watch_log_details.dart';
+import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -116,24 +122,36 @@ class WatchlistActionFlow {
   ) async {
     var didSubmit = false;
     final analytics = context.read<AnalyticsController>();
-    await showModalBottomSheet<void>(
+    final draftId = const Uuid().v4();
+    var details = const WatchLogDetails();
+    ExternalWatchInvite? invite;
+    var writeReview = false;
+    MovieWatchEntry? reviewWatch;
+    await showMovieWatchLogSheet<void>(
       context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => RewatchLogSheet(
+        movieTitle: item.movie?.title,
+        showReviewOption: true,
+        onReviewSelected: (value) => writeReview = value,
+        loadFriends: () async =>
+            (await FriendService.getFriends(userId)).friendships,
+        onDetailsChanged: (value) => details = value,
         onSubmit: ({
           required String? watchedAt,
           required double? rating,
           required bool? recommended,
           required String? notes,
         }) async {
-          await _service.logMovieWatch(
+          if (!context.mounted ||
+              context.read<AuthProvider>().dbUser?.id != userId) {
+            throw StateError('Your session has changed. Reopen the watch log.');
+          }
+          final savedWatch = await _service.logMovieWatch(
             userId,
             LogMovieWatchRequest(
+              draftId: draftId,
+              companionId: details.companion?.id,
+              externalCompanionName: details.externalCompanionName,
               movieId: item.movieId,
               watchedAt: watchedAt,
               rating: rating,
@@ -141,16 +159,36 @@ class WatchlistActionFlow {
               notes: notes,
             ),
           );
-          if (rating != null) {
-            await analytics.ratingSaved(source: 'watchlist');
-          }
+          reviewWatch = savedWatch;
+          invite = savedWatch.externalInvite;
           didSubmit = true;
+          if (rating != null) {
+            // Analytics must not turn a committed save into a failed draft.
+            unawaited(
+                analytics.ratingSaved(source: 'watchlist').catchError((_) {}));
+          }
           if (context.mounted) {
             context.read<AuthProvider>().markActivityChanged();
           }
         },
       ),
     );
+    if (didSubmit && writeReview && context.mounted) {
+      await showWatchEntryReviewSheet(context,
+          userId: userId,
+          movieId: item.movieId,
+          mediaTitle: item.movie?.title,
+          watchedAt: reviewWatch?.watchedAt,
+          watchEntryId: reviewWatch?.id,
+          rating: reviewWatch?.rating,
+          recommended: reviewWatch?.recommended);
+    }
+    if (context.mounted &&
+        context.read<AuthProvider>().dbUser?.id == userId &&
+        invite?.available == true) {
+      await showExternalWatchInviteSheet(
+          context, invite!, item.movie?.title ?? 'this film');
+    }
     return didSubmit;
   }
 

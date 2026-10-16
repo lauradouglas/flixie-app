@@ -1,10 +1,15 @@
+import 'package:flixie_app/models/friendship.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/features/social/data/group_service.dart';
 import 'package:flixie_app/features/social/data/request_service.dart';
 
 class MovieWatchPlanChoice {
   const MovieWatchPlanChoice(
-      {required this.id, required this.label, required this.save});
+      {required this.id,
+      required this.label,
+      required this.save,
+      this.companion});
+  final FriendshipUser? companion;
   final String id;
   final String label;
   final Future<void> Function(
@@ -26,7 +31,8 @@ class MovieWatchPlanChoice {
           plan.participantFor(userId)?.response.toUpperCase() == 'ACCEPTED') &&
       plan.hasCurrentUserLoggedWatch != true &&
       !plan.hasCurrentUserConfirmed(userId) &&
-      ((plan.normalizedScheduleStatus == 'AGREED' &&
+      (plan.lightweight ||
+          (plan.normalizedScheduleStatus == 'AGREED' &&
               plan.scheduledFor != null) ||
           plan.canConfirmWatchedFor(userId));
 
@@ -43,6 +49,16 @@ class MovieWatchPlanChoice {
         if (canLinkDirect(plan, userId, movieId))
           MovieWatchPlanChoice(
               id: 'direct:${plan.id}',
+              companion: plan.otherUser(userId) == null
+                  ? null
+                  : FriendshipUser.fromJson({
+                      'id': plan.otherUser(userId)!.id,
+                      'username': plan.otherUser(userId)!.username,
+                      'firstName': plan.otherUser(userId)!.firstName,
+                      'iconColor': plan.otherUser(userId)!.iconColor,
+                      'avatar': plan.otherUser(userId)!.avatar?.toJson(),
+                      'profileBadges': plan.otherUser(userId)!.profileBadges
+                    }),
               label:
                   'With ${plan.otherUser(userId)?.displayName ?? 'your friends'}',
               save: ({watchedAt, rating, recommended, notes}) async {
@@ -53,7 +69,7 @@ class MovieWatchPlanChoice {
                     watchedAt: watchedAt,
                     rating: rating?.round(),
                     recommended: recommended,
-                    reviewText: notes);
+                    reviewText: notes ?? '');
               }),
       for (final item in groups)
         if (item.request.mediaType == 'movie' &&
@@ -67,7 +83,7 @@ class MovieWatchPlanChoice {
                     watchedAt: watchedAt,
                     rating: rating?.round(),
                     recommended: recommended,
-                    reviewText: notes);
+                    reviewText: notes ?? '');
               }),
     ];
   }

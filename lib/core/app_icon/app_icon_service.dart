@@ -35,12 +35,12 @@ class AppIconService {
   }
 
   Future<void> select(String icon) {
-    if (icon != 'default' && icon != 'pipGlasses') {
+    if (icon != 'default' && icon != 'pipGlasses' && icon != 'pipHoodie') {
       return Future<void>.error(ArgumentError.value(icon));
     }
     final owner = _user?.id;
     return _enqueue(() async {
-      if (icon == 'pipGlasses' && (!eligible(_user) || _user?.id != owner)) {
+      if (icon != 'default' && (!eligible(_user) || _user?.id != owner)) {
         throw StateError(
             'This icon is available to First 100 and Founder members.');
       }

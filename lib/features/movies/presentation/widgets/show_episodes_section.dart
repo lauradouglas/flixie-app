@@ -101,6 +101,13 @@ class ShowEpisodesSection extends StatelessWidget {
                         ? 'Specials'
                         : 'Season ${selected.seasonNumber}'),
                 Text(
+                    DateTime.tryParse(selected.airDate ?? '') == null
+                        ? 'Release date to be announced'
+                        : 'Premiere · ${MaterialLocalizations.of(context).formatFullDate(DateTime.parse(selected.airDate!))}',
+                    style:
+                        TextStyle(color: context.colors.light, fontSize: 12)),
+                const SizedBox(height: 4),
+                Text(
                     '${selected.watchedEpisodeCount} of ${selected.resolvedEpisodeCount} watched',
                     style:
                         TextStyle(color: context.colors.light, fontSize: 12)),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -16,12 +17,18 @@ class WriteReviewSheet extends StatefulWidget {
     this.showId,
     required this.userId,
     required this.onSubmitted,
+    this.mediaTitle,
+    this.initialWatchedAt,
     this.initialRating,
     this.initialRecommended,
     this.watchEntryId,
     this.watchEntries = const [],
+    this.initialTitle = '',
+    this.initialBody = '',
+    this.initialContainsSpoilers = false,
   }) : assert((movieId == null) != (showId == null));
 
+  final String? mediaTitle, initialWatchedAt;
   final int? movieId;
   final int? showId;
   final String userId;
@@ -30,6 +37,8 @@ class WriteReviewSheet extends StatefulWidget {
   final bool? initialRecommended;
   final String? watchEntryId;
   final List<MovieWatchEntry> watchEntries;
+  final String initialTitle, initialBody;
+  final bool initialContainsSpoilers;
 
   @override
   State<WriteReviewSheet> createState() => _WriteReviewSheetState();
@@ -47,16 +56,21 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   late bool _recommended;
   bool _containsSpoilers = false;
   bool _isSubmitting = false;
+  bool _editingRating = false;
 
   @override
   void initState() {
     super.initState();
     _watchEntryId = widget.watchEntryId;
+    _titleController.text = widget.initialTitle;
+    _bodyController.text = widget.initialBody;
+    _containsSpoilers = widget.initialContainsSpoilers;
     final initial = widget.initialRating;
     _rating = initial != null && initial >= 1 && initial <= 10
         ? initial.round()
         : null;
     _recommended = widget.initialRecommended ?? true;
+    _editingRating = _rating == null;
   }
 
   @override
@@ -67,7 +81,9 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   }
 
   Future<void> _submit() async {
-    if (_isSubmitting || _rating == null || !_formKey.currentState!.validate()) {
+    if (_isSubmitting ||
+        _rating == null ||
+        !_formKey.currentState!.validate()) {
       return;
     }
     setState(() => _isSubmitting = true);
@@ -131,309 +147,449 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
     return 'Watch $index · ${date == null ? 'No date' : MaterialLocalizations.of(context).formatMediumDate(date.toLocal())}';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final mediaLabel = widget.showId != null ? 'show' : 'movie';
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.9),
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.colors.medium,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          // Header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                    child: Text(
-                  'Write a Review',
-                  style: TextStyle(
-                    color: context.colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )),
-                IconButton(
-                  icon: Icon(Icons.close, color: context.colors.light),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-          ),
-          Divider(color: context.colors.tabBarBorder, height: 1),
-          // Form
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (widget.movieId != null &&
-                        (widget.watchEntries.isNotEmpty ||
-                            widget.watchEntryId != null)) ...[
-                      DropdownButtonFormField<String>(
-                        initialValue: _watchEntryId ?? '',
-                        isExpanded: true,
-                        itemHeight: null,
-                        // Menu rows need generous tap padding, but the selected
-                        // value must fit inside the closed field from first paint.
-                        selectedItemBuilder: (context) => [
-                          const Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text('Standalone review'),
-                          ),
-                          if (widget.watchEntryId != null &&
-                              !widget.watchEntries.any(
-                                  (entry) => entry.id == widget.watchEntryId))
-                            const Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text('The watch you just logged'),
-                            ),
-                          for (final entry in widget.watchEntries)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(_watchLabel(entry)),
-                            ),
-                        ],
-                        decoration:
-                            const InputDecoration(labelText: 'Link to a watch'),
-                        items: [
-                          const DropdownMenuItem(
-                              value: '', child: Text('Standalone review')),
-                          if (widget.watchEntryId != null &&
-                              !widget.watchEntries.any(
-                                  (entry) => entry.id == widget.watchEntryId))
-                            DropdownMenuItem(
-                                value: widget.watchEntryId,
-                                child: const Text('The watch you just logged')),
-                          for (final entry in widget.watchEntries)
-                            DropdownMenuItem(
-                                value: entry.id,
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 12),
-                                  child: Text(_watchLabel(entry)),
-                                )),
-                        ],
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) => setState(() =>
-                                _watchEntryId = value == '' ? null : value),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    // Rating
-                    Text(
-                      'Rating',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 7,
-                      children: List.generate(10, (i) {
-                        final value = i + 1;
-                        final isSelected = value == _rating;
-                        return ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minWidth: 48,
-                            minHeight: 42,
-                          ),
-                          child: FlixiePill.choice(
-                              label: Text('$value'),
-                              avatar: Icon(
-                                  isSelected
-                                      ? Icons.star_rounded
-                                      : Icons.star_border_rounded,
-                                  size: 17),
-                              selected: isSelected,
-                              showCheckmark: false,
-                              onSelected: (_) =>
-                                  setState(() => _rating = value)),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _rating == null
-                          ? 'Choose your rating to submit a review'
-                          : '$_rating / 10',
-                      style: TextStyle(
-                        color: context.colors.medium,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Title
-                    Text(
-                      'Title',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _titleController,
-                      style: TextStyle(color: context.colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Give your review a title',
-                        hintStyle: TextStyle(color: context.colors.medium),
-                        filled: true,
-                        fillColor: context.colors.surfaceElevated,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    // Body
-                    Text(
-                      'Review',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _bodyController,
-                      style: TextStyle(color: context.colors.white),
-                      maxLines: 6,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Share your thoughts about the $mediaLabel...',
-                        hintStyle: TextStyle(color: context.colors.medium),
-                        filled: true,
-                        fillColor: context.colors.surfaceElevated,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 20),
-                    // Toggles
-                    _ToggleTile(
-                      label: 'I recommend this $mediaLabel',
-                      value: _recommended,
-                      onChanged: (v) => setState(() => _recommended = v),
-                    ),
-                    const SizedBox(height: 8),
-                    _ToggleTile(
-                      label: 'Contains spoilers',
-                      value: _containsSpoilers,
-                      onChanged: (v) => setState(() => _containsSpoilers = v),
-                    ),
-                    const SizedBox(height: 28),
-                    // Submit
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: SizedBox(
-                        key: const ValueKey('button'),
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: FlixieColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed:
-                              _isSubmitting || _rating == null ? null : _submit,
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Submit Review',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ), // Flexible
-        ],
-      ),
-    );
+  static const _paper = Color(0xFFEDE1FB);
+  static const _paperInk = Color(0xFF301B46);
+  static const _paperMuted = Color(0xFF684983);
+  static const _paperLine = Color(0xFFC7B3DC);
+
+  bool get _hasWatchChoice =>
+      widget.movieId != null &&
+      (widget.watchEntries.isNotEmpty || widget.watchEntryId != null);
+
+  String? get _watchDate {
+    final entry = widget.watchEntries
+        .where((entry) => entry.id == _watchEntryId)
+        .firstOrNull;
+    final raw = entry?.watchedAt ??
+        (_watchEntryId == widget.watchEntryId ? widget.initialWatchedAt : null);
+    final date = DateTime.tryParse(raw ?? '');
+    return date == null
+        ? null
+        : MaterialLocalizations.of(context).formatMediumDate(date.toLocal());
   }
-}
 
-class _ToggleTile extends StatelessWidget {
-  const _ToggleTile({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
+  Widget _paperField(
+          {required String label,
+          required String hint,
+          required TextEditingController controller,
+          bool body = false}) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label,
+            style: const TextStyle(
+                color: _paperInk, fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          enabled: !_isSubmitting,
+          minLines: body ? 6 : 1,
+          maxLines: body ? null : 3,
+          textCapitalization: TextCapitalization.sentences,
+          textInputAction:
+              body ? TextInputAction.newline : TextInputAction.next,
+          cursorColor: _paperInk,
+          style: const TextStyle(color: _paperInk, fontSize: 15, height: 1.6),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: _paperMuted),
+            filled: false,
+            contentPadding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+            border: body
+                ? InputBorder.none
+                : const UnderlineInputBorder(
+                    borderSide: BorderSide(color: _paperLine)),
+            enabledBorder: body
+                ? InputBorder.none
+                : const UnderlineInputBorder(
+                    borderSide: BorderSide(color: _paperLine)),
+            focusedBorder: body
+                ? InputBorder.none
+                : const UnderlineInputBorder(
+                    borderSide: BorderSide(color: _paperMuted, width: 1.5)),
+            errorStyle: const TextStyle(color: Color(0xFF8D273B)),
+          ),
+          validator: (value) => value == null || value.trim().isEmpty
+              ? (body ? 'Add your thoughts.' : 'Give your review a title.')
+              : null,
+        ),
+      ]);
 
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  Widget _notebook() => Container(
+      key: const ValueKey('review-notebook'),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
+      decoration:
+          BoxDecoration(color: _paper, borderRadius: BorderRadius.circular(20)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              Text(
+                  widget.mediaTitle ??
+                      (widget.showId == null
+                          ? 'Your movie review'
+                          : 'Your show review'),
+                  style: const TextStyle(
+                      color: _paperInk,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700)),
+              if (_watchEntryId != null && _watchDate != null)
+                Text(_watchDate!,
+                    style: const TextStyle(color: _paperMuted, fontSize: 12)),
+            ]),
+        const SizedBox(height: 24),
+        _paperField(
+            label: 'Review title',
+            hint: 'Still thinking about that ending',
+            controller: _titleController),
+        const SizedBox(height: 20),
+        _paperField(
+            label: 'Your review',
+            hint: 'What made this one memorable?',
+            controller: _bodyController,
+            body: true),
+      ]));
+
+  Widget _watchChoice() => DropdownButtonFormField<String>(
+        key: const ValueKey('review-watch-choice'),
+        initialValue: _watchEntryId ?? '',
+        isExpanded: true,
+        style: TextStyle(color: context.colors.light, fontSize: 13),
+        itemHeight: null,
+        selectedItemBuilder: (context) => [
+          const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Standalone review')),
+          if (widget.watchEntryId != null &&
+              !widget.watchEntries
+                  .any((entry) => entry.id == widget.watchEntryId))
+            const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Linked to your saved watch')),
+          for (final entry in widget.watchEntries)
+            Align(
+                alignment: Alignment.centerLeft,
+                child: Text(_watchLabel(entry))),
+        ],
+        decoration: InputDecoration(
+          prefixIcon: Icon(Icons.link_rounded,
+              color: context.colors.primaryText, size: 18),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          filled: false,
+          border: const UnderlineInputBorder(),
+          enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: context.colors.tabBarBorder)),
+          focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: context.colors.primaryText)),
+        ),
+        items: [
+          const DropdownMenuItem(value: '', child: Text('Standalone review')),
+          if (widget.watchEntryId != null &&
+              !widget.watchEntries
+                  .any((entry) => entry.id == widget.watchEntryId))
+            DropdownMenuItem(
+                value: widget.watchEntryId,
+                child: const Text('The watch you just logged')),
+          for (final entry in widget.watchEntries)
+            DropdownMenuItem(
+                value: entry.id,
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(_watchLabel(entry)))),
+        ],
+        onChanged: _isSubmitting
+            ? null
+            : (value) =>
+                setState(() => _watchEntryId = value == '' ? null : value),
+      );
+
+  Widget _ratingEditor() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              Semantics(
+                  label: _rating == null
+                      ? 'No rating selected'
+                      : 'Rating $_rating out of 10',
+                  child: ExcludeSemantics(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(_rating == null ? 'Your rating' : '$_rating / 10',
+                            style: TextStyle(
+                                color: _rating == null
+                                    ? context.colors.light
+                                    : context.colors.warning,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700)),
+                        if (_rating != null)
+                          Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Wrap(
+                                  spacing: 1,
+                                  children: List.generate(
+                                      10,
+                                      (i) => Icon(Icons.star_rounded,
+                                          size: 18,
+                                          color: i < _rating!
+                                              ? context.colors.warning
+                                              : context.colors.tabBarBorder)))),
+                      ]))),
+              TextButton(
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => setState(() => _editingRating = !_editingRating),
+                  child: Text(_editingRating ? 'Done' : 'Change rating')),
+            ]),
+        if (_editingRating) ...[
+          const SizedBox(height: 8),
+          Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: List.generate(
+                  10,
+                  (i) => ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(minWidth: 48, minHeight: 48),
+                      child: FlixiePill.choice(
+                          label: Text('${i + 1}'),
+                          selected: _rating == i + 1,
+                          showCheckmark: false,
+                          onSelected: _isSubmitting
+                              ? null
+                              : (_) => setState(() {
+                                    _rating = i + 1;
+                                    _editingRating = false;
+                                  }))))),
+          if (_rating == null)
+            Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('Choose your rating to post a review.',
+                    style:
+                        TextStyle(color: context.colors.medium, fontSize: 12))),
+        ],
+      ]);
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: context.colors.tabBarBorder),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-              child: Text(label,
-                  style: TextStyle(color: context.colors.light, fontSize: 14))),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: FlixieColors.primary,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      LayoutBuilder(builder: (context, constraints) {
+        final size = MediaQuery.sizeOf(context);
+        final inset = MediaQuery.viewInsetsOf(context).bottom;
+        final available =
+            (constraints.maxHeight - inset).clamp(0.0, constraints.maxHeight);
+        final height = (size.height * .9).clamp(0.0, available);
+        final compact = height < 300;
+        return Padding(
+            padding: EdgeInsets.only(bottom: inset),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              heightFactor: 1,
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SizedBox(
+                      height: height,
+                      child: Material(
+                        color: context.colors.surface,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(24)),
+                        clipBehavior: Clip.antiAlias,
+                        child: SafeArea(
+                            top: false,
+                            child: Column(children: [
+                              if (!compact) ...[
+                                Container(
+                                    margin: const EdgeInsets.only(
+                                        top: 12, bottom: 4),
+                                    width: 36,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                        color: context.colors.medium,
+                                        borderRadius:
+                                            BorderRadius.circular(4))),
+                                Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(24, 0, 12, 0),
+                                    child: Row(children: [
+                                      const Expanded(
+                                          child: FlixieWordmark(fontSize: 21)),
+                                      IconButton(
+                                          tooltip: 'Close review',
+                                          onPressed: _isSubmitting
+                                              ? null
+                                              : () =>
+                                                  Navigator.of(context).pop(),
+                                          icon:
+                                              const Icon(Icons.close_rounded)),
+                                    ])),
+                              ],
+                              Expanded(
+                                  child: SingleChildScrollView(
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
+                                padding:
+                                    const EdgeInsets.fromLTRB(24, 6, 24, 24),
+                                child: Form(
+                                    key: _formKey,
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          if (!compact) ...[
+                                            Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Expanded(
+                                                      child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                        Text(
+                                                            'Dear ${widget.showId == null ? 'movie' : 'TV'} diary…',
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .headlineSmall
+                                                                ?.copyWith(
+                                                                    fontSize:
+                                                                        26,
+                                                                    height:
+                                                                        1.15,
+                                                                    letterSpacing:
+                                                                        -.5,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700)),
+                                                        const SizedBox(
+                                                            height: 8),
+                                                        Text(
+                                                            _watchEntryId ==
+                                                                    null
+                                                                ? 'A little space for your take.'
+                                                                : 'Your watch is saved.\nNow for your take.',
+                                                            style: TextStyle(
+                                                                color: context
+                                                                    .colors
+                                                                    .medium,
+                                                                fontSize: 13,
+                                                                height: 1.5)),
+                                                      ])),
+                                                  const SizedBox(width: 12),
+                                                  Image.asset(
+                                                      'assets/icon/pip_emote_hot_take.png',
+                                                      width: 88,
+                                                      height: 96,
+                                                      fit: BoxFit.contain,
+                                                      excludeFromSemantics:
+                                                          true),
+                                                ]),
+                                            const SizedBox(height: 12),
+                                          ],
+                                          _notebook(),
+                                          if (_hasWatchChoice) ...[
+                                            const SizedBox(height: 14),
+                                            _watchChoice()
+                                          ],
+                                          const SizedBox(height: 18),
+                                          _ratingEditor(),
+                                          const SizedBox(height: 18),
+                                          Wrap(
+                                              spacing: 8,
+                                              runSpacing: 8,
+                                              children: [
+                                                FlixiePill.choice(
+                                                    label:
+                                                        const Text('Recommend'),
+                                                    avatar: const Icon(
+                                                        Icons
+                                                            .thumb_up_alt_outlined,
+                                                        size: 16),
+                                                    selected: _recommended,
+                                                    showCheckmark: false,
+                                                    onSelected: _isSubmitting
+                                                        ? null
+                                                        : (value) => setState(
+                                                            () => _recommended =
+                                                                value)),
+                                                FlixiePill.choice(
+                                                    label: const Text(
+                                                        'Contains spoilers'),
+                                                    avatar: const Icon(
+                                                        Icons
+                                                            .visibility_off_outlined,
+                                                        size: 16),
+                                                    selected: _containsSpoilers,
+                                                    showCheckmark: false,
+                                                    onSelected: _isSubmitting
+                                                        ? null
+                                                        : (value) => setState(() =>
+                                                            _containsSpoilers =
+                                                                value)),
+                                              ]),
+                                        ])),
+                              )),
+                              Container(
+                                  padding: EdgeInsets.fromLTRB(24,
+                                      compact ? 6 : 12, 24, compact ? 6 : 16),
+                                  decoration: BoxDecoration(
+                                      border: Border(
+                                          top: BorderSide(
+                                              color: context
+                                                  .colors.tabBarBorder))),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                              minimumSize:
+                                                  const Size.fromHeight(50),
+                                              backgroundColor:
+                                                  FlixieColors.primary,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          15))),
+                                          onPressed:
+                                              _isSubmitting || _rating == null
+                                                  ? null
+                                                  : _submit,
+                                          icon: _isSubmitting
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.white))
+                                              : const Icon(Icons.send_rounded,
+                                                  size: 18),
+                                          label: Text(
+                                              _isSubmitting
+                                                  ? 'Posting…'
+                                                  : 'Post review',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w700)),
+                                        ),
+                                        if (!compact && inset == 0) ...[
+                                          const SizedBox(height: 9),
+                                          Text(
+                                              'Shared following your privacy settings.',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                  color: context.colors.medium,
+                                                  fontSize: 11)),
+                                        ],
+                                      ])),
+                            ])),
+                      ))),
+            ));
+      });
 }

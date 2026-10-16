@@ -1,3 +1,4 @@
+import '../widgets/availability_alert_setting.dart';
 import '../widgets/blocked_users_sheet.dart';
 import '../widgets/settings_edit_profile_sheet.dart';
 import '../widgets/episode_spoiler_setting.dart';
@@ -195,12 +196,14 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              // TODO: implement Notifications settings
-              // SettingsTile(
-              //   icon: Icons.notifications_outlined,
-              //   label: 'Notifications',
-              //   onTap: () {},
-              // ),
+              Consumer<AuthProvider>(builder: (context, auth, _) {
+                final userId = auth.dbUser?.id;
+                if (userId == null) return const SizedBox.shrink();
+                return AvailabilityAlertSetting(
+                    key: ValueKey(userId),
+                    userId: userId,
+                    isCurrentUser: () => auth.dbUser?.id == userId);
+              }),
               const AppearanceSetting(),
               SettingsTile(
                 icon: Icons.live_tv_outlined,

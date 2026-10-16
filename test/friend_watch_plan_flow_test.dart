@@ -107,6 +107,100 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final spec in [(320.0, 1.6), (844.0, 1.0), (1024.0, 1.0)]) {
+    testWidgets(
+        'shared viewing shows all people and logs only this viewer at $spec',
+        (tester) async {
+      var logs = 0;
+      final request = fixture({
+        'lightweight': true,
+        'movieId': 348,
+        'movie': {'id': 348, 'title': 'Alien'},
+        'candidates': [],
+        'participants': [
+          {
+            'user': {
+              'id': 'laura',
+              'username': 'Laura',
+              'profileBadges': [
+                {'badge': 'FOUNDER'}
+              ]
+            }
+          },
+          {
+            'user': {'id': 'me', 'username': 'You'}
+          },
+          {
+            'user': {
+              'id': 'casey',
+              'username': 'Casey with a longer display name',
+              'profileBadges': [
+                {'badge': 'EARLY_ADOPTER'}
+              ]
+            }
+          },
+        ],
+        'watchConfirmations': [
+          {
+            'id': 'laura-watch',
+            'userId': 'laura',
+            'watched': true,
+            'rating': 8
+          },
+        ],
+      });
+      expect(request.isSharedViewing, isTrue);
+      expect(request.analyticsParticipantCount, 3);
+      expect(request.canConfirmWatchedFor('casey'), isTrue);
+      expect(request.canConfirmWatchedFor('outsider'), isFalse);
+      await show(tester, request,
+          width: spec.$1, scale: spec.$2, logWatch: () => logs++);
+      expect(find.text('Casey with a longer display name'), findsOneWidget);
+      expect(find.text('Of 3 people'), findsOneWidget);
+      expect(find.text('1 of 3 rated'), findsOneWidget);
+      expect(find.text('Your recap'), findsNothing);
+      await tester.ensureVisible(find.text('Log your watch'));
+      await tester.tap(find.text('Log your watch'));
+      expect(logs, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('missed response completes shared recap when everyone else rated',
+      (tester) async {
+    await show(
+        tester,
+        fixture({
+          'lightweight': true,
+          'movieId': 348,
+          'movie': {'id': 348, 'title': 'Alien'},
+          'candidates': [],
+          'participants': [
+            {
+              'user': {'id': 'laura', 'username': 'Laura'}
+            },
+            {
+              'user': {'id': 'me', 'username': 'You'}
+            },
+            {
+              'user': {'id': 'casey', 'username': 'Casey'}
+            },
+          ],
+          'watchConfirmations': [
+            {'userId': 'laura', 'watched': true, 'rating': 8},
+            {'userId': 'casey', 'watched': true, 'rating': 6},
+            {'userId': 'me', 'watched': false},
+          ],
+        }),
+        width: 390);
+    expect(find.text('Everyone who watched has rated'), findsOneWidget);
+    expect(find.text('Everyone has responded'), findsOneWidget);
+    expect(find.text('1 wasn’t there'), findsOneWidget);
+    expect(find.text('7.0 avg · 2 ratings'), findsOneWidget);
+    expect(find.text('Log your watch'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final target in ['poster', 'title']) {
     testWidgets('tapping movie $target opens details and back returns to plan',
         (tester) async {

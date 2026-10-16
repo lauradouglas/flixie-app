@@ -119,14 +119,14 @@ void watchComposerJourneys(
       await openComposer($, api,
           group: group, success: () => successes++, error: () => errors++);
       if (!group) await composerTap($, 'Robin');
-      await composerTap($, 'Choose when to watch');
+      await composerTap($, 'Date to decide');
       await composerTap($, 'Tomorrow');
       await composerTap($, 'Save schedule');
-      await composerTap($, 'Send watch plan');
+      await composerTap($, group ? 'Send watch plan' : 'Save watch plan');
       expect(successes, 0);
       expect(errors, 1);
       expect(find.byType(MovieWatchRequestSheet), findsOneWidget);
-      await composerTap($, 'Send watch plan');
+      await composerTap($, group ? 'Send watch plan' : 'Save watch plan');
       expect(successes, 1);
       expect(errors, 1);
       expect(find.byType(MovieWatchRequestSheet), findsNothing);
@@ -145,7 +145,7 @@ void watchComposerJourneys(
     expect(find.text('In cinemas near you'), findsOneWidget);
     await composerTap($, 'The Odyssey');
     expect(api.cinemaRegions, ['GB']);
-    await composerTap($, 'Send watch plan');
+    await composerTap($, 'Save watch plan');
     expect(api.writes.single['movies'], [1368337]);
     expect(find.byType(MovieWatchRequestSheet), findsNothing);
   });
@@ -174,7 +174,7 @@ void watchComposerJourneys(
     final api = ComposerFixture(), auth = ComposerAuth();
     await openComposer($, api, auth: auth);
     await composerTap($, 'Robin');
-    await composerTap($, 'Choose when to watch');
+    await composerTap($, 'Date to decide');
     expect(find.byType(BottomSheet), findsNWidgets(2));
     auth.switchAccount();
     await $.pumpAndSettle();
@@ -192,7 +192,7 @@ void watchComposerJourneys(
         success: () => successes++,
         error: () => errors++);
     await composerTap($, 'Robin');
-    await composerTap($, 'Send watch plan');
+    await composerTap($, 'Save watch plan');
     expect(successes, 1);
     expect(errors, 0);
     expect(api.writes.length, 1);
@@ -234,7 +234,7 @@ void watchComposerJourneys(
     await openComposer($, api,
         auth: auth, success: () => callbacks++, error: () => callbacks++);
     await composerTap($, 'Robin');
-    final send = find.text('Send watch plan');
+    final send = find.text('Save watch plan');
     await $.tester.ensureVisible(send);
     await $.pumpAndSettle();
     await $.tester.tap(send);

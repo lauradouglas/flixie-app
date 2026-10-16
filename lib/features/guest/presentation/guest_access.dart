@@ -31,9 +31,14 @@ class GuestAccess {
         '/welcome',
         '/around-flixie',
         '/help-support',
-        '/about-credits'
+        '/about-credits',
+        '/play',
+        '/play/pip-pairs',
+        '/play/space-premiere',
+        '/play/popcorn-catch'
       ].contains(path) ||
-      RegExp(r'^/(movies|shows|people|collections)/[0-9]+$').hasMatch(path);
+      RegExp(r'^/(movies|shows|people|collections)/[0-9]+$').hasMatch(path) ||
+      RegExp(r'^/watch-invites/[A-Za-z0-9_-]{43}$').hasMatch(path);
 
   static Future<bool> require(
     BuildContext context, {

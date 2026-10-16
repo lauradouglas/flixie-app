@@ -113,13 +113,8 @@ void main() async {
   );
   await analyticsController.initialize();
 
-  // Lock to portrait + landscape orientations, allow both
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
+  // Screens stay portrait; the trailer route temporarily requests landscape.
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   // Explicitly enable edge-to-edge on older Android versions as well.
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {

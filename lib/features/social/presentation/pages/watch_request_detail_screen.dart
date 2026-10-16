@@ -12,19 +12,25 @@ import 'watch_requests_screen.dart';
 
 /// Dedicated full-page view for one Watch Plan.
 class WatchRequestDetailScreen extends StatelessWidget {
-  const WatchRequestDetailScreen({super.key, required this.requestId});
+  const WatchRequestDetailScreen(
+      {super.key, required this.requestId, this.logOnOpen = false});
   final String requestId;
+  final bool logOnOpen;
   @override
   Widget build(BuildContext context) {
     final viewer =
         context.select<AuthProvider, String?>((auth) => auth.dbUser?.id);
     return _WatchRequestDetailPage(
-        key: ValueKey((viewer, requestId)), requestId: requestId);
+        key: ValueKey((viewer, requestId)),
+        requestId: requestId,
+        logOnOpen: logOnOpen);
   }
 }
 
 class _WatchRequestDetailPage extends StatefulWidget {
-  const _WatchRequestDetailPage({super.key, required this.requestId});
+  final bool logOnOpen;
+  const _WatchRequestDetailPage(
+      {super.key, required this.requestId, required this.logOnOpen});
   final String requestId;
   @override
   State<_WatchRequestDetailPage> createState() =>
@@ -52,6 +58,8 @@ class _WatchRequestDetailScreenState extends State<_WatchRequestDetailPage> {
       final auth = context.read<AuthProvider>();
       final userId = auth.dbUser?.id;
       _viewer = userId;
+      // Companion-log notifications are direct plans; avoid scanning every group first.
+      if (widget.logOnOpen) return;
       bool current() =>
           mounted &&
           generation == _generation &&
@@ -101,6 +109,7 @@ class _WatchRequestDetailScreenState extends State<_WatchRequestDetailPage> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    return WatchRequestsScreen(initialRequestId: widget.requestId);
+    return WatchRequestsScreen(
+        initialRequestId: widget.requestId, logOnOpen: widget.logOnOpen);
   }
 }

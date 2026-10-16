@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/popcorn_catch/models/popcorn_challenge.dart';
+import 'package:flixie_app/features/popcorn_catch/presentation/widgets/popcorn_challenge_card.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_back_button.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
@@ -425,7 +427,22 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                             },
                           );
                         }
+                        Widget? gameCard;
+                        if (currentUserId != null &&
+                            (msg.type == 'popcorn_challenge' ||
+                                msg.type == 'popcorn_result') &&
+                            msg.game != null) {
+                          try {
+                            gameCard = PopcornChallengeCard(
+                                challenge: PopcornChallenge.fromJson(msg.game!),
+                                currentUserId: currentUserId,
+                                result: msg.type == 'popcorn_result');
+                          } catch (_) {
+                            /* Older malformed cards keep their readable text fallback. */
+                          }
+                        }
                         return ChatBubble(
+                          richContent: gameCard,
                           onLongPress: isMe
                               ? null
                               : () async {

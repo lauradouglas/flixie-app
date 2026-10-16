@@ -6,36 +6,53 @@
   "screens": [
     {
       "scene": "01-home",
-      "headline": "Movies, TV\n& friends."
+      "headline": "Movies, TV\n& friends.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-perched-looking-down.png",
+      "pip_position": "top-right"
     },
     {
       "scene": "06-interstellar",
-      "headline": "See what your\nfriends think.",
-      "android_headline": "Find your film.\nSee where to watch."
+      "headline": "Find your film.\nSee where to watch.",
+      "android_headline": "Find your film.\nSee where to watch.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-rear-view.png",
+      "pip_position": "bottom-left"
     },
     {
       "scene": "03-watchlist",
-      "headline": "Your next watch.\nAll in one place."
+      "headline": "Your next watch.\nAll in one place.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
+      "pip_position": "bottom-left"
     },
     {
       "scene": "04-watch-plan",
-      "headline": "Make movie\nnight happen."
+      "headline": "Make movie\nnight happen.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-rear-view.png",
+      "pip_position": "bottom-left"
     },
     {
       "scene": "08-rating",
-      "headline": "Every watch.\nYour own rating."
+      "headline": "Every watch.\nYour own rating.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
+      "pip_position": "bottom-left"
     },
     {
       "scene": "07-the-newsroom",
-      "headline": "Never lose\nyour place."
+      "headline": "Never lose\nyour place.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-perched-looking-down.png",
+      "pip_position": "top-right"
     },
     {
       "scene": "05-community",
-      "headline": "Find your\nfilm people."
+      "headline": "Find your\nfilm people.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-rear-view.png",
+      "pip_position": "bottom-left"
     },
     {
       "scene": "02-profile",
-      "headline": "Your favourites.\nYour film identity."
+      "headline": "Your favourites.\nYour film identity.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
+      "pip_position": "bottom-left"
     }
-  ]
+  ],
+  "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png"
 }

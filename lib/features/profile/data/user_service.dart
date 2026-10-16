@@ -906,8 +906,13 @@ class UserService {
     LogMovieWatchRequest request,
   ) async {
     final data = await ApiClient.post(
-      '/users/$userId/movie/watches',
-      body: request.toJson(),
+      request.draftId == null
+          ? '/users/$userId/movie/watches'
+          : '/watch-requests/log-watch',
+      body: {
+        ...request.toJson(),
+        if (request.draftId != null) 'userId': userId
+      },
     );
     final entry = MovieWatchEntry.fromJson(data as Map<String, dynamic>);
     MovieRatingPrivacy.instance
@@ -946,10 +951,14 @@ class UserService {
     String watchEntryId,
     UpdateMovieWatchRequest request,
   ) async {
-    final data = await ApiClient.patch(
-      '/users/$userId/movie/watches/$watchEntryId',
-      body: request.toJson(),
-    );
+    final data = request.draftId != null
+        ? await ApiClient.post('/watch-requests/log-watch', body: {
+            ...request.toJson(),
+            'userId': userId,
+            'watchEntryId': watchEntryId
+          })
+        : await ApiClient.patch('/users/$userId/movie/watches/$watchEntryId',
+            body: request.toJson());
     final entry = MovieWatchEntry.fromJson(data as Map<String, dynamic>);
     MovieRatingPrivacy.instance
         .ratingSaved(userId, entry.movieId, entry.rating);

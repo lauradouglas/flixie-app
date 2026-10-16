@@ -1,0 +1,29 @@
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "checked": [
+      "pairs-music",
+      "popcorn-music",
+      "space-music",
+      "arcade-select",
+      "arcade-pause",
+      "pairs-flip",
+      "pairs-match",
+      "pairs-mismatch",
+      "pairs-complete",
+      "popcorn-catch",
+      "popcorn-gold",
+      "popcorn-burnt",
+      "popcorn-streak",
+      "popcorn-round",
+      "space-laser",
+      "space-enemy",
+      "space-shield",
+      "space-heart",
+      "space-wave",
+      "space-over"
+    ],
+    "status": "passed"
+  },
+  "id": ""
+}

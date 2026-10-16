@@ -42,6 +42,9 @@ def headline(screen, platform):
 def inputs(config):
     paths = [ROOT / 'fastlane/ScreenshotPresentation.json',
              ROOT / 'scripts/render-store-screenshots.swift', ROOT / config['font']]
+    if config.get('pip'):
+        paths.append(ROOT / config['pip'])
+    paths.extend(ROOT / screen['pip'] for screen in config['screens'] if screen.get('pip'))
     return {str(path.relative_to(ROOT)): digest(path) for path in paths}
 
 
@@ -119,11 +122,13 @@ def prepare(platform="ios"):
                 source = raw_directory(platform, config['locale'], screenshot_type) / entry['file']
                 filename = f"{manifest['device']}-{position:02}-{screen['scene'][3:]}.png"
                 jobs.append(dict(source=str(source), output=str(images_dir / filename),
-                                 headline=headline(screen, platform), width=entry['width'], height=entry['height']))
+                                 headline=headline(screen, platform), width=entry['width'], height=entry['height'],
+                                 pip=str(ROOT / screen.get('pip', config.get('pip'))) if screen.get('pip', config.get('pip')) else None,
+                                 pipPosition=screen.get('pip_position', 'bottom-left')))
                 entries.append(dict(source=str(source.relative_to(ROOT)), source_sha256=digest(source),
                                     file=filename, headline=headline(screen, platform), device=manifest['device'], screenshot_type=screenshot_type))
         plan = staging / 'render.json'
-        plan.write_text(json.dumps(dict(config, font=str(ROOT / config['font']), jobs=jobs)))
+        plan.write_text(json.dumps(dict(config, font=str(ROOT / config['font']), pip=str(ROOT / config['pip']) if config.get('pip') else None, jobs=jobs)))
         # Swift's module cache stays in build/, avoiding global development caches.
         cache = ROOT / 'build/store-screenshots/swift-cache'
         cache.mkdir(parents=True, exist_ok=True)

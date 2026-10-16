@@ -1,0 +1,23 @@
+{
+  "source": "Actual Flutter widgets rendered by widget test; fictional API fixtures; no iOS system chrome",
+  "logicalViewport": [
+    390,
+    844
+  ],
+  "pixelRatio": 3,
+  "participants": "You plus Robin, Ellis and Sophie",
+  "scenes": [
+    "01-select-three",
+    "02-watch-editor",
+    "03-one-rating-card",
+    "04-one-rating-detail",
+    "05-one-rating-people",
+    "06-everyone-rated",
+    "07-everyone-rated-people",
+    "08-wasnt-there-choice",
+    "09-missed-complete",
+    "10-missed-people"
+  ],
+  "nativeCapture": "Build succeeded; test runner exited code 65 before launching tests",
+  "verification": "29 focused page/recap tests passed; rendering journey passed with all 10 captures"
+}

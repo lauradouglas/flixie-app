@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/friendship.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:flixie_app/models/review.dart';
@@ -35,6 +36,10 @@ enum ActivityListType {
 }
 
 class ActivityListItem {
+  final FriendshipUser? companion;
+  final List<FriendshipUser> companions;
+  List<FriendshipUser> get allCompanions =>
+      companions.isNotEmpty ? companions : [if (companion != null) companion!];
   final String id;
   final String userId;
   final String username;
@@ -78,6 +83,8 @@ class ActivityListItem {
   }
 
   const ActivityListItem({
+    this.companion,
+    this.companions = const [],
     required this.id,
     required this.userId,
     required this.username,
@@ -114,6 +121,8 @@ class ActivityListItem {
   });
 
   ActivityListItem copyWith({ProfileAvatar? avatar}) => ActivityListItem(
+        companion: companion,
+        companions: companions,
         id: id,
         userId: userId,
         username: username,
@@ -205,6 +214,14 @@ class ActivityListItem {
       }
     }
     return ActivityListItem(
+      companions: (json['companions'] as List? ?? [])
+          .whereType<Map>()
+          .map((person) =>
+              FriendshipUser.fromJson(Map<String, dynamic>.from(person)))
+          .toList(),
+      companion: json['companion'] is Map<String, dynamic>
+          ? FriendshipUser.fromJson(json['companion'] as Map<String, dynamic>)
+          : null,
       id: json['id']?.toString() ?? '',
       userId: userId,
       username:

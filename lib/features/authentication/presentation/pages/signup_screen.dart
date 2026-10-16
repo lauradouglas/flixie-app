@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/presentation/widgets/watch_invite_signup_context.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/features/authentication/data/setup_service.dart';
 import 'package:flixie_app/features/settings/data/reference_data_service.dart';
@@ -473,6 +474,7 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const WatchInviteSignupContext(),
               if (!socialProfile) ...[
                 SocialAuthButtons(onSignedIn: _socialSignedIn),
                 const SizedBox(height: 20),
