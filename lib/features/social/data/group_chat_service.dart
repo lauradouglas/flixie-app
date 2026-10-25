@@ -24,6 +24,8 @@ class GroupChatService {
   Future<List<GroupWatchRequest>> requests(String id, String userId) =>
       GroupService.getConversationWatchRequests(id,
           filter: WatchRequestFilter.all, userId: userId);
+  Future<List<ChatMessage>> olderMessages(String id, ChatMessage before) =>
+      ChatService.olderMessages(id, before);
   Stream<List<ChatMessage>> messages(String id) =>
       ChatService.messagesStream(id);
 }

@@ -1,3 +1,9 @@
+import 'dart:async';
+import '../../taste/data/taste_setup_store.dart';
+import '../../watchlist/data/guest_watchlist_store.dart';
+import 'widgets/title_rating_editor.dart';
+import 'package:go_router/go_router.dart';
+import 'widgets/unreleased_movie_prompt.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/external_watch_invite_sheet.dart';
 import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
 import 'package:uuid/uuid.dart';
@@ -52,13 +58,27 @@ class MovieDetailActionFlow {
       data.generation == _generation &&
       data.auth.dbUser?.id == _viewer;
 
+  void _tasteReady() {
+    if (!isCurrent) return;
+    final id = context.read<AuthProvider>().dbUser?.id;
+    if (id != null) {
+      unawaited(const TasteSetupStore().enable(id).catchError((Object _) {}));
+    }
+  }
+
   Future<void> toggleWatchlist({bool offerUndo = true}) async {
     if (!await GuestAccess.require(context,
         title: 'Save this film for later',
         message:
             'Create an account to keep your watchlist and come back to this film whenever you’re ready.',
         path: '/movies/${data.movieId}',
+        mediaTitle: data.movie?.title,
+        mediaPoster: data.movie?.posterPath,
         intent: 'watchlist')) {
+      if (isCurrent && data.auth.dbUser == null) {
+        data.change(() => data.inWatchlist =
+            GuestWatchlistStore.instance.homeKeys.contains(data.movieId));
+      }
       return;
     }
     if (!context.mounted) return;
@@ -136,6 +156,7 @@ class MovieDetailActionFlow {
                   },
                 }));
           authProvider.markActivityChanged();
+          _tasteReady();
           authProvider.updateUserList(movieWatchlist: currentWatchlist);
         } else {
           // Removed
@@ -176,20 +197,31 @@ class MovieDetailActionFlow {
           final savedState = data.inWatchlist;
           ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
             type: FlixieToastType.success,
-            content: Text(
-                savedState ? 'Added to watchlist' : 'Removed from watchlist'),
-            action: offerUndo
+            content: Text(savedState
+                ? (GuestAccess.bookmarkSetupPath != null
+                    ? '${data.movie?.title ?? 'Title'} is on your watchlist'
+                    : 'Added to watchlist')
+                : 'Removed from watchlist'),
+            action: savedState &&
+                    !user.completedSetup &&
+                    GuestAccess.bookmarkSetupPath != null
                 ? SnackBarAction(
-                    label: 'Undo',
+                    label: 'Set up Flixie',
                     onPressed: () {
-                      if (context.mounted &&
-                          isCurrent &&
-                          data.currentlyUpdating == null &&
-                          data.inWatchlist == savedState) {
-                        toggleWatchlist(offerUndo: false);
-                      }
+                      if (context.mounted) context.go('/onboarding');
                     })
-                : null,
+                : offerUndo
+                    ? SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () {
+                          if (context.mounted &&
+                              isCurrent &&
+                              data.currentlyUpdating == null &&
+                              data.inWatchlist == savedState) {
+                            toggleWatchlist(offerUndo: false);
+                          }
+                        })
+                    : null,
           ));
         }
       }
@@ -219,6 +251,8 @@ class MovieDetailActionFlow {
     if (!await GuestAccess.require(context,
         title: 'Save your favourites',
         path: '/movies/${data.movieId}',
+        mediaTitle: data.movie?.title,
+        mediaPoster: data.movie?.posterPath,
         intent: 'favorite')) {
       return;
     }
@@ -276,6 +310,7 @@ class MovieDetailActionFlow {
             updatedFavorites.add(addedFavorite);
           }
           authProvider.markActivityChanged();
+          _tasteReady();
         } else {
           // Removed
           updatedFavorites = (user.favoriteMovies ?? [])
@@ -364,8 +399,8 @@ class MovieDetailActionFlow {
         movieReleaseDate: data.movie?.releaseDate,
         movieRuntimeMinutes: data.movie?.runtime,
         movieRatingLabel: !hideMovieRatings(sheetContext, movieId) &&
-                data.movie?.voteAverage != null
-            ? '★ ${data.movie!.voteAverage!.toStringAsFixed(1)}'
+                data.movie?.tmdbVoteAverage != null
+            ? 'TMDB ${data.movie!.tmdbVoteAverage!.toStringAsFixed(1)}/10'
             : null,
       ),
     );
@@ -374,12 +409,65 @@ class MovieDetailActionFlow {
     }
   }
 
+  Future<void> showRatingSheet() async {
+    if (!await GuestAccess.require(context,
+        title: 'Rate this film',
+        path: '/movies/${data.movieId}',
+        intent: 'rate',
+        mediaTitle: data.movie?.title,
+        mediaPoster: data.movie?.posterPath)) {
+      return;
+    }
+    if (!context.mounted || !isCurrent) return;
+    final auth = context.read<AuthProvider>();
+    final analytics = context.read<AnalyticsController?>();
+    final userId = auth.dbUser?.id;
+    final movieId = data.movieId;
+    if (userId == null || movieId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheet) => ConstrainedBox(
+          constraints:
+              BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * .85),
+          child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: TitleRatingEditor(
+                  title: 'How was ${data.movie?.title ?? 'the film'}?',
+                  initialRating: data.userRating,
+                  onSave: (rating, recommendation) async {
+                    await MovieService().addMovieRating(
+                        movieId,
+                        userId,
+                        rating,
+                        recommendation == null || recommendation == 'neutral'
+                            ? null
+                            : recommendation == 'recommend');
+                    if (!isCurrent || !sheet.mounted) return;
+                    data.change(() => data.userRating = rating);
+                    auth.markActivityChanged();
+                    _tasteReady();
+                    analytics
+                        ?.ratingAdded(
+                            contentType: 'movie',
+                            contentId: movieId,
+                            source: 'movie_detail')
+                        .catchError((Object _) {});
+                    Navigator.pop(sheet);
+                  }))),
+    );
+  }
+
   Future<bool> showLogWatchSheet({MovieWatchEntry? entry}) async {
     if (!await GuestAccess.require(context,
         title: 'Log your movie entry',
         message:
             'Create an account to log when you watched this film, add a rating and keep your movie diary.',
         path: '/movies/${data.movieId}',
+        mediaTitle: data.movie?.title,
+        mediaPoster: data.movie?.posterPath,
         intent: 'log')) {
       return false;
     }
@@ -403,6 +491,11 @@ class MovieDetailActionFlow {
     var details = const WatchLogDetails();
     ExternalWatchInvite? invite = entry?.externalInvite;
     await showMovieWatchLogSheet<void>(
+      movieId: movieId,
+      movieTitle: data.movie?.title,
+      releaseDate: data.movie?.releaseDate,
+      status: data.movie?.status,
+      editingExisting: entry != null,
       context: context,
       builder: (_) => RewatchLogSheet(
         movieTitle: data.movie?.title,
@@ -435,6 +528,7 @@ class MovieDetailActionFlow {
             if (entry == null) {
               if (selectedPlan != null) {
                 await selectedPlan!.save(
+                    watchedAtCinema: details.watchedAtCinema,
                     watchedAt: watchedAt,
                     rating: rating,
                     recommended: recommended,
@@ -443,6 +537,7 @@ class MovieDetailActionFlow {
                 final savedWatch = await data.actions.logMovieWatch(
                   userId,
                   LogMovieWatchRequest(
+                    watchedAtCinema: details.watchedAtCinema,
                     draftId: draftId,
                     companionId: details.companion?.id,
                     companionIds:
@@ -477,6 +572,7 @@ class MovieDetailActionFlow {
                   ));
               authProvider.updateUserList(watchedMovies: updatedWatched);
               authProvider.markActivityChanged();
+              _tasteReady();
               didSubmit = true;
               // Offer watchlist removal if applicable
               if (context.mounted && data.inWatchlist && isCurrent) {
@@ -523,6 +619,7 @@ class MovieDetailActionFlow {
                 userId,
                 entry.id,
                 UpdateMovieWatchRequest(
+                  watchedAtCinema: details.watchedAtCinema,
                   companionIds:
                       details.companions.map((friend) => friend.id).toList(),
                   companionId:
@@ -593,6 +690,7 @@ class MovieDetailActionFlow {
               logger.w('Watch saved; a follow-up refresh was unavailable: $e');
               if (context.mounted && isCurrent) {
                 authProvider.markActivityChanged();
+                _tasteReady();
               }
               return;
             }
@@ -674,6 +772,7 @@ class MovieDetailActionFlow {
                 .toList());
       }
       auth.markActivityChanged();
+      _tasteReady();
       await data.loadWatchHistory(userId, movieId);
       if (context.mounted && isCurrent) {
         ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
@@ -701,6 +800,8 @@ class MovieDetailActionFlow {
         message:
             'Create an account to write your review and discuss it with other film fans.',
         path: '/movies/${data.movieId}',
+        mediaTitle: data.movie?.title,
+        mediaPoster: data.movie?.posterPath,
         intent: 'review')) {
       return;
     }
@@ -709,6 +810,16 @@ class MovieDetailActionFlow {
     if (user == null) return;
     final movieId = data.movieId;
     if (movieId == null) return;
+
+    if (watchEntryId == null && initialReview == null) {
+      if (!await confirmUnreleasedMovie(context,
+          title: data.movie?.title,
+          releaseDate: data.movie?.releaseDate,
+          status: data.movie?.status)) {
+        return;
+      }
+      if (!context.mounted || !isCurrent) return;
+    }
 
     await showModalBottomSheet<Review>(
       useSafeArea: true,
@@ -740,6 +851,7 @@ class MovieDetailActionFlow {
               ]);
           auth.invalidateCachedReviews();
           auth.markActivityChanged();
+          _tasteReady();
         },
       ),
     );

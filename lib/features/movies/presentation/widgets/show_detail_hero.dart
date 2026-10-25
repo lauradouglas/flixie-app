@@ -1,5 +1,9 @@
+import '../../domain/release_status.dart';
+import 'unreleased_status_label.dart';
 import 'media_backdrop_inset.dart';
 import 'show_status_badge.dart';
+import 'genre_chip.dart';
+import 'package:flixie_app/core/utils/genre_catalogue.dart';
 import 'movie_header_backdrop.dart';
 import 'movie_detail_hero_tokens.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/show_detail_images.dart';
@@ -105,7 +109,9 @@ class _ShowDetailHeroState extends State<ShowDetailHero> {
   }
 
   Widget _buildHeroInformation(TvShow show, {required bool compact}) {
-    final years = showYearRange(show);
+    final genres = show.genres.where(isVisibleGenre).toList(growable: false);
+    final unreleased = isShowNotReleasedYet(show);
+    final years = unreleased ? null : showYearRange(show);
     final seasons = show.numberOfSeasons ?? show.seasons.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,6 +123,8 @@ class _ShowDetailHeroState extends State<ShowDetailHero> {
                 fontSize: compact ? 24 : 28,
                 height: 1.02,
                 fontWeight: FontWeight.w900)),
+        if (unreleased)
+          UnreleasedStatusLabel(date: show.firstAirDate, status: show.status),
         const SizedBox(height: 9),
         FittedBox(
           fit: BoxFit.scaleDown,
@@ -134,6 +142,17 @@ class _ShowDetailHeroState extends State<ShowDetailHero> {
                 '$seasons ${seasons == 1 ? 'season' : 'seasons'}',
             ].join('  ·  '),
             style: TextStyle(color: context.colors.light, fontSize: 14)),
+        if (genres.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final genre in genres)
+                GenreChip(label: genre.toUpperCase(), compact: true),
+            ],
+          ),
+        ],
       ],
     );
   }

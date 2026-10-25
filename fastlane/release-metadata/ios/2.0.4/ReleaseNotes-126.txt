@@ -1,0 +1,6 @@
+New in Flixie:
+• Look back on your movie nights in a weekly film diary, with a calendar to find any week.
+• See who you watched with and mark cinema visits when logging a film.
+• A tidier profile, faster startup and smoother Home loading.
+• Movie scores from TMDB, with your personal ratings saved separately.
+• Explore Flixie before signing up, and enjoy shared watches, reviews and Pip games.

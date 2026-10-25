@@ -1,0 +1,1 @@
+We’ve improved optional usage analytics to understand search, movie and show browsing, and the features people find useful. Analytics stays off until you allow it, and you can change your choice in Settings.

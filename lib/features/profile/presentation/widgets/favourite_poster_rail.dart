@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -24,6 +25,77 @@ void showFavouriteMoviesSheet(
     items: favouriteMovieItems(movies),
     limit: maxFavouriteMovies,
   ).showAll(context);
+}
+
+List<FavouriteDisplayItem> favouriteShowItems(List<dynamic> shows) {
+  final ranked = shows
+      .whereType<Map>()
+      .where((e) => e['removed'] != true)
+      .toList()
+    ..sort((a, b) => ((a['rank'] as num?)?.toInt() ?? 999)
+        .compareTo((b['rank'] as num?)?.toInt() ?? 999));
+  return ranked.map((outer) {
+    final show = outer['show'] is Map ? outer['show'] as Map : outer;
+    final id = show['id'] ?? outer['showId'];
+    return FavouriteDisplayItem(
+        title: (show['title'] ?? show['name'] ?? 'Show').toString(),
+        imagePath: show['posterPath']?.toString(),
+        route: id == null ? null : '/shows/$id');
+  }).toList();
+}
+
+void showAllFavouritesSheet(
+    BuildContext context, List<FavoriteMovie> movies, List<dynamic> shows) {
+  showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheet) => SizedBox(
+          height: MediaQuery.sizeOf(sheet).height * .8,
+          child: Column(children: [
+            Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 8, 8),
+                child: Row(children: [
+                  const Expanded(
+                      child: Text('Favourite films & shows',
+                          style: TextStyle(
+                              fontSize: 22, fontWeight: FontWeight.w800))),
+                  IconButton(
+                      tooltip: 'Close favourites',
+                      onPressed: () => Navigator.pop(sheet),
+                      icon: const Icon(Icons.close)),
+                ])),
+            Expanded(
+                child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    children: [
+                  for (final group in [
+                    ('Films', favouriteMovieItems(movies)),
+                    ('Shows', favouriteShowItems(shows))
+                  ]) ...[
+                    Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text('${group.$1} (${group.$2.length})',
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w700))),
+                    if (group.$2.isEmpty)
+                      Text('No favourite ${group.$1.toLowerCase()} yet.'),
+                    for (final item in group.$2)
+                      ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(item.title),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: item.route == null
+                              ? null
+                              : () {
+                                  final router = GoRouter.of(context);
+                                  Navigator.pop(sheet);
+                                  router.push(item.route!);
+                                }),
+                  ],
+                ])),
+          ])));
 }
 
 class FavouriteDisplayItem {
@@ -172,11 +244,7 @@ class FavouritePosterRail extends StatelessWidget {
       children: [
         Row(children: [
           Expanded(
-              child: Text(title,
-                  style: TextStyle(
-                      color: context.colors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800))),
+              child: FlixieSectionHeader(title: title)),
           if (onRank != null)
             IconButton(
               tooltip:
@@ -187,8 +255,8 @@ class FavouritePosterRail extends StatelessWidget {
             ),
           TextButton(
             onPressed: onSeeAll ?? () => showAll(context),
-            child: Text('See all',
-                style: TextStyle(color: context.colors.light, fontSize: 13)),
+            child: Text(title.startsWith('Favourite ') ? 'All (${items.length})' : 'See all',
+                style: TextStyle(color: context.colors.primaryText, fontSize: 14)),
           ),
         ]),
         const SizedBox(height: 8),
@@ -203,8 +271,8 @@ class FavouritePosterRail extends StatelessWidget {
                   ? width * 1.5
                   : 146.0;
           var titleHeight = MediaQuery.textScalerOf(context).scale(36);
-          if (tablet) {
-            for (final item in items.take(10)) {
+          {
+            for (final item in (circular ? items : items.take(10))) {
               final painter = TextPainter(
                 text: TextSpan(
                     text: item.title,
@@ -268,8 +336,6 @@ class FavouritePosterRail extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           item.title,
-                          maxLines: tablet ? null : 2,
-                          overflow: tablet ? null : TextOverflow.ellipsis,
                           style: TextStyle(
                             color: context.colors.light,
                             fontSize: 12,

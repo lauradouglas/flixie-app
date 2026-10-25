@@ -8,6 +8,20 @@ import 'package:flixie_app/features/settings/data/reference_data_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 
+/// Opens the existing provider selector without leaving the current task.
+Future<void> showWatchProvidersSetup(BuildContext context) async {
+  final userId = context.read<AuthProvider>().dbUser?.id;
+  if (userId == null) return;
+  await showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    useSafeArea: true,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => WatchProvidersSheet(userId: userId),
+  );
+}
+
 class WatchProvidersSheet extends StatefulWidget {
   const WatchProvidersSheet({
     super.key,
@@ -26,6 +40,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
 
   bool _loading = true;
   bool _saving = false;
+  bool _loadFailed = false;
 
   List<WatchProvider> _providers = [];
   List<WatchProvider> _filteredProviders = [];
@@ -44,6 +59,10 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
   }
 
   Future<void> _loadProviders() async {
+    setState(() {
+      _loading = true;
+      _loadFailed = false;
+    });
     try {
       final allProviders = await ReferenceDataService.getWatchProviders();
 
@@ -64,11 +83,15 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
     }
   }
 
   void _toggleProvider(int providerId) {
+    if (_saving || _loading || _loadFailed) return;
     setState(() {
       if (_selectedProviderIds.contains(providerId)) {
         _selectedProviderIds.remove(providerId);
@@ -92,6 +115,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
   }
 
   Future<void> _save() async {
+    if (_saving || _loading || _loadFailed) return;
     setState(() => _saving = true);
 
     final messenger = ScaffoldMessenger.of(context);
@@ -211,102 +235,111 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
                         color: FlixieColors.primary,
                       ),
                     )
-                  : _filteredProviders.isEmpty
+                  : _loadFailed
                       ? Center(
-                          child: Text(
-                            'No providers found',
-                            style: TextStyle(
-                              color: context.colors.medium,
-                              fontSize: 14,
-                            ),
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: _filteredProviders.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 4),
-                          itemBuilder: (context, index) {
-                            final provider = _filteredProviders[index];
-                            final selected =
-                                _selectedProviderIds.contains(provider.id);
+                          child: TextButton(
+                              onPressed: _loadProviders,
+                              child: const Text(
+                                  'Couldn’t load your services. Retry')))
+                      : _filteredProviders.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No providers found',
+                                style: TextStyle(
+                                  color: context.colors.medium,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: _filteredProviders.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 4),
+                              itemBuilder: (context, index) {
+                                final provider = _filteredProviders[index];
+                                final selected =
+                                    _selectedProviderIds.contains(provider.id);
 
-                            return InkWell(
-                              onTap: () => _toggleProvider(provider.id),
-                              borderRadius: BorderRadius.circular(14),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? FlixieColors.primary
-                                          .withValues(alpha: 0.18)
-                                      : context.colors.tabBarBackgroundFocused,
+                                return InkWell(
+                                  onTap: () => _toggleProvider(provider.id),
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: selected
-                                        ? context.colors.primaryTint
-                                        : Colors.transparent,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        provider.logoUrl,
-                                        width: 42,
-                                        height: 42,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          width: 42,
-                                          height: 42,
-                                          decoration: BoxDecoration(
-                                            color: context.colors.surface,
-                                            borderRadius:
-                                                BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? FlixieColors.primary
+                                              .withValues(alpha: 0.18)
+                                          : context
+                                              .colors.tabBarBackgroundFocused,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: selected
+                                            ? context.colors.primaryTint
+                                            : Colors.transparent,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Image.network(
+                                            provider.logoUrl,
+                                            width: 42,
+                                            height: 42,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                Container(
+                                              width: 42,
+                                              height: 42,
+                                              decoration: BoxDecoration(
+                                                color: context.colors.surface,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: Icon(
+                                                Icons.tv_outlined,
+                                                color: context.colors.medium,
+                                              ),
+                                            ),
                                           ),
-                                          child: Icon(
-                                            Icons.tv_outlined,
+                                        ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Text(
+                                            provider.providerName,
+                                            style: TextStyle(
+                                              color: context.colors.textPrimary,
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        Checkbox(
+                                          value: selected,
+                                          onChanged: (_) =>
+                                              _toggleProvider(provider.id),
+                                          activeColor: FlixieColors.primary,
+                                          checkColor: Colors.white,
+                                          side: BorderSide(
                                             color: context.colors.medium,
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Text(
-                                        provider.providerName,
-                                        style: TextStyle(
-                                          color: context.colors.textPrimary,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    Checkbox(
-                                      value: selected,
-                                      onChanged: (_) =>
-                                          _toggleProvider(provider.id),
-                                      activeColor: FlixieColors.primary,
-                                      checkColor: Colors.white,
-                                      side: BorderSide(
-                                        color: context.colors.medium,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                                  ),
+                                );
+                              },
+                            ),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _saving ? null : _save,
+                onPressed: _saving || _loading || _loadFailed ? null : _save,
                 style: FilledButton.styleFrom(
                   backgroundColor: FlixieColors.primary,
                 ),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/firebase_environment.dart';
 import 'package:flixie_app/core/widgets/watchlist_widget_sync.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
 import 'package:flixie_app/features/social/data/starred_people.dart';
@@ -6,7 +7,6 @@ import 'package:flixie_app/features/social/data/community_service.dart';
 import 'package:flixie_app/features/profile/data/milestone_cache.dart';
 import 'package:flixie_app/core/safety/safety_service.dart';
 import 'dart:async';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flixie_app/core/auth/startup_trace.dart';
 
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
@@ -73,6 +73,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     AuthPrefetchCoordinator? prefetchCoordinator,
     BackendProfileCreator? profileCreator,
     BackendProfileLoader? profileLoader,
+    BackendProfileLoader? startupProfileLoader,
     Future<bool> Function()? termsStatusLoader,
     bool prefetchAfterAuth = true,
     AvatarSelector? avatarSelector,
@@ -81,6 +82,9 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         _profileCreator = profileCreator ?? UserService.createUser {
     _accountCache = AuthAccountCache(_prefetchCoordinator);
     _profileLoader = profileLoader ?? UserService.getUserByExternalId;
+    _startupProfileLoader = startupProfileLoader ??
+        profileLoader ??
+        UserService.getStartupUserByExternalId;
     _termsStatusLoader = termsStatusLoader ??
         () async {
           final response = await ApiClient.get('/users/me/terms');
@@ -94,6 +98,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       user: () => _firebaseUser,
       loadProfile: _profileLoader,
       applyProfile: (profile) {
+        _libraryRevision++;
         _dbUser = profile;
         notifyListeners();
       },
@@ -136,6 +141,92 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   final AuthPrefetchCoordinator _prefetchCoordinator;
   final BackendProfileCreator _profileCreator;
   late final BackendProfileLoader _profileLoader;
+  late final BackendProfileLoader _startupProfileLoader;
+  Future<bool>? _libraryInFlight;
+  String? _libraryOwner;
+  int? _libraryGeneration;
+  int _libraryRevision = 0;
+  String? _libraryError;
+  bool get libraryReady => _dbUser?.hasLibrarySnapshot == true;
+  String? get libraryError => _libraryError;
+
+  Future<bool> ensureLibraryLoaded() => _loadLibrary();
+
+  /// Refresh after a journey writes titles outside the library screens.
+  Future<bool> refreshLibrary() async {
+    final pending = _libraryInFlight;
+    if (pending != null) await pending;
+    return _loadLibrary(force: true);
+  }
+
+  Future<bool> _loadLibrary({bool force = false}) {
+    final user = _dbUser;
+    if (user == null || _disposed) return Future.value(false);
+    if (!force && libraryReady) return Future.value(true);
+    if (_libraryOwner == user.id &&
+        _libraryGeneration == _sessionGeneration &&
+        _libraryInFlight != null) {
+      return _libraryInFlight!;
+    }
+    final generation = _sessionGeneration;
+    final activity = _activityVersion;
+    final revision = _libraryRevision;
+    _libraryOwner = user.id;
+    _libraryGeneration = generation;
+    _libraryError = null;
+    final future = () async {
+      try {
+        final full = await StartupTrace.run(
+            'profile.library',
+            () => _profileLoader(user.externalId ?? _firebaseUser!.uid)
+                .timeout(AuthSessionRecovery.profileTimeout));
+        if (_disposed ||
+            generation != _sessionGeneration ||
+            _dbUser?.id != user.id) {
+          return false;
+        }
+        if (full == null || full.id != user.id || !full.hasLibrarySnapshot) {
+          throw StateError('Incomplete library response');
+        }
+        // A mutation or refreshed profile takes precedence over this old read.
+        if (activity != _activityVersion || revision != _libraryRevision) {
+          return libraryReady;
+        }
+        _dbUser = _dbUser!.copyWith(
+            watchedMovies: full.watchedMovies,
+            watchedShows: full.watchedShows,
+            movieWatchlist: full.movieWatchlist,
+            showWatchlist: full.showWatchlist,
+            favoriteMovies: full.favoriteMovies,
+            favoriteShows: full.favoriteShows,
+            favoritePeople: full.favoritePeople,
+            favoriteGenres: full.favoriteGenres);
+        _profileRefreshedActivityVersion = activity;
+        notifyListeners();
+        return true;
+      } catch (error) {
+        if (!_disposed &&
+            generation == _sessionGeneration &&
+            AuthSessionRecovery.isExpired(error)) {
+          await _onAuthStateChanged(null);
+          return false;
+        }
+        if (!_disposed &&
+            generation == _sessionGeneration &&
+            _dbUser?.id == user.id) {
+          _libraryError = 'Couldn’t load your library. Try again.';
+          notifyListeners();
+        }
+        return false;
+      }
+    }();
+    _libraryInFlight = future;
+    future.then((_) {
+      if (identical(_libraryInFlight, future)) _libraryInFlight = null;
+    });
+    return future;
+  }
+
   late final bool _prefetchAfterAuth;
   late final AvatarSelector _avatarSelector;
   final AuthNotificationPoller _notificationPoller = AuthNotificationPoller();
@@ -346,6 +437,12 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _termsVerified = false;
       _sessionGeneration++;
       _prefetchGeneration++;
+      _libraryInFlight = null;
+      _libraryOwner = null;
+      _libraryError = null;
+      _startupWarmupTimer?.cancel();
+      _pendingStartupWarmup = null;
+      _startupWarmupReleased = false;
       ShowService.clearSummaryCache();
       _recovery.reset();
       _profileRefreshedActivityVersion = null;
@@ -435,11 +532,16 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       try {
         await _recovery.refreshToken(user, isCurrent: current);
         if (!current()) return;
+        // Both reads use the restored token and are independent. Consent still
+        // must resolve before an authenticated route can open.
+        final termsReady = StartupTrace.run('terms',
+                () => verifyTerms().timeout(AuthSessionRecovery.profileTimeout))
+            .catchError((Object _) => false);
         models.User? profile;
         try {
           profile = await StartupTrace.run(
               'profile',
-              () => _profileLoader(user.uid)
+              () => _startupProfileLoader(user.uid)
                   .timeout(AuthSessionRecovery.profileTimeout));
         } on ApiException catch (error) {
           if (error.statusCode != 404) rethrow;
@@ -464,12 +566,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         _profileRefreshedActivityVersion = _activityVersion;
         // Resolve account consent before the router sees an authenticated
         // session. An unknown value must not briefly open the agreement page.
-        try {
-          await verifyTerms().timeout(AuthSessionRecovery.profileTimeout);
-        } catch (_) {
-          // Keep deletion and the existing retry UI available on lookup failure.
-          // A failed check must never grant access.
-        }
+        await termsReady;
+        // Failed/unknown consent remains unverified; routing cannot grant access.
         if (!current()) return;
         _status = AuthStatus.authenticated;
         _recovery.succeeded();
@@ -546,6 +644,20 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  Timer? _startupWarmupTimer;
+  VoidCallback? _pendingStartupWarmup;
+  bool _startupWarmupReleased = false;
+
+  /// Give first-screen data priority over inbox, follows and background warming.
+  void releaseStartupWarmup(String userId) {
+    if (_disposed || _dbUser?.id != userId) return;
+    _startupWarmupReleased = true;
+    _startupWarmupTimer?.cancel();
+    final start = _pendingStartupWarmup;
+    _pendingStartupWarmup = null;
+    start?.call();
+  }
+
   /// Warms compact shared data after the authenticated route has painted.
   void _prefetch(String userId, {String? region}) {
     final session = _sessionGeneration;
@@ -554,7 +666,21 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       if (_disposed || session != _sessionGeneration || _dbUser?.id != userId) {
         return;
       }
-      _runPrefetch(userId, region: region);
+      if (_startupWarmupReleased) {
+        _runPrefetch(userId, region: region);
+      } else {
+        _pendingStartupWarmup = () {
+          if (!_disposed &&
+              session == _sessionGeneration &&
+              _dbUser?.id == userId) {
+            _runPrefetch(userId, region: region);
+          }
+        };
+        _startupWarmupTimer?.cancel();
+        // Direct links without Home still receive background inbox updates.
+        _startupWarmupTimer = Timer(
+            const Duration(seconds: 12), () => releaseStartupWarmup(userId));
+      }
     });
   }
 
@@ -731,6 +857,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Applies a profile update without discarding omitted collections.
   void updateCachedUser(models.User user) {
+    _libraryRevision++;
     _dbUser = user.preservingCollectionsFrom(_dbUser);
     notifyListeners();
   }
@@ -792,7 +919,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
           body: {
             'username': identifier,
             'password': password,
-            'apiKey': Firebase.app().options.apiKey,
+            'apiKey': FirebaseEnvironment.app.options.apiKey,
           },
           logRequestBody: false);
       return result['email'] as String;
@@ -1121,7 +1248,12 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<bool> completeAvatarSignUp(int avatarId) async {
+  /// Finish registration with the existing initials avatar; artwork is optional.
+  Future<bool> completeSignupWithDefaultAvatar() => _completeSignup(null);
+
+  Future<bool> completeAvatarSignUp(int avatarId) => _completeSignup(avatarId);
+
+  Future<bool> _completeSignup(int? avatarId) async {
     if (_isLoading || _pendingSignupProfile == null) return false;
     _setLoading(true);
     _setError(null);
@@ -1134,8 +1266,10 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
       _dbUser ??= await _createBackendProfileWithAuthRetry(
         _pendingSignupProfile!,
       );
-      final avatar = await _avatarSelector(_pendingAvatarId!);
-      _dbUser = _dbUser!.copyWith(avatar: avatar);
+      if (_pendingAvatarId != null) {
+        final avatar = await _avatarSelector(_pendingAvatarId!);
+        _dbUser = _dbUser!.copyWith(avatar: avatar);
+      }
       // The backend already persisted this agreement when creating the profile.
       // Publish consent and authentication together to avoid the terms route.
       _termsVerified = _pendingSignupProfile!['termsAccepted'] == true;
@@ -1289,6 +1423,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   /// Use this when you already have updated user data from an API response.
   void updateDbUser(models.User user) {
     logger.d('Updating database user: ${user.username}');
+    _libraryRevision++;
     _dbUser = user;
     notifyListeners();
   }
@@ -1304,6 +1439,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
     List<dynamic>? favoritePeople,
   }) {
     if (_dbUser == null) return;
+    _libraryRevision++;
 
     logger.d('Updating user lists:');
     if (watchedMovies != null) {
@@ -1354,6 +1490,8 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     _disposed = true;
+    _startupWarmupTimer?.cancel();
+    _pendingStartupWarmup = null;
     _sessionGeneration++;
     _prefetchGeneration++;
     _accountCache.clear();

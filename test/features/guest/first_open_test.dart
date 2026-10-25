@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -13,13 +14,18 @@ void main() {
     ('Already a member? Sign in', '/auth/login'),
     ('Create account', '/auth/signup'),
   ]) {
-    testWidgets('$label preserves welcome beneath auth and Back returns to it', (tester) async {
+    testWidgets('$label preserves welcome beneath auth and Back returns to it',
+        (tester) async {
       final router = GoRouter(initialLocation: '/welcome', routes: [
-        GoRoute(path: '/welcome', builder: (_, __) => const GuestWelcomeScreen()),
-        GoRoute(path: destination, builder: (context, _) => Scaffold(
-          appBar: AppBar(leading: BackButton(onPressed: () => context.pop())),
-          body: const Text('Authentication'),
-        )),
+        GoRoute(
+            path: '/welcome', builder: (_, __) => const GuestWelcomeScreen()),
+        GoRoute(
+            path: destination,
+            builder: (context, _) => Scaffold(
+                  appBar: AppBar(
+                      leading: BackButton(onPressed: () => context.pop())),
+                  body: const Text('Authentication'),
+                )),
       ]);
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.ensureVisible(find.text(label));
@@ -31,7 +37,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Explore Flixie'), findsOneWidget);
       expect(router.routeInformationProvider.value.uri.path, '/welcome');
-      await tester.pumpWidget(const SizedBox()); router.dispose();
+      await tester.pumpWidget(const SizedBox());
+      router.dispose();
     });
   }
 
@@ -60,6 +67,26 @@ void main() {
     auth.dispose();
     analytics.dispose();
   });
+  testWidgets(
+      'fresh-install tour deep link stays public without forcing welcome',
+      (tester) async {
+    final auth = GuestAuth(), analytics = ActionAnalytics();
+    late BuildContext context;
+    await tester.pumpWidget(MaterialApp(home: Builder(builder: (c) {
+      context = c;
+      return const SizedBox();
+    })));
+    final router = buildRouter(auth, analytics, GuestReferrals());
+    router.go('/why-flixie');
+    final match = await router.routeInformationParser
+        .parseRouteInformationWithDependencies(
+            router.routeInformationProvider.value, context);
+    expect(match.uri.path, '/why-flixie');
+    expect(GuestAccess.awaitingAccount, isFalse);
+    router.dispose();
+    auth.dispose();
+    analytics.dispose();
+  });
   testWidgets('fresh-install movie deep link bypasses welcome', (tester) async {
     final auth = GuestAuth(), analytics = ActionAnalytics();
     late BuildContext context;
@@ -77,11 +104,7 @@ void main() {
     auth.dispose();
     analytics.dispose();
   });
-  for (final size in const [
-    Size(320, 568),
-    Size(844, 390),
-    Size(1024, 768)
-  ]) {
+  for (final size in const [Size(320, 568), Size(844, 390), Size(1024, 768)]) {
     testWidgets('welcome actions remain reachable at $size with doubled text',
         (tester) async {
       tester.view.physicalSize = size;

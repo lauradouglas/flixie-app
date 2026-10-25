@@ -2,8 +2,10 @@ import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/models/notification.dart';
 import 'package:flixie_app/models/friendship.dart';
 import 'dart:async';
+import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flixie_app/core/widgets/library_readiness_gate.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/auth/auth_service.dart';
@@ -97,7 +99,207 @@ User profile(String id) => User(
     iconColorId: 0,
     completedSetup: true,
     darkMode: true);
+User libraryProfile(String id) => profile(id).copyWith(
+    watchedMovies: [],
+    watchedShows: [],
+    movieWatchlist: [],
+    showWatchlist: [],
+    favoriteMovies: [],
+    favoriteShows: [],
+    favoritePeople: [],
+    favoriteGenres: []);
+
 void main() {
+  testWidgets(
+      'journey completion refreshes an already-loaded library after a save',
+      (tester) async {
+    final auth = Auth._();
+    var reads = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        startupProfileLoader: (id) async => profile(id),
+        profileLoader: (id) async {
+          reads++;
+          return libraryProfile(id);
+        },
+        termsStatusLoader: () async => true);
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pumpAndSettle();
+    expect(await provider.ensureLibraryLoaded(), true);
+    expect(await provider.ensureLibraryLoaded(), true);
+    expect(reads, 1);
+    provider.markActivityChanged();
+    expect(await provider.refreshLibrary(), true);
+    expect(reads, 2);
+  });
+
+  testWidgets(
+      'startup opens before library; concurrent callers share hydration',
+      (tester) async {
+    final auth = Auth._();
+    final library = Completer<User>();
+    var reads = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        startupProfileLoader: (id) async => profile(id),
+        profileLoader: (_) {
+          reads++;
+          return library.future;
+        },
+        termsStatusLoader: () async => true);
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pumpAndSettle();
+    expect(provider.status, AuthStatus.authenticated);
+    expect(provider.libraryReady, false);
+    expect(provider.dbUser?.movieWatchlist, isNull);
+    expect(reads, 0);
+    final first = provider.ensureLibraryLoaded();
+    final second = provider.ensureLibraryLoaded();
+    expect(reads, 1);
+    library.complete(libraryProfile('one'));
+    expect(await first, true);
+    expect(await second, true);
+    expect(provider.libraryReady, true);
+    expect(provider.dbUser?.movieWatchlist, isEmpty);
+  });
+
+  testWidgets(
+      'late library response cannot overwrite another account or an edit',
+      (tester) async {
+    final auth = Auth._();
+    final library = Completer<User>();
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        startupProfileLoader: (id) async => profile(id),
+        profileLoader: (_) => library.future,
+        termsStatusLoader: () async => true);
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pumpAndSettle();
+    final loading = provider.ensureLibraryLoaded();
+    auth.emit(Identity('two'));
+    await tester.pumpAndSettle();
+    library.complete(libraryProfile('one'));
+    expect(await loading, false);
+    expect(provider.dbUser?.id, 'two');
+    expect(provider.libraryReady, false);
+  });
+
+  testWidgets(
+      'library read begun before an edit is discarded and can be retried',
+      (tester) async {
+    final auth = Auth._();
+    final library = Completer<User>();
+    var reads = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        startupProfileLoader: (id) async => profile(id),
+        profileLoader: (_) {
+          reads++;
+          return reads == 1
+              ? library.future
+              : Future.value(libraryProfile('one'));
+        },
+        termsStatusLoader: () async => true);
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pumpAndSettle();
+    final loading = provider.ensureLibraryLoaded();
+    provider.updateUserList(movieWatchlist: []);
+    library.complete(libraryProfile('one'));
+    expect(await loading, false);
+    expect(provider.libraryReady, false);
+    expect(await provider.ensureLibraryLoaded(), true);
+  });
+
+  testWidgets(
+      'library-dependent screen waits and retries instead of showing empty data',
+      (tester) async {
+    final auth = Auth._();
+    final library = Completer<User>();
+    var reads = 0;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        startupProfileLoader: (id) async => profile(id),
+        profileLoader: (_) {
+          reads++;
+          return reads == 1
+              ? Future.error(StateError('offline'))
+              : library.future;
+        },
+        termsStatusLoader: () async => true);
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: provider,
+        child: MaterialApp(
+            home: LibraryReadinessGate(
+                requiredForRoute: true,
+                onHome: () {},
+                child: const Text('Library screen')))));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Library screen'), findsNothing);
+    expect(find.text('Couldn’t load your library.'), findsOneWidget);
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
+    library.complete(libraryProfile('one'));
+    await tester.pumpAndSettle();
+    expect(find.text('Library screen'), findsOneWidget);
+    expect(reads, 2);
+  });
+
+  testWidgets('profile and consent start together but routing waits for both',
+      (tester) async {
+    final auth = Auth._();
+    final profileGate = Completer<User>();
+    final termsGate = Completer<bool>();
+    var profileStarted = false, termsStarted = false;
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchAfterAuth: false,
+        prefetchCoordinator: Prefetch(), profileLoader: (_) {
+      profileStarted = true;
+      return profileGate.future;
+    }, termsStatusLoader: () {
+      termsStarted = true;
+      return termsGate.future;
+    });
+    addTearDown(() {
+      provider.dispose();
+      auth.changes.close();
+    });
+    auth.emit(Identity('one'));
+    await tester.pump();
+    expect(profileStarted, true);
+    expect(termsStarted, true);
+    profileGate.complete(profile('one'));
+    await tester.pump();
+    expect(provider.status, AuthStatus.unknown);
+    expect(provider.termsVerified, false);
+    termsGate.complete(true);
+    await tester.pumpAndSettle();
+    expect(provider.status, AuthStatus.authenticated);
+    expect(provider.termsVerified, true);
+  });
+
   testWidgets(
       'initial foreground and inactive interruptions reuse the startup profile without invalidating Home',
       (tester) async {
@@ -494,6 +696,45 @@ void main() {
     await auth.changes.close();
     await tester.pump();
   });
+  testWidgets(
+      'nonessential prefetch waits for foreground data and ignores another account',
+      (tester) async {
+    final auth = Auth._();
+    final prefetch = Prefetch();
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchCoordinator: prefetch,
+        profileLoader: (id) async => profile(id),
+        termsStatusLoader: () async => true);
+    auth.emit(Identity('warmup'));
+    await tester.pump();
+    expect(prefetch.calls, 0);
+    provider.releaseStartupWarmup('other-account');
+    expect(prefetch.calls, 0);
+    provider.releaseStartupWarmup('warmup');
+    await tester.pump();
+    expect(prefetch.calls, 1);
+    provider.dispose();
+    await auth.changes.close();
+  });
+
+  testWidgets(
+      'a direct link without Home eventually starts background prefetch',
+      (tester) async {
+    final auth = Auth._();
+    final prefetch = Prefetch();
+    final provider = AuthProvider(auth, MovieService(),
+        prefetchCoordinator: prefetch,
+        profileLoader: (id) async => profile(id),
+        termsStatusLoader: () async => true);
+    auth.emit(Identity('direct-link'));
+    await tester.pump();
+    expect(prefetch.calls, 0);
+    await tester.pump(const Duration(seconds: 12));
+    expect(prefetch.calls, 1);
+    provider.dispose();
+    await auth.changes.close();
+  });
+
   testWidgets('late prefetch cannot restore another account’s data',
       (tester) async {
     final auth = Auth._();
@@ -508,7 +749,10 @@ void main() {
         profileLoader: (id) async => profile(id));
     auth.emit(Identity('A'));
     await tester.pump();
+    provider.releaseStartupWarmup('A');
     auth.emit(Identity('B'));
+    await tester.pump();
+    provider.releaseStartupWarmup('B');
     await tester.pump();
     expect(provider.cachedTrending?.single.id, 2);
     old.complete(
@@ -530,6 +774,8 @@ void main() {
         prefetchCoordinator: prefetch,
         profileLoader: (id) async => profile(id));
     auth.emit(Identity('ratings-user'));
+    await tester.pump();
+    provider.releaseStartupWarmup('ratings-user');
     await tester.pump();
     expect(provider.cachedRatings, isNotNull);
     final before = provider.activityVersion;

@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/movie_detail_loading_sections.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'dart:async';
@@ -69,6 +70,7 @@ Widget app(GuestAuth auth, DelayedMovies movies, String id,
                 child: child!),
             home: MovieDetailScreen(movieId: id)));
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   testWidgets('narrow movie header reflows with large text and long title',
       (tester) async {
     tester.view.physicalSize = const Size(320, 740);
@@ -108,13 +110,14 @@ void main() {
     expect(find.text('Useful movie'), findsWidgets);
     expect(find.text('Watchlist'), findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
-    expect(find.text('Log an entry'), findsOneWidget);
-    await tester.ensureVisible(find.text('Log an entry'));
-    await tester.tap(find.text('Log an entry'));
+    expect(find.text('Log watch & rate'), findsOneWidget);
+    expect(find.text('Rate this film'), findsNothing);
+    await tester.ensureVisible(find.text('Log watch & rate'));
+    await tester.tap(find.text('Log watch & rate'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
-    expect(find.text('Log your movie entry'), findsOneWidget);
-    expect(find.text('Create account'), findsOneWidget);
+    expect(find.text('Log your watch of Useful movie'), findsOneWidget);
+    expect(find.text('Create account & log'), findsOneWidget);
     await tester.ensureVisible(find.text('Keep exploring'));
     await tester.tap(find.text('Keep exploring'));
     await tester.pump();

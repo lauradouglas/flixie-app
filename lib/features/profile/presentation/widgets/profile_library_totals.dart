@@ -57,16 +57,19 @@ class ProfileLibraryTotals extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tablet) {
+    if (tablet ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.4 ||
+        MediaQuery.sizeOf(context).width < 360) {
       return Material(
         type: MaterialType.transparency,
-        child: Column(
+        child: SingleChildScrollView(
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final library in ProfileLibrary.values)
               _tabletRow(context, library),
           ],
-        ),
+        )),
       );
     }
     return Material(
@@ -92,8 +95,8 @@ class ProfileLibraryTotals extends StatelessWidget {
                     case ProfileLibrary.watchlist:
                       context.go('/watchlist');
                     case ProfileLibrary.favourites:
-                      showFavouriteMoviesSheet(
-                          context, user.favoriteMovies ?? []);
+                      showAllFavouritesSheet(context, user.favoriteMovies ?? [],
+                          user.favoriteShows ?? []);
                   }
                 },
                 child: Padding(
@@ -117,7 +120,7 @@ class ProfileLibraryTotals extends StatelessWidget {
                         '$movies ${movies == 1 ? 'movie' : 'movies'} · $shows ${shows == 1 ? 'show' : 'shows'}',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 13,
                             height: 1.4,
                             color: context.colors.light)),
                   ]),
@@ -137,7 +140,8 @@ class ProfileLibraryTotals extends StatelessWidget {
       case ProfileLibrary.watchlist:
         context.go('/watchlist');
       case ProfileLibrary.favourites:
-        showFavouriteMoviesSheet(context, user.favoriteMovies ?? []);
+        showAllFavouritesSheet(
+            context, user.favoriteMovies ?? [], user.favoriteShows ?? []);
     }
   }
 

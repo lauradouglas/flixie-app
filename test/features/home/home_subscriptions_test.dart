@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/home/data/trending_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -16,17 +17,22 @@ import 'package:flixie_app/features/home/presentation/widgets/trending_carousel.
 import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import '../../home_startup_recovery_test.dart' show Session;
-import '../../auth_recovery_test.dart' show profile;
+import '../../auth_recovery_test.dart' show libraryProfile;
 
 void main() {
-  testWidgets('unread notifications use the bell without a Home catch-up banner',
+  setUp(() {
+    TrendingService.clearSessionCacheForTesting();
+    RecommendationService.invalidateCache();
+  });
+  testWidgets(
+      'unread notifications use the bell without a Home catch-up banner',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     HomeScreen.clearSessionSnapshotForTesting();
     final session = Session();
     final auth = AuthProvider(session, MovieService(),
         prefetchAfterAuth: false,
-        profileLoader: (id) async => profile(id),
+        profileLoader: (id) async => libraryProfile(id),
         termsStatusLoader: () async => true);
     final cache = WatchRequestCache();
     final client = MockClient((request) async => http.Response(
@@ -75,7 +81,7 @@ void main() {
     final session = Session();
     final auth = AuthProvider(session, MovieService(),
         prefetchAfterAuth: false,
-        profileLoader: (id) async => profile(id),
+        profileLoader: (id) async => libraryProfile(id),
         termsStatusLoader: () async => true);
     final cache = WatchRequestCache();
     final recommendations = Completer<http.Response>();
@@ -84,11 +90,11 @@ void main() {
         headers: {'content-type': 'application/json'});
     final client = MockClient((request) async {
       final path = request.url.path;
-      if (path == '/trending/movie/day') {
+      if (path == '/trending/all/day') {
         return response([
-          {'id': 13, 'title': 'Alien'},
-          {'id': 14, 'title': 'The Odyssey'},
-          {'id': 15, 'title': 'Obsession'}
+          {'id': 13, 'title': 'Alien', 'mediaType': 'MOVIE'},
+          {'id': 14, 'title': 'The Odyssey', 'mediaType': 'MOVIE'},
+          {'id': 15, 'title': 'Obsession', 'mediaType': 'MOVIE'}
         ]);
       }
       if (path.endsWith('/recommendations')) return recommendations.future;
@@ -118,7 +124,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(TrendingCarousel), findsOneWidget);
-    expect(find.text('Alien'), findsOneWidget);
+    expect(find.text('Alien'), findsWidgets);
     expect(friendReads, isEmpty);
 
     auth.setUnreadNotificationCount(3);
@@ -128,7 +134,7 @@ void main() {
     final notificationBadge = tester.widget<Badge>(find.byType(Badge).first);
     expect(notificationBadge.isLabelVisible, isTrue);
     expect((notificationBadge.label! as Text).data, '3');
-    auth.updateDbUser(profile(session.identity.uid)
+    auth.updateDbUser(libraryProfile(session.identity.uid)
         .copyWith(firstName: 'Taylor', profileBadges: ['EARLY_ADOPTER']));
     await tester.pump();
     final greeting = tester.widget<GreetingHeader>(find.byType(GreetingHeader));
@@ -141,10 +147,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Just for you'), findsOneWidget);
-    expect(find.text('Alien'), findsOneWidget);
+    expect(find.text('Alien'), findsWidgets);
     await tester.drag(find.byType(PageView).first, const Offset(-500, 0));
     await tester.pumpAndSettle();
-    expect(find.text('The Odyssey'), findsOneWidget);
+    expect(find.text('The Odyssey'), findsWidgets);
     expect(friendReads, isEmpty,
         reason: 'catalogue paging must not fetch friend activity');
     expect(tester.takeException(), isNull);

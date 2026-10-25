@@ -1,6 +1,9 @@
 // ignore_for_file: invalid_use_of_visible_for_testing_member
 import 'dart:async';
 import 'dart:convert';
+import 'package:flixie_app/core/analytics/analytics_backend.dart';
+import 'package:flixie_app/core/analytics/analytics_consent.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -49,7 +52,9 @@ Map<String, Object> mediaPage({int page = 1, String type = 'movie'}) => {
       ]
     };
 Future<GoRouter> openSearch(PatrolTester $,
-    {SearchAuth? auth, bool focus = false}) async {
+    {SearchAuth? auth,
+    bool focus = false,
+    AnalyticsController? analytics}) async {
   SharedPreferences.setMockInitialValues({});
   MovieCacheService().clearCache();
   final viewer = auth ?? SearchAuth();
@@ -63,8 +68,12 @@ Future<GoRouter> openSearch(PatrolTester $,
               appBar: AppBar(), body: Text('destination ${state.uri.path}'))),
   ]);
   addTearDown(router.dispose);
-  await $.pumpWidgetAndSettle(ChangeNotifierProvider<AuthProvider>.value(
-      value: viewer,
+  await $.pumpWidgetAndSettle(MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthProvider>.value(value: viewer),
+        if (analytics != null)
+          ChangeNotifierProvider<AnalyticsController>.value(value: analytics)
+      ],
       child:
           MaterialApp.router(theme: AppTheme.darkTheme, routerConfig: router)));
   return router;
@@ -94,6 +103,61 @@ Future<void> tapSearch(PatrolTester $, Finder finder) async {
 
 void searchJourneys(
     void Function(String, Future<void> Function(PatrolTester)) test) {
+  test(
+      'Search result taps emit analytics and navigate for movies, shows and people',
+      ($) async {
+    final backend = SearchAnalyticsBackend();
+    final analytics = AnalyticsController(
+        backend: backend, consentStore: SearchAnalyticsConsent());
+    await analytics.initialize();
+    addTearDown(analytics.dispose);
+    useApiFixture(MockClient((r) async {
+      if (r.url.path.contains('trending')) return searchResponse([]);
+      return searchResponse(mediaPage(
+          type: r.url.queryParameters['type'] == 'all'
+              ? 'movie'
+              : r.url.queryParameters['type'] ?? 'movie'));
+    }));
+    final router = await openSearch($, analytics: analytics);
+    for (final entry in [
+      ('Movies', 'Alien', 'movie', '/movies/348'),
+      ('Shows', 'Alien: Earth', 'show', '/shows/157239'),
+      ('People', 'Casey Runtime', 'person', '/people/990000001')
+    ]) {
+      await submitSearch($, 'Alien');
+      await tapSearch($, find.text(entry.$1));
+      await tapSearch(
+          $,
+          find
+              .descendant(
+                  of: find.byType(SearchResultsView),
+                  matching: find.text(entry.$2, findRichText: true))
+              .last);
+      expect(find.text('destination ${entry.$4}'), findsOneWidget);
+      final taps =
+          backend.events.where((e) => e.$1 == 'search_result_opened').toList();
+      expect(taps.last.$2, {
+        'search_mode': entry.$1.toLowerCase(),
+        'result_type': entry.$3,
+        'position': 1
+      });
+      router.pop();
+      await $.pumpAndSettle();
+    }
+    expect(backend.events.where((e) => e.$1 == 'search_result_opened'),
+        hasLength(3));
+    await analytics.decline();
+    await tapSearch(
+        $,
+        find
+            .descendant(
+                of: find.byType(SearchResultsView),
+                matching: find.text('Casey Runtime', findRichText: true))
+            .last);
+    expect(find.text('destination /people/990000001'), findsOneWidget);
+    expect(backend.events.where((e) => e.$1 == 'search_result_opened'),
+        hasLength(3));
+  });
   test('Search keeps history, retries paging and changes media filters',
       ($) async {
     var failPage = true;
@@ -221,7 +285,13 @@ void searchJourneys(
     router.pop();
     await $.pumpAndSettle();
     await tapSearch($, find.text('People'));
-    await tapSearch($, find.text('Casey Runtime', findRichText: true));
+    await tapSearch(
+        $,
+        find
+            .descendant(
+                of: find.byType(SearchResultsView),
+                matching: find.text('Casey Runtime', findRichText: true))
+            .last);
     expect(find.text('destination /people/990000001'), findsOneWidget);
   });
   test('Search focus and notifications preserve query without another request',
@@ -282,4 +352,24 @@ void searchJourneys(
             (w) => w is RichText && w.text.toPlainText() == 'Alien'),
         findsOneWidget);
   });
+}
+
+class SearchAnalyticsBackend implements AnalyticsBackend {
+  final events = <(String, Map<String, Object>?)>[];
+  @override
+  Future<void> logEvent(String name, Map<String, Object>? parameters) async {
+    events.add((name, parameters));
+  }
+
+  @override
+  Future<void> logScreenView(String screenName) async {}
+  @override
+  Future<void> setCollectionEnabled(bool enabled) async {}
+}
+
+class SearchAnalyticsConsent implements AnalyticsConsentStore {
+  @override
+  Future<AnalyticsConsent> read() async => AnalyticsConsent.accepted;
+  @override
+  Future<void> write(AnalyticsConsent value) async {}
 }

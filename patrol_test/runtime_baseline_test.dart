@@ -860,7 +860,7 @@ void main() {
                   reason: 'Stats data must remain lazy in Library');
             }
             for (final tab in scenario == 'profile'
-                ? ['Activity', 'Stats', 'Library', 'Stats']
+                ? ['Activity', 'Stats', 'Taste', 'Stats']
                 : ['Activity', 'Reviews', 'Overview', 'Reviews']) {
               final before = Map<String, int>.from(requests);
               final timer = Stopwatch()..start();

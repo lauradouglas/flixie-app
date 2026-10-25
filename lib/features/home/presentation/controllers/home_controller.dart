@@ -21,6 +21,7 @@ class HomeController {
     required this.watchPlans,
     HomeDataService service = const HomeDataService(),
     this.onTrendingReady,
+    this.firstHomeReveal,
   })  : _auth = auth,
         _service = service {
     _userId = auth.dbUser?.id;
@@ -42,9 +43,14 @@ class HomeController {
       _snapshotIncomplete = snapshot.incomplete;
       secondaryError.value = snapshot.secondaryError;
       _restored = true;
+    } else if (_userId != null && auth.cachedTrending?.isNotEmpty == true) {
+      // Auth bootstrap owns this account-scoped cache; refresh without blanking it.
+      trending.update(
+          data: List.unmodifiable(auth.cachedTrending!), loading: false);
     }
   }
 
+  final Future<void>? firstHomeReveal;
   final AuthProvider _auth;
   final HomeDataService _service;
   final HomeWatchPlansController watchPlans;
@@ -58,7 +64,7 @@ class HomeController {
   final _loadedFriendIds = <int>{};
   final _friendLoads = <int, Future<void>>{};
   int _heroIndex = 0;
-  static const heroLimit = 12;
+  static const heroLimit = 20;
   static _HomeSnapshot? _sessionSnapshot;
   bool _disposed = false, _started = false, _restored = false;
   bool _snapshotIncomplete = false;
@@ -178,10 +184,8 @@ class HomeController {
     }
     final user = _auth.dbUser;
     _lastActivityVersion = _auth.activityVersion;
-    unawaited(watchPlans.load(user,
-        force: refreshRecommendations || !showFullLoading));
-    unawaited(
-        _loadSecondary(user, generation, refresh: refreshRecommendations));
+    final plansReady = watchPlans.load(user,
+        force: refreshRecommendations || !showFullLoading);
     try {
       final movies = await _service.trending(refresh: refreshRecommendations);
       if (!_current(generation, id)) {
@@ -203,7 +207,34 @@ class HomeController {
       if (trending.value.data.isNotEmpty) {
         secondaryError.value = 'Couldn’t refresh Home.';
       }
+    } finally {
+      // Opening content gets the connection/DB budget first. Secondary sections
+      // may load independently once the initial plans and trending have settled.
+      await plansReady;
+      if (_current(generation, id)) {
+        unawaited(_loadDeferredLibrary(generation, id, refreshRecommendations));
+      }
     }
+  }
+
+  Future<void> _loadDeferredLibrary(
+      int generation, String? id, bool refresh) async {
+    recommendations.update(loading: true);
+    continueWatching.update(loading: true);
+    watchlist.update(loading: true);
+    await firstHomeReveal;
+    if (!_current(generation, id)) return;
+    final loaded = await _auth.ensureLibraryLoaded();
+    if (!_current(generation, id)) return;
+    if (!loaded) {
+      const message = 'Couldn’t load your library. Pull down to retry.';
+      recommendations.update(loading: false, error: message);
+      continueWatching.update(loading: false, error: message);
+      watchlist.update(loading: false, error: message);
+      secondaryError.value = message;
+      return;
+    }
+    await _loadSecondary(_auth.dbUser, generation, refresh: refresh);
   }
 
   Future<void> _loadSecondary(User? user, int generation,

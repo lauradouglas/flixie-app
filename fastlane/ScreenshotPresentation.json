@@ -1,57 +1,64 @@
 {
   "locale": "en-GB",
-  "background": "120A24",
+  "background": "0A1424",
   "accent": "B9A0FF",
   "font": "assets/fonts/Manrope-VariableFont_wght.ttf",
   "screens": [
     {
       "scene": "01-home",
-      "headline": "Movies, TV\n& friends.",
+      "headline": "Films are better\nwith friends.",
       "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-perched-looking-down.png",
-      "pip_position": "top-right"
+      "pip_position": "bottom-left",
+      "supporting_text": "Discover, plan and share your ratings.\nFind your next favourite through friends."
     },
     {
       "scene": "06-interstellar",
-      "headline": "Find your film.\nSee where to watch.",
-      "android_headline": "Find your film.\nSee where to watch.",
+      "headline": "Find a film.\nFind its service.",
       "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-rear-view.png",
-      "pip_position": "bottom-left"
-    },
-    {
-      "scene": "03-watchlist",
-      "headline": "Your next watch.\nAll in one place.",
-      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
-      "pip_position": "bottom-left"
-    },
-    {
-      "scene": "04-watch-plan",
-      "headline": "Make movie\nnight happen.",
-      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-rear-view.png",
-      "pip_position": "bottom-left"
-    },
-    {
-      "scene": "08-rating",
-      "headline": "Every watch.\nYour own rating.",
-      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
-      "pip_position": "bottom-left"
-    },
-    {
-      "scene": "07-the-newsroom",
-      "headline": "Never lose\nyour place.",
-      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-perched-looking-down.png",
-      "pip_position": "top-right"
+      "pip_position": "bottom-left",
+      "supporting_text": "See where to stream, rent or buy.\nFind a film for your next movie night."
     },
     {
       "scene": "05-community",
       "headline": "Find your\nfilm people.",
       "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-rear-view.png",
-      "pip_position": "bottom-left"
+      "pip_position": "bottom-left",
+      "supporting_text": "Join communities. Swap recommendations.\nKeep the plot twists spoiler-protected."
+    },
+    {
+      "scene": "04-watch-plan",
+      "headline": "Make movie\nnight happen.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-rear-view.png",
+      "pip_position": "bottom-left",
+      "supporting_text": "Suggest a film. Pick a time and place.\nKeep the plans out of the group-chat scroll."
+    },
+    {
+      "scene": "03-watchlist",
+      "headline": "Save the films.\nFind the right night.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
+      "pip_position": "bottom-left",
+      "supporting_text": "Filter your watchlist by genre and runtime.\nFind options on your streaming services."
+    },
+    {
+      "scene": "08-rating",
+      "headline": "Your watch.\nYour honest opinion.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
+      "pip_position": "bottom-left",
+      "supporting_text": "Rate each viewing and share your thoughts.\nSee what your friends recommend."
+    },
+    {
+      "scene": "07-the-newsroom",
+      "headline": "Keep up with\nyour favourite shows.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-perched-looking-down.png",
+      "pip_position": "top-right",
+      "supporting_text": "Track episodes, seasons and your progress.\nRemember where you left off."
     },
     {
       "scene": "02-profile",
       "headline": "Your favourites.\nYour film identity.",
       "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
-      "pip_position": "bottom-left"
+      "pip_position": "bottom-left",
+      "supporting_text": "Build your lists and revisit your watches.\nGive friends a feel for your taste."
     }
   ],
   "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png"

@@ -275,6 +275,8 @@ class _MediaListPickerBodyState extends State<_MediaListPickerBody> {
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
+      enableDrag: false,
+      isDismissible: false,
       useSafeArea: true,
       backgroundColor: context.colors.background,
       builder: (_) => ChangeNotifierProvider<MovieListsProvider>.value(

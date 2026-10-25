@@ -10,6 +10,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
+import 'package:flixie_app/features/social/presentation/widgets/chat_stream_builder.dart';
 import 'package:flixie_app/features/social/presentation/utils/movie_share_payload.dart';
 import 'package:flixie_app/models/conversation.dart';
 import 'package:flixie_app/models/friendship.dart';
@@ -26,6 +27,7 @@ class _ConversationsHubState extends State<ConversationsHub> {
   final TextEditingController _search = TextEditingController();
   bool _safetyReady = false;
   bool _safetyFailed = false;
+  int _refreshGeneration = 0;
 
   @override
   void initState() {
@@ -90,8 +92,9 @@ class _ConversationsHubState extends State<ConversationsHub> {
         if (group.id case final id?) id: group,
     };
 
-    return StreamBuilder<List<Conversation>>(
-      stream: ChatService.conversationsStream(userId),
+    return ChatStreamBuilder<List<Conversation>>(
+      source: (userId, _refreshGeneration),
+      createStream: () => ChatService.conversationsStream(userId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -128,7 +131,7 @@ class _ConversationsHubState extends State<ConversationsHub> {
         }).toList(growable: false);
 
         return RefreshIndicator(
-          onRefresh: () async => setState(() {}),
+          onRefresh: () async => setState(() => _refreshGeneration++),
           color: FlixieColors.primary,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),

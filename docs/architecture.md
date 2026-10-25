@@ -681,3 +681,28 @@ requests are preserved; no automatic historical merge or permanent group creatio
 Keep guest posters and Pip fitted with BoxFit.contain. A reserved poster slot does not change the source aspect ratio or crop the image; do not stretch a portrait poster into a wide hero. Narrow/large-text featured titles stack, and meaningful titles wrap. Guest Home retains the existing public community projection and badge pipeline; no personalised recommendations or invented mood collections are implied.
 
 Cinema list presentation is owned by Home at `features/home/presentation/widgets/cinema_list.dart` and shared by signed-in and guest Home. It consumes the existing InCinemasSection region feed and caller-owned action callbacks, saved IDs and pending IDs. It shows optional source-labelled TMDB scores, contains complete posters and provides a three-item preview with expansion. The guest alias preserves existing imports; no friends data is loaded for this list.
+
+Initial signed-in Home reveal is owned by HomeStartupGate. It covers shell navigation while Home starts its existing independent requests, releasing when plans/trending are usable and bounded image warming settles, or after six seconds. It never reopens for background refresh, ignores inactive Home branches and keeps normal error/retry UI reachable. Auth SplashScreen still owns session recovery; no catalogue requests were moved into router/auth. Native launch assets are rendered from the actual reduced-motion first pose with `tool/render_startup_brand_test.dart`; iOS uses PipLaunchBrand to avoid stale LaunchImage identity.
+
+
+Startup account data: AuthProvider loads an opt-in compact identity response before Home. The existing full-profile loader remains the source for library hydration and explicit profile refreshes. User.hasLibrarySnapshot distinguishes omitted collections from real empty collections. HomeController waits for initial Home reveal before coalesced hydration; LibraryReadinessGate protects collection-dependent routes from mounting with incomplete data. Session generations and collection revisions prevent late hydration overwriting another account or a newer edit. Released clients retain the full-profile endpoint default.
+
+
+### Own-profile weekly film diary
+
+`ProfileDiaryScreen` is a private, independently loaded profile route at `/profile/diary`. `ProfileDiaryController` owns the current account, request generation, loading/retry and watch index. `ProfileDataService.movieWatches` uses the existing own-watch endpoint only after the diary opens. This route consumes no library collections, so it bypasses the collection-readiness gate while retaining ordinary authentication/onboarding routing. `diary_selection.dart` owns local calendar grouping, same-day rewatches and undated separation; UTC calendar-day arithmetic keeps week jumps stable across DST. The calendar and watch-entry widgets own presentation, bounded root sheets and existing title/profile links. Controllers reject stale account loads and sheets observe cleared selection on logout. Group attendees are read-only diary context (`groupCompanions`) rather than direct-plan companion edit selections. No public diary contract, TV logging change or startup fetch is added.
+
+
+Release awareness: `features/movies/domain/release_status.dart` owns validated calendar-date/status rules shared by film and TV detail heroes. `unreleased_status_label.dart` renders the visible state; `unreleased_movie_prompt.dart` owns the root, safe-area confirmation. `showMovieWatchLogSheet` accepts movie identity and optional release metadata and checks new logs before mounting the editor, loading cached metadata for compact payloads; existing edits bypass this new-log prompt. Callers still own persistence and account validity. Whole-show status uses first-air date, separately from episode-level Continue Watching filtering.
+
+
+## Optional taste setup
+
+`features/taste` owns the post-action Build your taste flow. `TasteService`
+uses existing film favourite/rating APIs and recommendation cache invalidation;
+`TasteSetupStore` keeps account-scoped device dismissal/progress and activation
+notifications. `TasteController` owns search generations, save state and viewer
+guards. The page reuses the signup poster grid and existing rating editor. Home
+hosts an invitation only after a saved action/library evidence; Profile always
+links back. Signup and title action flows only mark eligibility after successful
+activity; taste setup never intercepts or delays the original action.

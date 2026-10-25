@@ -7,6 +7,8 @@ class ChatMessage {
   final String? senderUsername;
   final String text;
   final DateTime createdAt;
+  // Retain nanosecond precision for exclusive Firestore history cursors.
+  final Timestamp? firestoreCreatedAt;
   final String? replyToMessageId;
   final String? imageUrl;
   final Map<String, dynamic>? game;
@@ -27,6 +29,7 @@ class ChatMessage {
     this.senderUsername,
     required this.text,
     required this.createdAt,
+    this.firestoreCreatedAt,
     this.replyToMessageId,
     this.imageUrl,
     this.game,
@@ -60,6 +63,7 @@ class ChatMessage {
       senderUsername: data['senderUsername'] as String?,
       text: data['text'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      firestoreCreatedAt: data['createdAt'] as Timestamp?,
       replyToMessageId: data['replyToMessageId'] as String?,
       imageUrl: data['imageUrl'] as String?,
       game: data['game'] is Map

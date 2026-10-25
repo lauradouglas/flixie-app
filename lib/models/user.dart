@@ -38,6 +38,7 @@ class User {
   final List<FavoriteMovie>? favoriteMovies;
   final List<dynamic>? favoriteShows;
   final List<dynamic>? favoritePeople;
+  final Map<String, int> featuredPeople;
   final List<dynamic>? favoriteGenres;
 
   const User({
@@ -69,8 +70,19 @@ class User {
     this.favoriteMovies,
     this.favoriteShows,
     this.favoritePeople,
+    this.featuredPeople = const {},
     this.favoriteGenres,
   });
+
+  bool get hasLibrarySnapshot =>
+      watchedMovies != null &&
+      watchedShows != null &&
+      movieWatchlist != null &&
+      showWatchlist != null &&
+      favoriteMovies != null &&
+      favoriteShows != null &&
+      favoritePeople != null &&
+      favoriteGenres != null;
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -119,6 +131,12 @@ class User {
           : null,
       favoriteShows: json['favoriteShows'] as List<dynamic>?,
       favoritePeople: json['favoritePeople'] as List<dynamic>?,
+      featuredPeople: {
+        if (json['featuredPeople'] is Map)
+          for (final entry in (json['featuredPeople'] as Map).entries)
+            if (entry.value is int && entry.value > 0)
+              entry.key.toString(): entry.value as int
+      },
       favoriteGenres: json['favoriteGenres'] as List<dynamic>?,
     );
   }
@@ -262,6 +280,7 @@ class User {
     List<FavoriteMovie>? favoriteMovies,
     List<dynamic>? favoriteShows,
     List<dynamic>? favoritePeople,
+    Map<String, int>? featuredPeople,
     List<dynamic>? favoriteGenres,
   }) {
     return User(
@@ -293,6 +312,7 @@ class User {
       favoriteMovies: favoriteMovies ?? this.favoriteMovies,
       favoriteShows: favoriteShows ?? this.favoriteShows,
       favoritePeople: favoritePeople ?? this.favoritePeople,
+      featuredPeople: featuredPeople ?? this.featuredPeople,
       favoriteGenres: favoriteGenres ?? this.favoriteGenres,
     );
   }
@@ -326,6 +346,7 @@ class User {
       'favoriteMovies': favoriteMovies?.map((e) => e.toJson()).toList(),
       'favoriteShows': favoriteShows,
       'favoritePeople': favoritePeople,
+      'featuredPeople': featuredPeople,
       'favoriteGenres': favoriteGenres,
     };
   }

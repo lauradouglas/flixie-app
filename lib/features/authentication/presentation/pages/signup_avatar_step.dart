@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/widgets/bookmark_signup_context.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -147,6 +148,7 @@ class _SignupAvatarStepState extends State<SignupAvatarStep> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const BookmarkSignupContext(),
                             Text('A little more you.',
                                 style: text.headlineMedium
                                     ?.copyWith(fontWeight: FontWeight.w800)),

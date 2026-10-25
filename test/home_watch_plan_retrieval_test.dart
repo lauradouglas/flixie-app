@@ -24,6 +24,7 @@ void main() {
           includeHomeState: true, activeOnly: true),
       () => MockClient((request) async {
         expect(request.url.queryParameters['activeOnly'], 'true');
+        expect(request.url.queryParameters['homeOnly'], 'true');
         return http.Response(
             jsonEncode([
               {...plan('overdue'), 'scheduledFor': '2020-01-01T12:00:00Z'},

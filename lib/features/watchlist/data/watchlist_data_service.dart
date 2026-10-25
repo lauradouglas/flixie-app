@@ -16,6 +16,21 @@ import 'package:flixie_app/models/watchlist_movie.dart';
 class WatchlistDataService {
   const WatchlistDataService();
 
+  Future<Set<int>> getNewlyAvailableMovies(String date) async {
+    final response = await ApiClient.get(
+        '/availability-alerts/movies?date=${Uri.encodeQueryComponent(date)}');
+    if (response is! Map ||
+        response['date'] != date ||
+        response['movieIds'] is! List) {
+      throw const FormatException('Invalid availability response');
+    }
+    final ids = response['movieIds'] as List;
+    if (ids.any((id) => id is! int || id <= 0)) {
+      throw const FormatException('Invalid availability movie IDs');
+    }
+    return ids.cast<int>().toSet();
+  }
+
   Future<List<MovieShort>> searchMovies(String query) async {
     final response = await SearchService.search(query, type: 'movie');
     return response.results

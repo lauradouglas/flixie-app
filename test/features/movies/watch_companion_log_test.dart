@@ -23,6 +23,37 @@ void main() {
           ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
         .load();
   });
+  testWidgets(
+      'an empty friend response preserves an existing companion selection',
+      (tester) async {
+    StarredPeople.instance.selectAccount('fixture');
+    StarredPeople.instance.loaded = true;
+    addTearDown(() => StarredPeople.instance.selectAccount(null));
+    List<FriendshipUser>? result;
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+            body: Builder(
+                builder: (context) => TextButton(
+                    onPressed: () async => result =
+                        await showModalBottomSheet<List<FriendshipUser>>(
+                            context: context,
+                            useRootNavigator: true,
+                            useSafeArea: true,
+                            builder: (_) => WatchCompanionPicker(
+                                    loadFriends: () async => const [],
+                                    selected: const [
+                                      FriendshipUser(
+                                          id: 'existing', username: 'Sam')
+                                    ])),
+                    child: const Text('Open picker'))))));
+    await tester.tap(find.text('Open picker'));
+    await tester.pumpAndSettle();
+    expect(find.text('Their name'), findsNothing);
+    await tester.tap(find.text('Done · 1 selected'));
+    await tester.pumpAndSettle();
+    expect(result!.single.id, 'existing');
+  });
   testWidgets('multi-select stays usable with a landscape search keyboard',
       (tester) async {
     tester.view.physicalSize = const Size(844, 390);
@@ -47,12 +78,12 @@ void main() {
                               useSafeArea: true,
                               isScrollControlled: true,
                               builder: (_) => WatchCompanionPicker(
-                                  loadFriends: () async => [
+                                  loadFriends: () async => const [
                                         Friendship(
                                             id: 'sophie',
                                             createdAt: '',
                                             updatedAt: '',
-                                            friend: const FriendshipUser(
+                                            friend: FriendshipUser(
                                                 id: 'sophie',
                                                 username: 'Sophie')),
                                       ]));

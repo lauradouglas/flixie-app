@@ -16,6 +16,10 @@ class AnalyticsController extends ChangeNotifier {
         _consentStore = consentStore;
 
   static const approvedEvents = <String, Set<String>>{
+    'search_completed': {'search_mode', 'result_count', 'has_results'},
+    'search_result_opened': {'search_mode', 'result_type', 'position'},
+    'detail_action_tapped': {'content_type', 'action'},
+    'detail_tab_selected': {'content_type', 'tab'},
     'signup_started': {},
     'signup_completed': {},
     'taste_signal_added': {'signal_type'},
@@ -250,6 +254,64 @@ class AnalyticsController extends ChangeNotifier {
       debugPrint('[Analytics] screen_view {$screenName}');
     }
     await _safely(() => _backend.logScreenView(screenName));
+  }
+
+  static const searchModes = {
+    'all',
+    'movies',
+    'shows',
+    'people',
+    'companies',
+    'collections'
+  };
+  static const detailActions = {
+    'watchlist',
+    'favourite',
+    'list',
+    'plan',
+    'share',
+    'rate',
+    'log_watch'
+  };
+  Future<void> searchCompleted(
+          {required String mode, required int resultCount}) =>
+      logEvent('search_completed', {
+        'search_mode': searchModes.contains(mode) ? mode : 'all',
+        'result_count': resultCount.clamp(0, 100000),
+        'has_results': resultCount > 0 ? 1 : 0,
+      });
+  Future<void> searchResultOpened(
+          {required String mode,
+          required String resultType,
+          required int position}) =>
+      logEvent('search_result_opened', {
+        'search_mode': searchModes.contains(mode) ? mode : 'all',
+        'result_type': const {
+          'movie',
+          'show',
+          'person',
+          'collection',
+          'company'
+        }.contains(resultType)
+            ? resultType
+            : 'unknown',
+        'position': position.clamp(1, 10000),
+      });
+  Future<void> detailActionTapped(
+      {required String contentType, required String action}) async {
+    if (!detailActions.contains(action)) return;
+    await logEvent('detail_action_tapped',
+        {'content_type': _contentType(contentType), 'action': action});
+  }
+
+  Future<void> detailTabSelected(
+      {required String contentType, required String tab}) async {
+    if (!const {'overview', 'reviews', 'activity', 'details', 'episodes'}
+        .contains(tab)) {
+      return;
+    }
+    await logEvent('detail_tab_selected',
+        {'content_type': _contentType(contentType), 'tab': tab});
   }
 
   Future<void> signupStarted() => _logOnce('signup_started');

@@ -520,4 +520,30 @@ void main() {
     expect(provider.errorCode, 'USER_ALREADY_EXISTS');
     expect(avatarCalls, 0);
   });
+  test('registration completes with initials before optional avatar artwork',
+      () async {
+    var avatarCalls = 0;
+    final provider = AuthProvider(authService, MovieService(),
+        prefetchAfterAuth: false,
+        profileCreator: (_) async => _createdUser(),
+        avatarSelector: (_) async {
+          avatarCalls++;
+          throw StateError('Must remain optional');
+        });
+    expect(
+        await provider.beginAvatarSignUp(
+            termsAccepted: true,
+            email: 'fixture@example.invalid',
+            password: 'Password1!',
+            firstName: 'Fixture',
+            lastName: '',
+            username: 'fixture'),
+        isTrue);
+    expect(await provider.completeSignupWithDefaultAvatar(), isTrue);
+    expect(provider.isAuthenticated, isTrue);
+    expect(provider.termsVerified, isTrue);
+    expect(provider.dbUser!.completedSetup, isFalse);
+    expect(avatarCalls, 0);
+    provider.dispose();
+  });
 }

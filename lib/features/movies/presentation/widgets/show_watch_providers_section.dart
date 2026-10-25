@@ -15,6 +15,7 @@ enum _ShowProviderTab { stream, rent, buy }
 class ShowWatchProvidersSection extends StatefulWidget {
   const ShowWatchProvidersSection(
       {super.key,
+      this.onAddProviders,
       required this.providers,
       required this.userProviderIds,
       required this.userProviderMatchKeys,
@@ -24,6 +25,7 @@ class ShowWatchProvidersSection extends StatefulWidget {
       required this.failed,
       required this.onRetry,
       required this.onRegionChanged});
+  final VoidCallback? onAddProviders;
   final List<WatchProvider> providers;
   final Set<int> userProviderIds;
   final Set<String> userProviderMatchKeys;
@@ -73,6 +75,19 @@ class _ShowWatchProvidersSectionState extends State<ShowWatchProvidersSection> {
             await showSettingsEditDetailsSheet(context);
             if (mounted) await widget.onRegionChanged();
           }),
+      if (widget.onAddProviders != null &&
+          widget.userProviderIds.isEmpty &&
+          widget.userProviderMatchKeys.isEmpty) ...[
+        const SizedBox(height: 8),
+        const Text(
+            'Add your streaming services to spot your options more easily.'),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+            onPressed: widget.onAddProviders,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add watch providers')),
+        const SizedBox(height: 12),
+      ],
       if (_ShowProviderTab.values
               .where((tab) => _providersForTab(tab).isNotEmpty)
               .length >

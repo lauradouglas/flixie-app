@@ -36,6 +36,24 @@ Future<void> members(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('Undo cancels list removal before any write', (tester) async {
+    final api = MovieListDetailFixture();
+    await mount(tester, api);
+    await tester.tap(find.descendant(
+        of: find.byType(MovieListPosterCard).first,
+        matching: find.byTooltip('List item actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove from list'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(api.writes, isEmpty);
+    expect(api.entries.any((e) => e['movieId'] == 1), isTrue);
+  });
   testWidgets(
       'refresh after revoked access hides retained titles and edit controls',
       (tester) async {
@@ -174,6 +192,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove'));
     await tester.pumpAndSettle();
+    expect(api.writes, isEmpty);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
     expect(api.entries.any((e) => e['movieId'] == 1), isFalse);
     expect(api.entries.any((e) => e['showId'] == 1), isTrue);
     expect(
@@ -298,9 +319,12 @@ void main() {
         expect(tester.takeException(), isNull);
         await members(tester);
         expect(tester.takeException(), isNull);
-        Navigator.of(tester.element(find.text('2 members')), rootNavigator: true).pop();
+        Navigator.of(tester.element(find.text('2 members')),
+                rootNavigator: true)
+            .pop();
         await tester.pumpAndSettle();
-        tester.view.viewInsets = FakeViewPadding(bottom: size.height < 500 ? 180 : 300);
+        tester.view.viewInsets =
+            FakeViewPadding(bottom: size.height < 500 ? 180 : 300);
         addTearDown(tester.view.resetViewInsets);
         await tester.tap(find.byTooltip('Add titles'));
         await tester.pumpAndSettle();

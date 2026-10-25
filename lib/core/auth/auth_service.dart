@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/firebase_environment.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -10,7 +11,7 @@ import 'package:flixie_app/core/api/api_client.dart';
 /// forgot-password, and user-profile operations.
 class AuthService {
   AuthService({FirebaseAuth? firebaseAuth})
-      : _auth = firebaseAuth ?? FirebaseAuth.instance;
+      : _auth = firebaseAuth ?? FirebaseEnvironment.auth;
 
   final FirebaseAuth _auth;
   static Future<void>? _googleInitialization;

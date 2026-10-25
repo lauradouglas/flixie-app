@@ -23,6 +23,53 @@ FlixieNotification notice(String type) => FlixieNotification(
         });
 
 void main() {
+  for (final viewport in [
+    (const Size(320, 640), 2.0),
+    (const Size(430, 900), 1.0),
+    (const Size(1000, 720), 1.0),
+    (const Size(640, 320), 2.0),
+  ]) {
+    testWidgets('episode context reflows and opens show at $viewport',
+        (tester) async {
+      await tester.binding.setSurfaceSize(viewport.$1);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      const message = 'New episode of Vision Quest: S1 E2 aired 2026-10-24. '
+          'Show listed on Disney+ in GB.';
+      var opened = false;
+      await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.darkTheme,
+          builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(textScaler: TextScaler.linear(viewport.$2)),
+              child: child!),
+          home: Scaffold(
+              body: SingleChildScrollView(
+                  child: NotificationInboxCard(
+                      notification: const FlixieNotification(
+                        userId: 'fictional',
+                        type: FlixieNotification.availabilityAlert,
+                        message: message,
+                        data: {
+                          'event': 'NEW_EPISODE_RELEASE',
+                          'mediaType': 'tv',
+                          'mediaTitle': 'Vision Quest',
+                          'providerNames': 'Disney+',
+                          'country': 'GB',
+                          'route': '/shows/101?source=notification',
+                        },
+                      ),
+                      date: 'Today',
+                      onOptions: () {},
+                      onOpen: () => opened = true)))));
+      expect(find.text('New episode'), findsOneWidget);
+      expect(find.text(message), findsOneWidget);
+      expect(find.text('Added to Disney+ · GB'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.ensureVisible(find.text('View title →'));
+      await tester.tap(find.text('View title →'));
+      expect(opened, isTrue);
+    });
+  }
   testWidgets(
       'season premiere alert explains the release without provider claims',
       (tester) async {

@@ -296,24 +296,40 @@ class MovieListDetailActions {
     );
     if (confirmed != true || !context.mounted || !isCurrent) return;
     final analytics = context.read<AnalyticsController>();
-    final ok = movieId > 0
-        ? await provider.removeMovieFromList(listId, movieId)
-        : await provider.removeShowFromList(listId, showId);
-    if (ok) {
-      await (movieId > 0
-          ? analytics.movieRemovedFromList()
-          : analytics.showRemovedFromList());
+    var undone = false;
+    final notice = ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Removing $title from $listName…'),
+      duration: const Duration(seconds: 4),
+      persist: false,
+      showCloseIcon: true,
+      action: SnackBarAction(label: 'Undo', onPressed: () => undone = true),
+    ));
+    await notice.closed;
+    if (undone || !context.mounted || !isCurrent) return;
+    Future<void> commitRemoval() async {
+      if (!isCurrent) return;
+      final ok = movieId > 0
+          ? await provider.removeMovieFromList(listId, movieId)
+          : await provider.removeShowFromList(listId, showId);
+      if (!context.mounted || !isCurrent) return;
+      if (ok) {
+        await (movieId > 0
+            ? analytics.movieRemovedFromList()
+            : analytics.showRemovedFromList());
+      }
+      if (!context.mounted || !isCurrent) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok
+            ? 'Removed from list'
+            : 'Couldn’t remove this title. It is still in your list.'),
+        action: ok
+            ? null
+            : SnackBarAction(
+                label: 'Retry',
+                onPressed: () => _once('remove:${entry.id}', commitRemoval)),
+      ));
     }
-    if (!context.mounted || !isCurrent) return;
-    ScaffoldMessenger.of(context).showFlixieToast(
-      FlixieToast(
-        type: FlixieToastType.error,
-        content: Text(
-          ok
-              ? 'Removed from list'
-              : (provider.error ?? 'Unable to remove movie'),
-        ),
-      ),
-    );
+
+    await commitRemoval();
   }
 }

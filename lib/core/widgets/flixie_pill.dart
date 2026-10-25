@@ -34,12 +34,12 @@ class FlixiePill extends StatelessWidget {
       required this.onPressed,
       this.avatar,
       this.tooltip,
+      this.colorKey,
       this.selected = false,
       this.showCheckmark = false})
       : onSelected = null,
         compact = false,
-        _interactive = true,
-        colorKey = null;
+        _interactive = true;
   const FlixiePill.label(
       {super.key,
       required this.label,
@@ -62,7 +62,7 @@ class FlixiePill extends StatelessWidget {
   final VoidCallback? onPressed;
   final String? tooltip;
 
-  /// Stable palette key for decorative, non-interactive genre labels.
+  /// Stable palette key for genre labels and actions.
   final String? colorKey;
 
   @override
@@ -80,10 +80,11 @@ class FlixiePill extends StatelessWidget {
         fontSize: compact ? 12 : 14,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500);
     return IconTheme.merge(
-        data: const IconThemeData(color: FlixiePillStyle.iconColor, size: 16),
+        data: IconThemeData(
+            color: tint?.$2 ?? FlixiePillStyle.iconColor, size: 16),
         child: RawChip(
-          iconTheme:
-              const IconThemeData(color: FlixiePillStyle.iconColor, size: 16),
+          iconTheme: IconThemeData(
+              color: tint?.$2 ?? FlixiePillStyle.iconColor, size: 16),
           label: DefaultTextStyle(
             style: style,
             softWrap: true,

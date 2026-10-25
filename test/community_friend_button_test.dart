@@ -44,6 +44,26 @@ class Actions extends FriendActionsController {
 }
 
 void main() {
+  testWidgets(
+      'feed icon action keeps request accessible without a name-cramping label',
+      (tester) async {
+    final actions = Actions();
+    final controller =
+        CommunityConnectionsController(userId: 'me', actions: actions);
+    addTearDown(controller.dispose);
+    await controller.refresh();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: CommunityFriendButton(
+                connections: controller, author: author, iconOnly: true))));
+    expect(find.text('Add friend'), findsNothing);
+    expect(find.byTooltip('Add friend'), findsOneWidget);
+    await tester.tap(find.byTooltip('Add friend'));
+    await tester.pumpAndSettle();
+    expect(actions.sent, hasLength(1));
+    expect(find.text('Request sent'), findsNothing);
+    expect(find.byTooltip('Request sent'), findsOneWidget);
+  });
   testWidgets('compact friendship status is readable without a disabled action',
       (tester) async {
     final actions = Actions()

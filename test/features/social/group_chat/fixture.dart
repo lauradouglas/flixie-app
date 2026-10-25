@@ -95,6 +95,11 @@ class ChatFixture extends GroupChatService {
     return channel.stream;
   }
 
+  @override
+  Future<List<ChatMessage>> olderMessages(
+          String id, ChatMessage before) async =>
+      [];
+
   void close() {
     for (final channel in channels) {
       channel.close();

@@ -49,7 +49,7 @@ void main() {
     }
   });
 
-  testWidgets('tablet profile totals share header and activity tab still opens',
+  testWidgets('tablet taste places totals below identity and activity still opens',
       (t) async {
     t.view.physicalSize = const Size(1194, 834);
     t.view.devicePixelRatio = 1;
@@ -62,11 +62,11 @@ void main() {
       await t.pumpAndSettle();
       final header = t.getRect(find.byType(ProfileHeader));
       final totals = t.getRect(find.byType(ProfileLibraryTotals));
-      expect(totals.left, greaterThan(header.right));
-      expect(totals.top, lessThan(header.bottom));
+      expect(totals.top, greaterThan(header.bottom));
       await openProfileTab(t, 'Activity');
       expect(find.text('Favourite films'), findsNothing);
       expect(t.takeException(), isNull);
+      await openProfileTab(t, 'Taste');
       await t.pumpWidget(f.app(2));
       await t.pumpAndSettle();
       expect(t.getRect(find.byType(ProfileLibraryTotals)).top,

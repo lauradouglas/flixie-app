@@ -157,8 +157,9 @@ void main() {
       await tester.pumpWidget(tvDetailApp(fixture));
       await tester.pumpAndSettle();
       await scrollTvControlIntoView(tester, find.text('Seasons'));
-      final seasonsHeader = find.ancestor(
-          of: find.text('All episodes'), matching: find.byType(Row)).first;
+      final seasonsHeader = find
+          .ancestor(of: find.text('All episodes'), matching: find.byType(Row))
+          .first;
       expect(tester.getRect(find.text('All episodes')).right,
           closeTo(tester.getRect(seasonsHeader).right, 1));
       expect(find.text('Season 2'), findsOneWidget);
@@ -180,7 +181,7 @@ void main() {
     });
   }
 
-  testWidgets('guest show offers Watchlist without member action clutter',
+  testWidgets('guest show exposes Rate and Watchlist before signup',
       (tester) async {
     final fixture = TvDetailFixture()..install();
     fixture.auth.account = null;
@@ -194,7 +195,8 @@ void main() {
     expect(find.descendant(of: watchlistRow, matching: find.text('Share')),
         findsOneWidget);
     expect(find.text('Share'), findsOneWidget);
-    for (final label in ['Rate', 'Favourite', 'List']) {
+    expect(find.text('Rate'), findsOneWidget);
+    for (final label in ['Favourite', 'List']) {
       expect(find.text(label), findsNothing);
     }
     expect(fixture.writes, isEmpty);

@@ -31,7 +31,15 @@ class _CollectionScreenState extends State<CollectionScreen> {
     // A retry can fail before the next frame subscribes FutureBuilder.
     // Observe that error immediately while keeping it on the original future
     // for the page's retry state.
-    future.then<void>((_) {}, onError: (Object error, StackTrace stack) {});
+    future.then<void>((collection) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || context.read<AuthProvider>().dbUser == null) return;
+        final intent =
+            GuestAccess.takeAction('/collections/${widget.collectionId}');
+        if (intent == 'collection') _watchRest(collection);
+        if (intent == 'collection-plan') _plan(collection);
+      });
+    }, onError: (Object error, StackTrace stack) {});
     return future;
   }
 
@@ -53,7 +61,8 @@ class _CollectionScreenState extends State<CollectionScreen> {
   Future<void> _watchRest(MovieCollection collection) async {
     if (!await GuestAccess.require(context,
         title: 'Track your collection progress',
-        path: '/collections/${widget.collectionId}')) {
+        path: '/collections/${widget.collectionId}',
+        intent: 'collection')) {
       return;
     }
     if (!mounted) return;
@@ -69,7 +78,8 @@ class _CollectionScreenState extends State<CollectionScreen> {
   Future<void> _plan(MovieCollection collection) async {
     if (!await GuestAccess.require(context,
         title: 'Plan a collection with friends',
-        path: '/collections/${widget.collectionId}')) {
+        path: '/collections/${widget.collectionId}',
+        intent: 'collection-plan')) {
       return;
     }
     if (!mounted) return;

@@ -19,6 +19,11 @@ class ProfileLibraryTab extends StatelessWidget {
   const ProfileLibraryTab(
       {super.key,
       required this.userId,
+      this.diaryPreview,
+      this.libraryTotals,
+      this.featuredPeople = const {},
+      this.onChoosePerson,
+      this.savingPeople = false,
       required this.favoriteMovies,
       required this.favoritePeople,
       required this.favoriteShows,
@@ -33,6 +38,10 @@ class ProfileLibraryTab extends StatelessWidget {
       required this.onRatings,
       required this.onRetryExtras});
   final String? userId;
+  final Widget? diaryPreview, libraryTotals;
+  final Map<String, int> featuredPeople;
+  final Future<void> Function(String, int?)? onChoosePerson;
+  final bool savingPeople;
   final List<dynamic> favoriteMovies, favoritePeople, favoriteShows;
   final List<ActivityListItem> activity;
   final List<ContinueWatchingShow> continueWatching;
@@ -61,52 +70,98 @@ class ProfileLibraryTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final userId = this.userId;
     final favourites = ProfileFavouritesLibrary(
-      movies: favoriteMovies, people: favoritePeople, shows: favoriteShows);
+        featuredPeople: featuredPeople,
+        onChoosePerson: onChoosePerson,
+        savingPeople: savingPeople,
+        movies: favoriteMovies,
+        people: favoritePeople,
+        shows: favoriteShows);
     final extrasAndLists = <Widget>[
       const SizedBox(height: 20),
+      if (libraryTotals != null) libraryTotals!,
+      _libraryRow(context,
+          icon: Icons.tune,
+          label:
+              favoriteMovies.isEmpty ? 'Build your taste' : 'Refine your taste',
+          onPressed: () => context.push('/build-your-taste')),
       if (loadingExtras) ...[
-        const _ProfileExtrasLoadingIndicator(), const SizedBox(height: 20),
+        const _ProfileExtrasLoadingIndicator(),
+        const SizedBox(height: 20),
       ],
-      if (failedExtras) TextButton.icon(onPressed: onRetryExtras,
-        icon: const Icon(Icons.refresh), label: const Text('Couldn’t load profile details · Retry')),
-      _libraryRow(context, icon: Icons.bookmark_outline, label: 'Watchlist',
-        onPressed: () => context.push('/watchlist')),
+      if (failedExtras)
+        TextButton.icon(
+            onPressed: onRetryExtras,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Couldn’t load profile details · Retry')),
+      _libraryRow(context,
+          icon: Icons.bookmark_outline,
+          label: 'Watchlist',
+          onPressed: () => context.push('/watchlist')),
       const SizedBox(height: 20),
       if (userId != null) ...[
-        ListsPreviewSection(userId: userId, title: 'Your lists',
-          emptyMessage: 'Keep a little collection of your own. Rainy-day films? A director you love?',
-          allowManage: true, embedded: true),
+        ListsPreviewSection(
+            userId: userId,
+            title: 'Your lists',
+            emptyMessage:
+                'Keep a little collection of your own. Rainy-day films? A director you love?',
+            allowManage: true,
+            embedded: true),
         const SizedBox(height: 20),
       ],
     ];
     final recent = <Widget>[
       if (loadingActivity && activity.isEmpty)
-        const ContentPlaceholder(label: 'Loading recently watched', style: ContentPlaceholderStyle.posters)
-      else _recentlyWatched(context),
+        const ContentPlaceholder(
+            label: 'Loading recently watched',
+            style: ContentPlaceholderStyle.posters)
+      else
+        _recentlyWatched(context),
       const SizedBox(height: 20),
       if (continueWatching.isNotEmpty) ...[
-        _ProfileContinueWatching(shows: continueWatching, onRemove: onRemoveShow),
+        _ProfileContinueWatching(
+            shows: continueWatching, onRemove: onRemoveShow),
         const SizedBox(height: 20),
       ],
     ];
     final libraryActions = <Widget>[
-      _libraryRow(context, icon: Icons.rate_review_outlined, label: 'Reviews',
-        onPressed: () => context.push('/my-reviews')),
-      _libraryRow(context, icon: Icons.star_outline, label: 'Ratings', onPressed: onRatings),
+      _libraryRow(context,
+          icon: Icons.rate_review_outlined,
+          label: 'Reviews',
+          onPressed: () => context.push('/my-reviews')),
+      _libraryRow(context,
+          icon: Icons.star_outline, label: 'Ratings', onPressed: onRatings),
       const SizedBox(height: 20),
-      _WatchProvidersSummary(providers: watchProviders, onManage: onManageProviders),
+      _WatchProvidersSummary(
+          providers: watchProviders, onManage: onManageProviders),
       const SizedBox(height: 16),
     ];
     return LayoutBuilder(builder: (context, constraints) {
-      if (constraints.maxWidth < 900 || MediaQuery.textScalerOf(context).scale(1) > 1.4) {
-        return Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [favourites, ...extrasAndLists, ...recent, ...libraryActions]);
+      if (constraints.maxWidth < 900 ||
+          MediaQuery.textScalerOf(context).scale(1) > 1.4) {
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              favourites,
+              if (diaryPreview != null) ...[
+                const Divider(height: 40),
+                diaryPreview!
+              ],
+              ...extrasAndLists,
+              ...recent,
+              ...libraryActions
+            ]);
       }
       return FlixieAdaptiveColumns(
-        primary: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [favourites, const SizedBox(height: 24), ...recent]),
-        secondary: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [...extrasAndLists, ...libraryActions]),
+        primary: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [favourites, const SizedBox(height: 24), ...recent]),
+        secondary: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (diaryPreview != null) diaryPreview!,
+              ...extrasAndLists,
+              ...libraryActions
+            ]),
       );
     });
   }

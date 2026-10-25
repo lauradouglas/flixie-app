@@ -60,7 +60,7 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final movies = widget.movies.take(8).toList(growable: false);
+    final movies = widget.movies.take(20).toList(growable: false);
     if (movies.isEmpty) return const SizedBox.shrink();
     final scale = MediaQuery.textScalerOf(context).scale(1);
     return LayoutBuilder(builder: (context, constraints) {

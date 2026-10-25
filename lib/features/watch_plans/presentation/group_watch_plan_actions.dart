@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/models/watch_log_details.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'widgets/group_plan/group_plan_account_sheet.dart';
@@ -274,33 +275,41 @@ class GroupWatchPlanActions {
 
   Future<void> logWatch(GroupWatchRequest request) async {
     if (!active) return;
-    await _sheet<void>(
-      backgroundColor: Colors.transparent,
-      builder: (_) => RewatchLogSheet(
-        showReviewOption: false,
-        isPlanReview: true,
-        onSubmit: ({
-          required watchedAt,
-          required rating,
-          required recommended,
-          required notes,
-        }) async {
-          _ensureActive();
-          final saved = await controller.run(() async {
-            await GroupService.logGroupWatchPlan(
-              request,
-              _userId,
-              watchedAt: watchedAt,
-              rating: rating?.round(),
-              recommended: recommended,
-              reviewText: notes,
-            );
-          });
-          if (!saved) {
-            throw StateError('This Watch Plan session has changed.');
-          }
-        },
-      ),
+    var details = const WatchLogDetails();
+    await showMovieWatchLogSheet<void>(
+      context: context,
+      movieId: request.mediaType == 'movie' ? request.mediaId : null,
+      movieTitle: request.movieTitle,
+      builder: (_) => GroupPlanAccountSheet(
+          viewer: _userId,
+          child: RewatchLogSheet(
+            onDetailsChanged: (value) => details = value,
+            showReviewOption: false,
+            showCinemaOption: request.mediaType == 'movie',
+            isPlanReview: true,
+            onSubmit: ({
+              required watchedAt,
+              required rating,
+              required recommended,
+              required notes,
+            }) async {
+              _ensureActive();
+              final saved = await controller.run(() async {
+                await GroupService.logGroupWatchPlan(
+                  request,
+                  _userId,
+                  watchedAt: watchedAt,
+                  watchedAtCinema: details.watchedAtCinema,
+                  rating: rating?.round(),
+                  recommended: recommended,
+                  reviewText: notes,
+                );
+              });
+              if (!saved) {
+                throw StateError('This Watch Plan session has changed.');
+              }
+            },
+          )),
     );
   }
 

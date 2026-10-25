@@ -1,0 +1,1 @@
+We’ve updated optional usage analytics to help us understand which Flixie features are useful. Analytics stays off until you choose to allow it, and you can change your choice in Settings.

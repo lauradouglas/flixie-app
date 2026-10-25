@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
+import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/features/collections/collection_screen.dart';
 import 'package:flixie_app/models/search_result.dart';
 import '../controllers/search_controller.dart';
@@ -33,6 +34,9 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _search = SearchScreenController(
+      onSearchCompleted: (mode, count) => context
+          .read<AnalyticsController?>()
+          ?.searchCompleted(mode: mode.name, resultCount: count),
       cachedTrending: context.read<AuthProvider>().cachedTrending,
     );
     if (widget.focusSearch) _focusSearch();
@@ -58,6 +62,16 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _openResult(SearchResultItem item) {
     _search.saveHistory(_search.query);
+    final position = (_search.results?.results.indexOf(item) ?? -1) + 1;
+    context.read<AnalyticsController?>()?.searchResultOpened(
+          mode: _search.mode.name,
+          resultType: item.person != null
+              ? 'person'
+              : item.show != null
+                  ? 'show'
+                  : 'movie',
+          position: position,
+        );
     if (item.person != null) {
       context.push(
         personDetailPath(item.person!.id, source: DetailSource.search),
@@ -82,16 +96,26 @@ class _SearchScreenState extends State<SearchScreen> {
         return;
       }
       if (!mounted) return;
+      _recordEntityOpen(item, 'collection');
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => CollectionScreen(collectionId: item.id),
         ),
       );
     } else {
+      _recordEntityOpen(item, 'company');
       _text.text = item.name;
       _search.changeQuery(item.name);
       _search.setMode(SearchMode.movies);
     }
+  }
+
+  void _recordEntityOpen(SearchEntityResult item, String type) {
+    context.read<AnalyticsController?>()?.searchResultOpened(
+          mode: _search.mode.name,
+          resultType: type,
+          position: (_search.entityResults?.results.indexOf(item) ?? -1) + 1,
+        );
   }
 
   @override

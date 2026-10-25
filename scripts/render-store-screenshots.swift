@@ -9,6 +9,7 @@ struct Job: Decodable {
     let source: String
     let output: String
     let headline: String
+    let supportingText: String?
     let width: Int
     let height: Int
 }
@@ -33,6 +34,7 @@ let fontURL = URL(fileURLWithPath: plan.font)
 guard let descriptors = CTFontManagerCreateFontDescriptorsFromURL(fontURL as CFURL) as? [CTFontDescriptor],
       let descriptor = descriptors.first else { throw RenderError.invalid("Missing Manrope font") }
 let boldDescriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: 0x77676874), 800)
+let supportingDescriptor = CTFontDescriptorCreateCopyWithVariation(descriptor, NSNumber(value: 0x77676874), 550)
 let background = try color(plan.background)
 let accent = try color(plan.accent)
 
@@ -77,7 +79,7 @@ for job in plan.jobs {
         brand.draw(at: CGPoint(x: (w - brand.size().width) / 2, y: h * 0.027))
 
         let tablet = w / h > 0.65
-        let fontSize = w * (tablet ? 0.061 : 0.078)
+        let fontSize = w * (tablet ? 0.061 : 0.073)
         let font = CTFontCreateWithFontDescriptor(boldDescriptor, fontSize, nil) as NSFont
         let lines = job.headline.components(separatedBy: "\n")
         guard lines.count == 2 else { throw RenderError.invalid("Use two headline lines") }
@@ -92,14 +94,27 @@ for job in plan.jobs {
 
         // Contain the entire native screenshot. No cropping, replacement UI,
         // perspective distortion, simulated notch, or fabricated device frame.
-        let top = textTop + fontSize * 2.65
+        let supportingTop = textTop + fontSize * 2.60
+        let supportingSize = w * (tablet ? 0.026 : 0.031)
+        if let supporting = job.supportingText {
+            let supportFont = CTFontCreateWithFontDescriptor(supportingDescriptor, supportingSize, nil) as NSFont
+            for (index, line) in supporting.components(separatedBy: "\n").enumerated() {
+                guard (line as NSString).size(withAttributes: [.font: supportFont]).width <= w * 0.92 else {
+                    throw RenderError.invalid("Supporting text too wide: \(line)")
+                }
+                drawText(line, font: supportFont, color: .white,
+                         rect: CGRect(x: w * 0.04, y: supportingTop + CGFloat(index) * supportingSize * 1.45,
+                                      width: w * 0.92, height: supportingSize * 1.5))
+            }
+        }
+        let top = job.supportingText == nil ? textTop + fontSize * 2.65 : supportingTop + supportingSize * 3.8
         let availableHeight = h - top - h * 0.035
         let scale = min(w * 0.89 / w, availableHeight / h)
         let rect = CGRect(x: (w - w * scale) / 2, y: top,
                           width: w * scale, height: h * scale)
-        let edge = max(2, w * 0.0025)
+        let edge = max(3, w * 0.0035)
         let radius = w * 0.028
-        try color("66517F").setFill()
+        try color("596980").setFill()
         NSBezierPath(roundedRect: rect.insetBy(dx: -edge, dy: -edge),
                      xRadius: radius + edge, yRadius: radius + edge).fill()
         NSGraphicsContext.saveGraphicsState()
@@ -115,7 +130,7 @@ for job in plan.jobs {
             }
             let width = rect.width * (tablet ? 0.16 : 0.26)
             let height = width * pip.size.height / pip.size.width
-            let perched = job.pipPosition == "top-right"
+            let perched = job.pipPosition == "top-right" && job.supportingText == nil
             let pipRect = CGRect(x: perched ? rect.maxX - width * 0.88 : rect.minX - width * 0.40,
                                  y: perched ? rect.minY - height * 0.76 : rect.maxY - height + height * 0.18,
                                  width: width, height: height)

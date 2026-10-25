@@ -13,8 +13,10 @@ class AvatarPicker extends StatelessWidget {
     this.loading = false,
     this.error,
     this.onRetry,
+    this.profileBadges = const [],
   });
 
+  final List<String> profileBadges;
   final List<ProfileAvatar> avatars;
   final int? selectedId;
   final ValueChanged<ProfileAvatar> onSelected;
@@ -79,13 +81,15 @@ class AvatarPicker extends StatelessWidget {
                           ? constraints.maxWidth
                           : constraints.maxHeight;
                   return Center(
-                    child: ProfileAvatarView(
+                    child: ExcludeSemantics(
+                        child: ProfileAvatarView(
                       avatar: avatar,
+                      profileBadges: profileBadges,
                       useFullSize: true,
                       fallbackText: avatar.displayName.substring(0, 1),
                       fallbackColor: FlixieColors.primary,
                       size: avatarSize,
-                    ),
+                    )),
                   );
                 },
               ),

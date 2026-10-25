@@ -1603,3 +1603,186 @@ watch -> recap -> Home -> setup and verifies the marker is cleared. The first na
 additional editor obstruction was reproduced in a widget test; final native
 rerun passed all three journeys, including saved recap -> Home -> setup.
 Evidence: `build/ios_results_1792178527684.xcresult`. Installed 118 still has this defect; no new release uploaded.
+
+
+### Watch-entry cinema checkbox — 17 October 2026
+
+Focused client coverage: `flutter test test/features/movies/watch_entry_cinema_test.dart test/rewatch_log_sheet_test.dart test/movie_watch_entry_contract_test.dart test/features/movies/watch_log_contract_test.dart test/features/movies/watch_log_keyboard_test.dart` (19 tests). Covers independent date/cinema controls, edit prefill/clear, optional API field, responsive layouts and existing keyboard/review flow. No full regression suite required for this optional metadata addition.
+
+Backend focused checks: `npm test -- src/services/watchCinema.test.ts src/services/watchTogetherService.test.ts src/services/watchPlanViewing.test.ts src/services/messagingService.completion.test.ts`; also `npm run typecheck`. Local fixture script: `NODE_ENV=development node --env-file=.env.local -r ts-node/register -e 'process.env.DATABASE_URL = process.env.LOCAL_DATABASE_URL; require("./scripts/seed-dev-cinema-watches.ts");'` from FlixieBE. The script requires both URLs to be identical loopback PostgreSQL, refuses identity collisions, writes only fictional `dev_cinema_diary` and preserves its edits on rerun. Requires local cinema migration first. Two Alien entries distinguish cinema and unspecified rewatch. No production database or account changes.
+
+### Weekly profile film diary — 17 October 2026
+
+`flutter test test/features/profile/diary/diary_test.dart`: 10 passing tests cover
+calendar/DST grouping, same-day rewatches, group companion borders, stale account
+responses, retry/refresh, calendar week selection, undated watches and logout.
+Responsive checks include 360px enlarged text, phone, tablet and landscape;
+a separate long-title/long-username case uses 2x text. Targeted analysis is clean.
+The earlier cinema batch remains 19 passing tests; profile controller coverage
+also passes. No full regression or Patrol suite was run for this new diary.
+Backend watchCinema now has four passing checks including own-watch group
+attendee projection, watched/missed filtering and public badge fields; TypeScript
+check passes. The guarded cinema seed now supplies five fictional entries,
+Sophie/Robin companion overlaps, distinct borders and a spoiler-marked review.
+No production data was seeded. Group companion projection and cinema storage
+require a separately authorised backend rollout.
+
+
+Native diary rendering evidence: `output/diary-mockups/native-weekly-phone.png`,
+`native-calendar-phone.png`, `native-calendar-year-phone.png`,
+`native-empty-phone.png` and `native-weekly-tablet.png` are valid iOS 27 simulator
+captures of production widgets hosted by the isolated fictional
+`tool/diary_mockups/native_diary_preview.dart` harness. Phone is portrait; tablet
+uses its existing enlarged system text/date reflow. A compatible installed native
+debug shell and Flutter-synced Dart kernel were used after the Xcode build stalled;
+this is not proof of a fresh native build or authenticated API/persistence flow.
+No physical-device, Android or native-landscape verification is claimed. After
+the user-requested divider-gap adjustment, diary’s 10 tests passed again and
+targeted analysis remained clean. Final finish-review verdict is pending.
+
+Independent Impeccable finish review accepted the native phone/calendar/year/empty/tablet packet with no material findings at that scope.
+
+## Contextual signup suite — 24 October 2026
+
+Run `scripts/test-signup-patrol-local.sh <dedicated-patrol-simulator-id>` for the
+focused contracts plus real local registration journeys. See
+[signup testing](signup-testing.md) for the coverage matrix, emulator boundaries,
+controlled failure cases and remaining release/provider checks. The initial
+standalone bookmark journey passed 1/1 in
+`build/ios_results_1792852711938.xcresult`; expanded suite results are recorded
+below once verified. This does not imply native coverage of live Apple/Google
+provider pickers or Android release builds.
+
+The first completed expanded run passed 18/23 with no skips
+(`build/ios_results_1792854921007.xcresult`). Five test-driver failures exposed
+an extra submission via the keyboard Done action, an incorrect Home assumption
+after sign-out (two referral cases), a scrolling finder that threw before the TV
+review tab mounted, and a country search field mistaken for its result row.
+Corrected the interactions while retaining backend persistence assertions;
+the full corrected run is recorded below. Earlier interrupted diagnostic runs
+are not counted as completed suites.
+
+The corrected full suite passed **23/23, zero failures and zero skips** on the
+dedicated Flixie Review Patrol iOS simulator, with real local Firebase Auth and
+the local development API. Evidence:
+`build/ios_results_1792856048725.xcresult` (11m 6s native execution).
+The guarded runner also passed all **53 focused signup/auth/router tests**.
+The TV guest Rate fix passed all 14 focused show-detail/responsive widget tests;
+targeted static analysis is clean. Successful native cases independently verify
+saved titles, ratings, favourites, reviews, watches, episodes, provider choices
+and canonical referrals. Controlled fault cases verify retained drafts, the same
+Firebase identity on profile retry, and no duplicate saved records.
+
+Apple/Google native Firebase credential cases and cancellation/network recovery
+passed against the emulator; their external account pickers remain replaced by
+explicit test credentials. Live OAuth, physical devices, Android release builds,
+process-death recovery and every secondary feature handoff are not established
+by this 23-case run. No production accounts were used and nothing was deployed.
+
+### Live email signup and cleanup — 24 October 2026
+
+At the user's explicit request, ran the separately gated
+`patrol_test/bookmark_signup_live_test.dart` against real Firebase Auth and the
+production API on the dedicated Patrol simulator. **2/2 passed, zero failures or
+skips**, report `build/ios_results_1792865751535.xcresult` (2m 8s native execution).
+Alien and Breaking Bad each used a fresh fictional email account with a securely
+generated runtime password, normal signup/avatar UI and the actual bookmark
+continuation. Server reads verified exactly one original title before optional
+setup, then confirmed persistence after sign-out/sign-in. Both accounts and
+associated data were removed through normal account deletion; username checks
+returned false and Firebase rejected the deleted credentials. No existing user
+accounts were modified. New live tests are excluded by default unless
+`ALLOW_LIVE_SIGNUP_TEST=true`; they are not in the local aggregate.
+
+The user also reported successful live Google sign-in with their existing account.
+Fresh Apple/Google signup and email delivery/inbox verification remain separate.
+Nothing was deployed.
+
+### Signup screen-detail coverage — 24 October 2026
+
+User asked whether all journey screens display their required details, especially
+the existing provider selector with logos. Confirmed that production signup
+reuses `OnboardingServicesStep`. Added three focused tests for the existing
+country sheet, provider names, image URL wiring and successful image decoding,
+36px logos, missing-artwork fallback, selection, search and no-results text on
+320px phone/1024px tablet layouts at 2x text scaling. All three passed, together
+with all 16 existing signup-journey tests (19/19). Decoding uses deterministic
+fixture bytes and does not verify every live CDN logo. Native journey/persistence
+coverage and these component checks do not imply exhaustive visual coverage of
+all states. The local signup runner includes the new details tests.
+
+
+### Native signup visual review — 24 October 2026
+
+`patrol_test/signup_screens_review_test.dart` captures actual production widgets
+on dedicated iOS simulators with isolated fixture state and locally cached real
+posters, avatar artwork and streaming-service logos. No accounts or activity are
+created. It skips unless explicitly supplied a screenshot host. The capture server
+is `tool/signup_review/capture_server.py`; use Patrol `--no-label` for clean images.
+
+The clean iPhone run passed 1/1 native tests (zero failures/skips), producing 124
+screenshots: `build/ios_results_1792867609173.xcresult`. Ten routes cover film/TV
+watchlist, film/TV rating, film/TV review, watch logging, episode watched, Home and
+Profile. Each includes account/referral/avatar screens and relevant editors,
+optional follow-ups, poster search, providers/country/selection and companion
+invitation controls. Overlapping scroll captures expose content below the fold.
+Gallery: `output/signup-screen-review/index.html`; detailed findings in
+`output/signup-screen-review/review.html`. These are visual fixture captures,
+not an additional live authentication test or exhaustive accessibility proof.
+Focused analysis of the capture target passed.
+
+
+The pre-refinement visual audit also completed on iPad (92 captures), with
+`build/signup_review_tablet.xcresult` reporting a successful native capture test.
+The original 216 phone/iPad images are preserved under
+`output/signup-screen-review/before/`.
+
+The first refinement native run (`build/ios_results_1792868860654.xcresult`)
+was superseded after two automation issues: a review retry tapped behind its
+error toast, and a generic Continue finder could match the previous signup
+form during transition. The test now uses the visible Retry action and scopes
+Continue to SignupJourneyPage. That interrupted run is not counted as a pass.
+The corrected full signup suite and screenshots share
+`patrol_test/signup_review_and_regression_test.dart`.
+
+
+24 October 2026 refinement verification: **24/24 native tests passed, zero
+failures/skips** in `build/ios_results_1792869609313.xcresult`. This is the full
+23-case local signup suite plus the revised iPhone screen-capture test (128
+screens across 11 routes). Registration uses initials; explicit avatar artwork
+is optional after the first action. Movie/TV saves, scores, reviews, exact episode
+progress, provider persistence, referrals, cancellation, profile-create retry,
+review Retry and idempotent watch retry passed. Apple/Google callback credentials
+are emulated; native Firebase SDK and local API persistence remain real.
+
+Focused Flutter verification passed 69/69. Subsequent targeted companion/invite
+checks passed 16/16, guest/router checks 5/5, and final journey/referral layout
+checks 28/28 (these sets overlap; do not sum them as independent coverage).
+The companion empty-state regression also preserves an existing selected friend
+when the friend response is empty. Home → film picker → log ID/save is covered
+by a widget regression and native visual interaction; native API persistence is
+covered through the shared film-log journey. External provider consent UI and
+fresh live provider/production email registration were not rerun for this change.
+
+The first revised iPad visual run stopped at the TV provider country picker:
+a keyboard transition supplied a negative bottom inset, causing invalid padding
+(and secondary framework/key errors). It is recorded as failed, not passed, in
+`build/signup_refinement_tablet.xcresult` / local capture log. Country selection,
+journey scrolling and the shared review/log/companion editors now clamp keyboard
+insets to non-negative values. A forced -80px inset country-picker regression
+passes. The iPad scan also prompted aligning poster context with the existing
+560px review and 640px rating editor columns; alignment is asserted across phone,
+landscape and tablet sizes. The focused post-fix set passed 47/47.
+A single focused native iPad confirmation updates the four editor contexts and
+completes the TV/provider pages; unaffected earlier captures remain in the gallery.
+
+Final native iPad confirmation passed 1/1, completing all 11 iPad routes and
+refreshing the centred editor contexts/provider country selection after the fixes.
+The gallery contains 225 unique native screenshots: 128 phone + 97 tablet.
+Every manifest image exists and every route has captures on both devices.
+No further UI changes followed the final visual confirmation.
+
+Final iPad confirmation report: `build/ios_results_1792872346251.xcresult`,
+1/1 passed, zero failures/skips (95s capture body). This focused confirmation
+covered the corrected film/TV rating/review contexts and the TV watchlist
+country/provider selection that had failed in the initial iPad scan.

@@ -10,10 +10,11 @@ class CommunityFriendButton extends StatelessWidget {
       {super.key,
       required this.connections,
       required this.author,
-      this.compact = false});
+      this.compact = false,
+      this.iconOnly = false});
   final CommunityConnectionsController connections;
   final FriendshipUser author;
-  final bool compact;
+  final bool compact, iconOnly;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
       animation: connections,
@@ -40,6 +41,42 @@ class CommunityFriendButton extends StatelessWidget {
               };
         final canConnect = state == CommunityConnection.available ||
             state == CommunityConnection.incoming;
+        if (iconOnly) {
+          return IconButton(
+            tooltip: label,
+            onPressed: busy
+                ? null
+                : state == CommunityConnection.unknown && connections.failed
+                    ? connections.refresh
+                    : !canConnect
+                        ? null
+                        : () async {
+                            try {
+                              await connections.connect(author);
+                            } catch (_) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Couldn’t update the friend request. Please try again.')));
+                              }
+                            }
+                          },
+            icon: busy
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(switch (state) {
+                    CommunityConnection.friends => Icons.how_to_reg_outlined,
+                    CommunityConnection.outgoing => Icons.schedule,
+                    CommunityConnection.incoming =>
+                      Icons.person_add_alt_1_outlined,
+                    CommunityConnection.available =>
+                      Icons.person_add_alt_1_outlined,
+                    CommunityConnection.unknown => Icons.person_outline,
+                  }),
+          );
+        }
         if (compact &&
             (state == CommunityConnection.friends ||
                 state == CommunityConnection.outgoing)) {

@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -151,4 +152,36 @@ class _CinemaListState extends State<CinemaList> {
           ));
     });
   }
+}
+
+/// Reserve the same poster-left geometry while the cinema feed resolves.
+class CinemaListSkeleton extends StatelessWidget {
+  const CinemaListSkeleton({super.key});
+  @override
+  Widget build(BuildContext context) => Semantics(
+      label: 'Loading cinema releases',
+      child: ExcludeSemantics(
+          child: Column(children: [
+        for (var i = 0; i < 3; i++)
+          const Padding(
+              padding: EdgeInsets.only(bottom: 24),
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SkeletonBox(width: 82, height: 123, borderRadius: 6),
+                SizedBox(width: 14),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      SkeletonBox(height: 18),
+                      SizedBox(height: 8),
+                      FractionallySizedBox(
+                          widthFactor: .5, child: SkeletonBox(height: 12)),
+                      SizedBox(height: 14),
+                      SkeletonBox(height: 12),
+                      SizedBox(height: 8),
+                      SkeletonBox(height: 12)
+                    ])),
+              ])),
+      ])));
 }

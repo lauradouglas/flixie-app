@@ -48,13 +48,13 @@ void main() {
                   ))),
     ));
     await $(find.text('Edit fixture profile')).tap();
-    await $(find.text('Save Changes')).waitUntilVisible();
+    await $(find.text('Save changes')).waitUntilVisible();
     await $.tester
         .enterText(find.byType(TextField).at(1), 'Alien and The Odyssey');
     FocusManager.instance.primaryFocus?.unfocus();
     await $.tester.pumpAndSettle();
-    await $.tester.ensureVisible(find.text('Save Changes'));
-    await $(find.text('Save Changes')).tap();
+    await $.tester.ensureVisible(find.text('Save changes'));
+    await $(find.text('Save changes')).tap();
     await $(find.text('Edit fixture profile')).waitUntilVisible();
     expect(writes, [
       {'bio': 'Alien and The Odyssey'}

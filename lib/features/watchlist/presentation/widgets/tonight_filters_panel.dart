@@ -147,7 +147,8 @@ class TonightFiltersPanel extends StatelessWidget {
                   region: region,
                   onApply: onServices))),
     ];
-    final actions = Row(mainAxisSize: MainAxisSize.min, children: [
+    final actions =
+        Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
       TextButton.icon(
           onPressed: count == 0 || loading ? null : onPick,
           style: TextButton.styleFrom(

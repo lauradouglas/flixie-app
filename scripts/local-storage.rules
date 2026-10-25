@@ -1,0 +1,10 @@
+rules_version = '2';
+// Emulator-only: avatars are uploaded by the local Admin SDK seed/backend.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{path=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

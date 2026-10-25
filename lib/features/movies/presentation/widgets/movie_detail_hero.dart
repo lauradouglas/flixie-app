@@ -1,3 +1,5 @@
+import '../../domain/release_status.dart';
+import 'unreleased_status_label.dart';
 import 'package:flixie_app/features/movies/presentation/trailers/trailer_player_sheet.dart';
 import 'media_backdrop_inset.dart';
 import 'movie_header_backdrop.dart';
@@ -342,7 +344,7 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
                                   ? MovieDetailHeroTokens.textBlockGapCompact
                                   : MovieDetailHeroTokens.textBlockGapRegular,
                             ),
-                            _buildHeroFlixScoreBadge(context, movie),
+                            _buildHeroTmdbScoreBadge(context, movie),
                             SizedBox(
                               height: compact
                                   ? MovieDetailHeroTokens.textBlockGapCompact
@@ -452,20 +454,25 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
             ? MovieDetailHeroTokens.titleRegular
             : MovieDetailHeroTokens.titleWide);
 
-    return Text(
-      movie.title,
-      style: TextStyle(
-        color: context.colors.white,
-        fontSize: titleSize,
-        fontWeight: FontWeight.w900,
-        height: MovieDetailHeroTokens.titleLineHeight,
-        letterSpacing: MovieDetailHeroTokens.titleLetterSpacing,
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(
+        movie.title,
+        style: TextStyle(
+          color: context.colors.white,
+          fontSize: titleSize,
+          fontWeight: FontWeight.w900,
+          height: MovieDetailHeroTokens.titleLineHeight,
+          letterSpacing: MovieDetailHeroTokens.titleLetterSpacing,
+        ),
       ),
-    );
+      UnreleasedStatusLabel(date: movie.releaseDate, status: movie.status)
+    ]);
   }
 
   Widget _buildHeroMetadataRow(Movie movie, {required bool compact}) {
-    final year = _formatHeroReleaseDate(movie.releaseDate);
+    final year = isNotReleasedYet(date: movie.releaseDate, status: movie.status)
+        ? ''
+        : _formatHeroReleaseDate(movie.releaseDate);
     final runtime = _formatRuntime(movie.runtime);
     final metadata = [year, runtime].where((item) => item.isNotEmpty).toList();
 
@@ -494,11 +501,15 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
     );
   }
 
-  Widget _buildHeroFlixScoreBadge(BuildContext context, Movie movie) {
+  Widget _buildHeroTmdbScoreBadge(BuildContext context, Movie movie) {
     final scoresHidden = hideMovieRatings(context, movie.id);
-    final score = scoresHidden ? null : movie.voteAverage;
-    final voteCount = movie.voteCount ?? 0;
-    final hasScore = score != null && score > 0 && voteCount > 0;
+    final score = scoresHidden ? null : movie.tmdbVoteAverage;
+    final voteCount = movie.tmdbVoteCount;
+    final hasScore = score != null &&
+        score.isFinite &&
+        score > 0 &&
+        score <= 10 &&
+        voteCount != 0;
     final color = !hasScore
         ? context.colors.medium
         : score >= 8
@@ -510,24 +521,34 @@ class _MovieDetailHeroState extends State<MovieDetailHero> {
                     : context.colors.danger;
 
     if (!hasScore) {
-      return TextButton(
+      return TextButton.icon(
           onPressed: widget.onShowScoreInfo,
+          icon: const Icon(Icons.info_outline_rounded, size: 20),
           style: TextButton.styleFrom(
               padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
-          child: Text(scoresHidden ? 'Rate to see scores' : 'No ratings yet'));
+          label: Text(scoresHidden
+              ? 'Rate to see scores'
+              : voteCount == 0
+                  ? 'No ratings yet'
+                  : 'Score unavailable'));
     }
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: widget.onShowScoreInfo,
-        child: FlixiePill.label(
-            compact: false,
-            avatar: Icon(Icons.star_rounded, color: color),
-            label: Text(hasScore
-                ? '${score.toStringAsFixed(1)}  FlixScore'
-                : 'No FlixScore yet')),
-      ),
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 4,
+      children: [
+        FlixiePill.label(
+          compact: false,
+          avatar: Icon(Icons.star_rounded, color: color),
+          label: Text('${score.toStringAsFixed(1)}/10'),
+        ),
+        IconButton(
+          tooltip: 'About movie ratings',
+          onPressed: widget.onShowScoreInfo,
+          constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+          icon: Icon(Icons.info_outline_rounded,
+              size: 20, color: context.colors.light),
+        ),
+      ],
     );
   }
 

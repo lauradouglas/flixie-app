@@ -1,0 +1,4 @@
+Smoother guest watchlist confirmation and View watchlist navigation. Build your taste now opens consistently from Profile and Home. Only the favourite being saved spins, with other choices temporarily disabled. Updated Rate another film and Add more favourites buttons, plus a purple completion tick.
+Please test guest watchlist saving and navigation, opening Build your taste from Profile, adding/removing favourites and rating another film.
+Build your taste now explicitly labels film Favourites and offers optional watch-provider setup using the existing provider selector. Movie and show availability sections offer Add watch providers when your account has no services selected.
+Signed-out movies now have one Log watch & rate action. Activity-feed friend controls use icons to leave more room for names. Username entry has easier symbol access, and episode signup confirmation includes season artwork.

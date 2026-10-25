@@ -23,6 +23,7 @@ void main() {
     final response = events
         .singleWhere((e) => e['phase'] == 'api.home-plans-direct.response');
     expect(response['status'], 200);
+    expect(response['bytes'], 12);
     expect(response['appMs'], 12.5);
     expect(response['dataMs'], 8.2);
     expect(events.toString(), isNot(contains('private-account')));

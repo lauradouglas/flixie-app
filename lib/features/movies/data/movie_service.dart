@@ -40,7 +40,10 @@ class MovieService {
 
     apiLogger.d('Fetching movie $id.');
     // Shared cache contains metadata only; viewer data loads separately.
-    final queryParams = {'includeReviews': 'false'};
+    final queryParams = {
+      'includeReviews': 'false',
+      'includeTmdbRating': 'true',
+    };
     try {
       final data = await _get('/movies/id/$id', queryParams: queryParams);
       final movie = Movie.fromJson(data as Map<String, dynamic>);

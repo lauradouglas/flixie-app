@@ -19,8 +19,14 @@ class AvailabilityNotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final n = notification;
-    final seasonRelease = n.event == 'NEW_SEASON_RELEASE';
-    final title = n.watchMediaTitle ?? 'A title on your watchlist';
+    final event = n.event ?? n.data?['event'];
+    final seasonRelease = event == 'NEW_SEASON_RELEASE';
+    final episodeRelease = event == 'NEW_EPISODE_RELEASE';
+    final movieDigest = event == 'WATCHLIST_MOVIE_DIGEST' &&
+        (int.tryParse('${n.data?['count']}') ?? 0) > 1;
+    final title = movieDigest
+        ? '${n.data?['count']} films from your watchlist'
+        : n.watchMediaTitle ?? 'A title on your watchlist';
     final providers = n.data?['providerNames']?.toString() ?? 'your services';
     final country = n.data?['country']?.toString();
     final poster = n.watchMediaPosterPath;
@@ -60,7 +66,9 @@ class AvailabilityNotificationCard extends StatelessWidget {
                             Text(
                                 seasonRelease
                                     ? 'New season today'
-                                    : 'Now on your services',
+                                    : episodeRelease
+                                        ? 'New episode'
+                                        : 'Now on your services',
                                 style: TextStyle(
                                     color: context.colors.primaryText,
                                     fontSize: 13,
@@ -74,7 +82,7 @@ class AvailabilityNotificationCard extends StatelessWidget {
                                     height: 1.3)),
                             const SizedBox(height: 6),
                             Text(
-                                seasonRelease
+                                seasonRelease || episodeRelease || movieDigest
                                     ? n.message
                                     : 'Added to $providers${country == null ? '' : ' · $country'}',
                                 style: TextStyle(
@@ -101,7 +109,9 @@ class AvailabilityNotificationCard extends StatelessWidget {
                                       padding: EdgeInsets.zero,
                                       alignment: Alignment.centerLeft,
                                       minimumSize: const Size(48, 48)),
-                                  child: const Text('View title →')),
+                                  child: Text(movieDigest
+                                      ? 'View what’s available'
+                                      : 'View title →')),
                           ])),
                       SizedBox(
                           width: 48,

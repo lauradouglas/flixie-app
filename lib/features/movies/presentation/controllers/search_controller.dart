@@ -18,6 +18,7 @@ class SearchScreenController extends ChangeNotifier {
   SearchScreenController({
     List<MovieShort>? cachedTrending,
     SearchMedia? search,
+    this.onSearchCompleted,
     SearchEntities? collections,
     SearchEntities? companies,
     LoadSearchTrending? trending,
@@ -34,6 +35,7 @@ class SearchScreenController extends ChangeNotifier {
   }
   static Future<List<MovieShort>> _loadTrending({bool refresh = false}) =>
       TrendingService.getTrendingMovies(refresh: refresh);
+  final void Function(SearchMode mode, int resultCount)? onSearchCompleted;
   final SearchMedia _search;
   final SearchEntities _collections, _companies;
   final LoadSearchTrending _trending;
@@ -260,6 +262,10 @@ class SearchScreenController extends ChangeNotifier {
             )
           : media;
       _entityResults = entities;
+      if (page == 1) {
+        onSearchCompleted?.call(
+            selectedMode, media?.totalResults ?? entities?.totalResults ?? 0);
+      }
     } catch (_) {
       if (current()) _searchFailed = true;
     } finally {

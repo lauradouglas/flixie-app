@@ -60,7 +60,8 @@ void main() {
                   headers: {'content-type': 'application/json'});
             }));
     expect(requests.length, 3);
-    expect(requests.first.queryParameters, {'includeReviews': 'false'});
+    expect(requests.first.queryParameters,
+        {'includeReviews': 'false', 'includeTmdbRating': 'true'});
     expect(requests[1].queryParameters['userId'], 'a');
     expect(requests[2].queryParameters['userId'], 'b');
     final cache = MovieCacheService();

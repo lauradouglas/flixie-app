@@ -1,0 +1,40 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Flixie: start local services",
+            "type": "process",
+            "command": "${workspaceFolder}/scripts/dev.sh",
+            "args": [
+                "--services-only"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "flixie-local",
+                "pattern": {
+                    "regexp": "^(.+):(\\d+):(\\d+): (.+)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^FLIXIE_LOCAL_STARTING$",
+                    "endsPattern": "^FLIXIE_LOCAL_READY$"
+                }
+            },
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated",
+                "focus": false
+            },
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        }
+    ]
+}

@@ -10,8 +10,9 @@ class CinemaAccountSheet extends StatelessWidget {
       required this.title,
       required this.message,
       required this.onChoice,
+      this.signupLabel = 'Create account',
       this.showReturnNote = false});
-  final String title, message;
+  final String title, message, signupLabel;
   final bool showReturnNote;
   final ValueChanged<String?> onChoice;
 
@@ -82,7 +83,7 @@ class CinemaAccountSheet extends StatelessWidget {
                                           onPressed: () => onChoice('signup'),
                                           style: FilledButton.styleFrom(
                                               minimumSize: const Size(0, 55)),
-                                          child: const Text('Create account')),
+                                          child: Text(signupLabel)),
                                       if (showReturnNote) ...[
                                         const SizedBox(height: 12),
                                         Text('We’ll bring you back here.',

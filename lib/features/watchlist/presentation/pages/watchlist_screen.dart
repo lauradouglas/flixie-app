@@ -1,3 +1,4 @@
+import '../widgets/guest_picks_recovery_button.dart';
 import '../widgets/watchlist_tablet_gallery.dart';
 import 'dart:async';
 import 'dart:math';
@@ -5,6 +6,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/app/theme/flixie_typography.dart';
@@ -30,7 +32,8 @@ import '../watchlist_action_flow.dart';
 import '../widgets/watchlist_movie_row.dart';
 
 class WatchlistScreen extends StatefulWidget {
-  const WatchlistScreen({super.key});
+  const WatchlistScreen({super.key, this.availableOn});
+  final String? availableOn;
 
   @override
   State<WatchlistScreen> createState() => _WatchlistScreenState();
@@ -66,11 +69,33 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     WidgetsBinding.instance.addObserver(this);
     TabRefreshController.watchlist.addListener(_watchlist.refreshWatchlist);
     _watchlist.loadWatchlist();
+    if (widget.availableOn != null) {
+      unawaited(_watchlist.setAvailabilityDate(widget.availableOn));
+    }
     _searchController.addListener(_onSearchChanged);
   }
 
   void _onWatchlistChanged() {
     if (mounted) setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(covariant WatchlistScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.availableOn != widget.availableOn) {
+      unawaited(_watchlist.setAvailabilityDate(widget.availableOn));
+    }
+  }
+
+  String get _availabilityLabel {
+    final date = DateTime.tryParse(_watchlist.availabilityDate ?? '');
+    if (date == null) return 'Newly available films';
+    final now = DateTime.now();
+    return date.year == now.year &&
+            date.month == now.month &&
+            date.day == now.day
+        ? 'Newly available today'
+        : 'Newly available · ${DateFormat.yMMMd().format(date)}';
   }
 
   @override
@@ -142,6 +167,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
               Text(
                   '${_watchlist.allWatchlist.length + _watchlist.allShowWatchlist.length} saved titles',
                   style: TextStyle(color: context.colors.light)),
+              const GuestPicksRecoveryButton(),
               TextButton(
                   onPressed: () => context.push('/watch-history'),
                   child: const Text('Watch history')),
@@ -310,6 +336,28 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         _watchlist.allShowWatchlist.isNotEmpty;
 
     final header = <Widget>[
+      if (_watchlist.availabilityDate != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _buildCheckboxFilter(
+            label: _availabilityLabel,
+            selected: _watchlist.newlyAvailableOnly,
+            onChanged: _watchlist.setNewlyAvailableOnly,
+          ),
+        ),
+      if (_watchlist.newlyAvailableOnly && _watchlist.loadingAvailability)
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: ContentPlaceholder(
+              label: 'Loading newly available films',
+              style: ContentPlaceholderStyle.compact),
+        ),
+      if (_watchlist.newlyAvailableOnly && _watchlist.availabilityError != null)
+        TextButton(
+          onPressed: () =>
+              _watchlist.setAvailabilityDate(_watchlist.availabilityDate),
+          child: Text('${_watchlist.availabilityError} Retry'),
+        ),
       if (_watchlist.loadError != null)
         TextButton(
             onPressed: _watchlist.refreshWatchlist,
@@ -452,23 +500,30 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                   label: 'Loading watchlist picks', rows: 3)),
         ]);
       }
-      final emptyLabel = _watchlist.experienceLoading
-          ? 'Finding your picks…'
-          : _watchlist.experienceError != null
-              ? 'Your picks couldn’t load'
-              : _watchlist.usesExperience
-                  ? 'Nothing fits all of this yet. Try a different description or adjust your filters.'
-                  : switch (_watchlist.filters.tab) {
-                      1 => _watchlist.loadingWatchProviderAvailability ||
-                              _watchlist.loadingShowWatchProviderAvailability
-                          ? 'Checking your providers...'
-                          : 'Nothing you can watch right now',
-                      2 => 'No upcoming titles in your watchlist',
-                      3 => 'No watched movies in your watchlist',
-                      _ => hasItems || _searchController.text.isNotEmpty
-                          ? 'No watchlist matches'
-                          : 'Your watchlist is empty',
-                    };
+      final emptyLabel = _watchlist.newlyAvailableOnly
+          ? _watchlist.loadingAvailability
+              ? 'Loading newly available films…'
+              : _watchlist.availabilityError != null
+                  ? 'Newly available films couldn’t load'
+                  : 'No newly available films match this view'
+          : _watchlist.experienceLoading
+              ? 'Finding your picks…'
+              : _watchlist.experienceError != null
+                  ? 'Your picks couldn’t load'
+                  : _watchlist.usesExperience
+                      ? 'Nothing fits all of this yet. Try a different description or adjust your filters.'
+                      : switch (_watchlist.filters.tab) {
+                          1 => _watchlist.loadingWatchProviderAvailability ||
+                                  _watchlist
+                                      .loadingShowWatchProviderAvailability
+                              ? 'Checking your providers...'
+                              : 'Nothing you can watch right now',
+                          2 => 'No upcoming titles in your watchlist',
+                          3 => 'No watched movies in your watchlist',
+                          _ => hasItems || _searchController.text.isNotEmpty
+                              ? 'No watchlist matches'
+                              : 'Your watchlist is empty',
+                        };
       return ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [

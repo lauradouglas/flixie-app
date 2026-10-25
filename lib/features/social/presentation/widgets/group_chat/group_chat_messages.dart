@@ -14,6 +14,9 @@ import '../watch_request_chat_card.dart';
 class GroupChatMessages extends StatelessWidget {
   const GroupChatMessages(
       {super.key,
+      this.scrollController,
+      this.historyFooter,
+      this.canMarkRead,
       required this.conversationId,
       required this.groupId,
       required this.currentUserId,
@@ -27,6 +30,9 @@ class GroupChatMessages extends StatelessWidget {
       required this.respondingIds,
       required this.onRespond,
       required this.onRequestDetail});
+  final bool Function()? canMarkRead;
+  final ScrollController? scrollController;
+  final Widget? historyFooter;
   final String conversationId, groupId;
   final String? currentUserId;
   final bool active;
@@ -43,11 +49,14 @@ class GroupChatMessages extends StatelessWidget {
     return ChatReadObserver(
         conversationId: conversationId,
         active: active,
+        canMarkRead: canMarkRead,
         child: ListView.builder(
+          controller: scrollController,
           reverse: true,
           padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-          itemCount: messages.length,
+          itemCount: messages.length + (historyFooter == null ? 0 : 1),
           itemBuilder: (_, i) {
+            if (i == messages.length) return historyFooter!;
             final msg = messages[i];
             final isMe = msg.senderId == currentUserId;
             if (!isMe && SafetyService.isBlocked(msg.senderId)) {

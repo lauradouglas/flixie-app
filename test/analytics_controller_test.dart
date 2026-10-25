@@ -60,6 +60,35 @@ AnalyticsController _controller(
     AnalyticsController(backend: backend, consentStore: store);
 
 void main() {
+  test('usage tracking respects consent and rejects arbitrary action text',
+      () async {
+    final backend = _FakeBackend();
+    final controller = _controller(backend, _FakeConsentStore());
+    await controller.initialize();
+    await controller.searchCompleted(mode: 'movies', resultCount: 0);
+    expect(backend.events, isEmpty);
+    await controller.allow();
+    await controller.searchCompleted(mode: 'movies', resultCount: 0);
+    await controller.searchResultOpened(
+        mode: 'shows', resultType: 'show', position: 3);
+    await controller.detailActionTapped(
+        contentType: 'movie', action: 'watchlist');
+    await controller.detailTabSelected(contentType: 'show', tab: 'episodes');
+    await controller.detailActionTapped(
+        contentType: 'movie', action: 'private search text');
+    expect(backend.events.map((e) => e.name), [
+      'search_completed',
+      'search_result_opened',
+      'detail_action_tapped',
+      'detail_tab_selected'
+    ]);
+    expect(backend.events.first.parameters,
+        {'search_mode': 'movies', 'result_count': 0, 'has_results': 0});
+    await controller.decline();
+    await controller.detailActionTapped(contentType: 'movie', action: 'share');
+    expect(backend.events, hasLength(4));
+  });
+
   test('collection stays disabled for unknown consent', () async {
     final backend = _FakeBackend();
     final controller = _controller(backend, _FakeConsentStore());

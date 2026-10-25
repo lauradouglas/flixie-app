@@ -35,6 +35,15 @@ service cloud.firestore {
         }
       }
     }
+    // `members` is reserved for server-managed chat membership records.
+    // The badge may LIST only its owner's positive counts across conversations.
+    // Membership removal deletes this record atomically with parent membership;
+    // clients cannot create, alter, or retain their own membership records.
+    // Direct gets and all message/history access retain isMember checks above.
+    match /{parent=**}/members/{memberId} {
+      allow list: if activeIdentity() && resource.data.userId == userId()
+        && resource.data.unreadCount > 0;
+    }
     // Identity mappings, deletion jobs and other collections are server-only.
     match /{document=**} { allow read, write: if false; }
   }

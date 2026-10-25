@@ -1,24 +1,33 @@
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flixie_app/models/conversation.dart';
 import 'chat_service.dart';
 
-/// One shared subscription per conversation, scoped to the signed-in account.
+/// One unread-only query per account; legacy listeners handle staged rule rollout.
 class ChatUnreadController extends ChangeNotifier {
   ChatUnreadController({
+    Stream<Map<String, int>> Function(String)? unreadCounts,
     Stream<List<Conversation>> Function(String)? conversations,
     Stream<int> Function(String, String)? counts,
     Future<void> Function(String, String)? markRead,
-  })  : _conversations = conversations ?? ChatService.conversationsStream,
+  })  : _unreadCounts = unreadCounts ??
+            (conversations != null || counts != null
+                ? null
+                : ChatService.unreadConversationsStream),
+        _conversations = conversations ?? ChatService.conversationsStream,
         _counts = counts ?? ChatService.unreadCountStream,
         _markRead = markRead ?? ChatService.markRead;
 
   final Future<void> Function(String, String) _markRead;
   bool markingAllRead = false;
   int _generation = 0;
+  final Stream<Map<String, int>> Function(String)? _unreadCounts;
+  bool _usingLegacy = false;
   final Stream<List<Conversation>> Function(String) _conversations;
   final Stream<int> Function(String, String) _counts;
-  StreamSubscription<List<Conversation>>? _subscription;
+  StreamSubscription<dynamic>? _subscription;
   final _members = <String, StreamSubscription<int>>{};
   final _unread = <String, int>{};
   String? _userId;
@@ -71,8 +80,41 @@ class ChatUnreadController extends ChangeNotifier {
       if (!_disposed) notifyListeners();
     });
     if (userId == null) return;
+    _usingLegacy = false;
+    final source = _unreadCounts;
+    if (source == null) {
+      _startLegacy(userId, _generation);
+      return;
+    }
+    final generation = _generation;
+    _subscription = source(userId).listen((counts) {
+      if (_disposed || _usingLegacy || generation != _generation) return;
+      _unread
+        ..clear()
+        ..addEntries(counts.entries.where((e) => e.value > 0));
+      notifyListeners();
+    }, onError: (Object error) {
+      if (_disposed || _usingLegacy || generation != _generation) return;
+      if (error is FirebaseException &&
+          const ['permission-denied', 'failed-precondition']
+              .contains(error.code)) {
+        // A new app can precede rules/index rollout. Reuse the established path,
+        // which checks identity again; never treat a denied query as a zero badge.
+        logger
+            .w('Unread-only query unavailable; using legacy unread listeners.');
+        _subscription?.cancel();
+        _unread.clear();
+        notifyListeners();
+        _startLegacy(userId, generation);
+      }
+      // Transient failures retain the last server count; Firestore reconnects.
+    });
+  }
+
+  void _startLegacy(String userId, int generation) {
+    _usingLegacy = true;
     _subscription = _conversations(userId).listen((conversations) {
-      if (_userId != userId) return;
+      if (_disposed || generation != _generation) return;
       final ids = conversations.map((c) => c.id).toSet();
       for (final id in _members.keys.toList()) {
         if (!ids.contains(id)) {
@@ -84,7 +126,11 @@ class ChatUnreadController extends ChangeNotifier {
         _members.putIfAbsent(
             id,
             () => _counts(id, userId).listen((count) {
-                  if (_userId != userId || !_members.containsKey(id)) return;
+                  if (_disposed ||
+                      generation != _generation ||
+                      !_members.containsKey(id)) {
+                    return;
+                  }
                   _unread[id] = count < 0 ? 0 : count;
                   notifyListeners();
                 }, onError: (Object error) {

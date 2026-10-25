@@ -15,3 +15,9 @@ for target in patrol_test/test_bundle.dart /project/patrol_test/test_bundle.dart
 done
 CONFIGURATION=Debug FLUTTER_TARGET=patrol_test/test_bundle.dart sh scripts/validate-ios-release.sh
 printf '%s\n' 'iOS release guard checks passed'
+local_flag=$(printf '%s' 'USE_FIREBASE_EMULATORS=true' | /usr/bin/base64 | tr -d '\n')
+if CONFIGURATION=Release FLUTTER_TARGET=lib/main.dart DART_DEFINES="$local_flag" \
+  sh scripts/validate-ios-release.sh >/dev/null 2>&1; then
+  echo 'Release guard unexpectedly accepted local Firebase' >&2
+  exit 1
+fi

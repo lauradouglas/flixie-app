@@ -46,7 +46,7 @@ void main() {
       await openProfileTab($.tester, 'Activity');
       await openProfileTab($.tester, 'Stats');
       expect(f.paths.where((p) => p.contains('/wrapped/')), hasLength(1));
-      await openProfileTab($.tester, 'Library');
+      await openProfileTab($.tester, 'Taste');
       await openProfileTab($.tester, 'Stats');
       expect(f.paths.where((p) => p.contains('/wrapped/')), hasLength(1));
       expect($.tester.takeException(), isNull);

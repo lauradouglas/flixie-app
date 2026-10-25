@@ -1,9 +1,18 @@
 import 'package:flixie_app/models/show.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flixie_app/models/movie_short.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/core/storage/movie_cache_service.dart';
 
 class TrendingService {
+  @visibleForTesting
+  static void clearSessionCacheForTesting() {
+    _mixedCache.clear();
+    _mixedRequests.clear();
+    _showsCache.clear();
+    _movieRequests.clear();
+  }
+
   static final _cache = MovieCacheService();
   static final _movieRequests = <String, Future<List<MovieShort>>>{};
 

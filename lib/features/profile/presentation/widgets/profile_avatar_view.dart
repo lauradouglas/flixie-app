@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/firebase_environment.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -16,6 +17,7 @@ class ProfileAvatarView extends StatefulWidget {
     this.size = 44,
     this.useFullSize = false,
     this.profileBadges = const [],
+    this.imageProvider,
   });
 
   final ProfileAvatar? avatar;
@@ -26,6 +28,9 @@ class ProfileAvatarView extends StatefulWidget {
   /// Selection flows always show the original, even in a compact grid.
   final bool useFullSize;
   final List<String> profileBadges;
+
+  /// Bundled portraits for offline examples; uses the same sizing and badge frame.
+  final ImageProvider<Object>? imageProvider;
 
   @override
   State<ProfileAvatarView> createState() => _ProfileAvatarViewState();
@@ -72,19 +77,28 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
         oldWidget.avatar?.iconStoragePath != widget.avatar?.iconStoragePath ||
         oldWidget.avatar?.iconImageUrl != widget.avatar?.iconImageUrl ||
         oldWidget.size != widget.size ||
-        oldWidget.useFullSize != widget.useFullSize) {
+        oldWidget.useFullSize != widget.useFullSize ||
+        oldWidget.imageProvider != widget.imageProvider) {
       _iconFailed = false;
       _load();
     }
   }
 
   void _load({bool retry = false}) {
+    if (widget.imageProvider != null) {
+      _url = null;
+      return;
+    }
     final avatar = widget.avatar;
     if (avatar == null) {
       _url = null;
       return;
     }
-    final imageUrl = _usesIcon ? avatar.iconImageUrl : avatar.imageUrl;
+    final imageUrl = FirebaseEnvironment.storageImageUrl(
+      _usesIcon ? avatar.iconImageUrl : avatar.imageUrl,
+      local: FirebaseEnvironment.useEmulators,
+      emulatorHost: FirebaseEnvironment.host,
+    );
     final storagePath = _usesIcon
         ? avatar.iconStoragePath ?? avatar.storagePath
         : avatar.storagePath;
@@ -139,6 +153,15 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
   }
 
   Widget _buildAvatar() {
+    if (widget.imageProvider case final provider?) {
+      return ClipOval(
+          child: Image(
+              image: provider,
+              width: _imageSize,
+              height: _imageSize,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _fallback()));
+    }
     if (_url == null) return _fallback();
     return Semantics(
       image: true,

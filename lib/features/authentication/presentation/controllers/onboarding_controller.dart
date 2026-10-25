@@ -192,7 +192,7 @@ class OnboardingController extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<void> load() async {
+  Future<void> load({bool includeTaste = true}) async {
     if (!active) return;
     final tasteRevision = _tasteRevision;
     _update(() {
@@ -206,7 +206,8 @@ class OnboardingController extends ChangeNotifier {
       if (!active) return;
       final saved = await service.savedProviders(userId);
       if (!active) return;
-      final taste = await service.loadTaste(userId);
+      final taste =
+          includeTaste ? await service.loadTaste(userId) : <SetupTitle>[];
       if (!active) return;
       _update(() {
         _countries = countries;

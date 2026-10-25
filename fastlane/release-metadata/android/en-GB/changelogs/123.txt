@@ -1,0 +1,8 @@
+New in Flixie:
+• Explore before signing up, with an optional Flixie tour.
+• Faster startup and improved Home loading.
+• Log films with several friends, each with your own watch and rating.
+• Invite someone to share a viewing with a link.
+• Write reviews in the Cinema notebook.
+• Play Pip Pairs, Space Premiere and Popcorn Catch with music and effects.
+• Try games as a guest and carry your Popcorn Catch score into your account.

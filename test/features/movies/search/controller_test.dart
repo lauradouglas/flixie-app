@@ -34,6 +34,28 @@ SearchScreenController create(
         history: history ?? History(),
         trending: trending ?? ({refresh = false}) async => []);
 void main() {
+  test('search usage records current first-page success, never stale or paging',
+      () async {
+    final recorded = <(String, int)>[];
+    final stale = Completer<SearchResults>();
+    final c = SearchScreenController(
+      history: History(),
+      trending: ({refresh = false}) async => [],
+      search: (q, {type = 'all', page = 1}) =>
+          q == 'Old' ? stale.future : Future.value(results(q, page: page)),
+      onSearchCompleted: (mode, count) => recorded.add((mode.name, count)),
+    );
+    addTearDown(c.dispose);
+    final old = c.submit('Old');
+    await c.submit('Alien');
+    stale.complete(results('Old'));
+    await old;
+    await c.loadMore();
+    expect(recorded, [('all', 2)]);
+    await c.setMode(SearchMode.movies);
+    expect(recorded, [('all', 2), ('movies', 2)]);
+  });
+
   testWidgets('typing debounces, submission cancels timer and keeps one read',
       (tester) async {
     final calls = <String>[];

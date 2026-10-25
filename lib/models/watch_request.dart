@@ -227,6 +227,7 @@ class WatchScheduleProposalResponse {
 
 class WatchConfirmation {
   final String? watchedAt, watchEntryId, reviewBody, reviewTitle;
+  final bool watchedAtCinema;
   final bool reviewContainsSpoilers;
   final String id;
   final String userId;
@@ -243,6 +244,7 @@ class WatchConfirmation {
     this.reviewBody,
     this.reviewTitle,
     this.reviewContainsSpoilers = false,
+    this.watchedAtCinema = false,
     required this.id,
     required this.userId,
     required this.watched,
@@ -255,6 +257,7 @@ class WatchConfirmation {
 
   factory WatchConfirmation.fromJson(Map<String, dynamic> json) {
     return WatchConfirmation(
+      watchedAtCinema: (json['watchEntry'] as Map?)?['watchedAtCinema'] == true,
       reviewTitle: ((json['watchEntry'] as Map?)?['reviews'] as List?)
           ?.whereType<Map>()
           .firstOrNull?['title']

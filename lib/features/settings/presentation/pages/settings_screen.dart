@@ -95,6 +95,8 @@ class SettingsScreen extends StatelessWidget {
                   context: context,
                   useRootNavigator: true,
                   isScrollControlled: true,
+                  enableDrag: false,
+                  isDismissible: false,
                   useSafeArea: true,
                   backgroundColor: context.colors.background,
                   builder: (_) => const FractionallySizedBox(

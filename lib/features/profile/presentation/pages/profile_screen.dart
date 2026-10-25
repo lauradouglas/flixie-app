@@ -19,6 +19,10 @@ import '../widgets/profile_stats_tab.dart';
 import '../widgets/profile_activity_tab.dart';
 import '../widgets/profile_tabs.dart';
 import '../widgets/profile_notification_button.dart';
+import 'profile_diary_screen.dart';
+import '../controllers/featured_people_controller.dart';
+import '../controllers/profile_diary_controller.dart';
+import '../widgets/profile_diary_preview.dart';
 import '../../models/profile_section.dart';
 export '../widgets/profile_favourites_library.dart'
     show ProfileFavouritesLibrary;
@@ -32,6 +36,8 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late final ProfileController _data;
+  late final ProfileDiaryController _diary;
+  late final FeaturedPeopleController _people;
   ProfileActionFlow get _flow =>
       ProfileActionFlow(context: context, data: _data);
   @override
@@ -39,8 +45,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     _data = ProfileController(auth: context.read<AuthProvider>())
       ..addListener(_changed);
+    _people = FeaturedPeopleController(auth: context.read<AuthProvider>())
+      ..addListener(_changed);
+    _diary = ProfileDiaryController(auth: context.read<AuthProvider>());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _data.loadAll();
+      if (mounted) {
+        _data.loadAll();
+        _diary.load();
+      }
     });
   }
 
@@ -52,6 +64,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _data.removeListener(_changed);
     _data.dispose();
+    _diary.dispose();
+    _people.dispose();
     super.dispose();
   }
 
@@ -92,56 +106,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: FlixieRefresh(
         color: FlixieColors.primary,
-        onRefresh: _data.refresh,
+        onRefresh: () async {
+          await Future.wait([_data.refresh(), _diary.load(refresh: true)]);
+        },
         child: CustomScrollView(
           key: const PageStorageKey('profile-scroll'),
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-                child: LayoutBuilder(builder: (context, constraints) {
-              final header = ProfileHeader(
-                displayName: displayName,
-                username: username,
-                bio: bio,
-                iconColor: dbUser.iconColor,
-                avatar: dbUser.avatar,
-                profileBadges: dbUser.profileBadges,
-                memberSince: _memberSinceLabel(dbUser.createdAt),
-                onPreview: () => context.push('/friends/$userId?preview=true'),
-              );
-              final totals = Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: ProfileLibraryTotals(user: dbUser));
-              if (constraints.maxWidth >= 700 &&
-                  MediaQuery.textScalerOf(context).scale(1) <= 1.4) {
-                return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: header),
-                          const SizedBox(width: 24),
-                          SizedBox(
-                            width: 300,
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 16),
-                              child: ProfileLibraryTotals(
-                                  user: dbUser, tablet: true),
-                            ),
-                          ),
-                        ]));
-              }
-              return Column(children: [header, totals]);
-            })),
-            SliverToBoxAdapter(
-                child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                            onPressed: () => context.push('/profile/people'),
-                            icon: const Icon(Icons.people_outline, size: 19),
-                            label: const Text('Friends & following'))))),
+                child: ProfileHeader(
+              displayName: displayName,
+              username: username,
+              bio: bio,
+              iconColor: dbUser.iconColor,
+              avatar: dbUser.avatar,
+              profileBadges: dbUser.profileBadges,
+              memberSince: _memberSinceLabel(dbUser.createdAt),
+              onPreview: () => context.push('/friends/$userId?preview=true'),
+              onPeople: () => context.push('/profile/people'),
+            )),
             SliverPersistentHeader(
                 pinned: true,
                 delegate: ProfileTabsDelegate(
@@ -151,39 +134,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         selected: _data.selectedTab,
                         onSelected: _data.selectTab))),
             SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                sliver: _data.selectedTab == ProfileTab.activity
+                padding: _data.selectedTab == ProfileTab.diary
+                    ? const EdgeInsets.fromLTRB(0, 8, 0, 12)
+                    : const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                sliver: _data.selectedTab == ProfileTab.diary
+                    ? SliverToBoxAdapter(
+                        child: ProfileDiaryScreen(
+                            controller: _diary, embedded: true))
+                    : _data.selectedTab == ProfileTab.activity
                     ? _activityTab()
                     : SliverToBoxAdapter(
                         child: _data.selectedTab == ProfileTab.stats
-                            ? ProfileStatsTab(
-                                wrapped: _data.wrapped,
-                                milestones: _data.milestones,
-                                milestonesLoading: _data.milestonesLoading,
-                                milestonesFailed: _data.milestonesFailed,
-                                onRetryMilestones: () =>
-                                    _data.loadMilestones(forceRefresh: true),
-                                failed: _data.statsFailed,
-                                onRetry: _data.loadStats,
-                                ratings: _data.ratings,
-                                reviewCount: _data.reviewCount,
-                                directorPeople: _data.directorPeople,
-                                user: dbUser)
-                            : ProfileLibraryTab(
-                                userId: userId,
-                                favoriteMovies: favoriteMovies,
-                                favoritePeople: favoritePeople,
-                                favoriteShows: favoriteShows,
-                                activity: _data.recentActivity,
-                                continueWatching: _data.continueWatching,
-                                watchProviders: _data.watchProviders,
-                                loadingExtras: _data.profileExtrasLoading,
-                                failedExtras: _data.profileExtrasFailed,
-                                loadingActivity: _data.recentActivityLoading,
-                                onRemoveShow: _flow.removeContinueWatching,
-                                onManageProviders: _flow.openWatchProviders,
-                                onRatings: _flow.openRatings,
-                                onRetryExtras: _data.loadProfileExtras))),
+                                ? ProfileStatsTab(
+                                    wrapped: _data.wrapped,
+                                    milestones: _data.milestones,
+                                    milestonesLoading: _data.milestonesLoading,
+                                    milestonesFailed: _data.milestonesFailed,
+                                    onRetryMilestones: () => _data
+                                        .loadMilestones(forceRefresh: true),
+                                    failed: _data.statsFailed,
+                                    onRetry: _data.loadStats,
+                                    ratings: _data.ratings,
+                                    reviewCount: _data.reviewCount,
+                                    directorPeople: _data.directorPeople,
+                                    user: dbUser)
+                                : ProfileLibraryTab(
+                                    userId: userId,
+                                    featuredPeople: dbUser.featuredPeople,
+                                    onChoosePerson: _people.choose,
+                                    savingPeople: _people.saving,
+                                    diaryPreview: ProfileDiaryPreview(
+                                        controller: _diary,
+                                        onOpen: () =>
+                                            _data.selectTab(ProfileTab.diary)),
+                                    libraryTotals:
+                                        ProfileLibraryTotals(user: dbUser),
+                                    favoriteMovies: favoriteMovies,
+                                    favoritePeople: favoritePeople,
+                                    favoriteShows: favoriteShows,
+                                    activity: _data.recentActivity,
+                                    continueWatching: _data.continueWatching,
+                                    watchProviders: _data.watchProviders,
+                                    loadingExtras: _data.profileExtrasLoading,
+                                    failedExtras: _data.profileExtrasFailed,
+                                    loadingActivity:
+                                        _data.recentActivityLoading,
+                                    onRemoveShow: _flow.removeContinueWatching,
+                                    onManageProviders: _flow.openWatchProviders,
+                                    onRatings: _flow.openRatings,
+                                    onRetryExtras: _data.loadProfileExtras))),
           ],
         ),
       ),

@@ -1,0 +1,2 @@
+Smoother guest watchlist confirmation and View watchlist navigation. Build your taste now opens consistently from Profile and Home. Only the favourite being saved spins, with other choices temporarily disabled. Updated Rate another film and Add more favourites buttons, plus a purple completion tick.
+Please test guest watchlist saving and navigation, opening Build your taste from Profile, adding/removing favourites and rating another film.

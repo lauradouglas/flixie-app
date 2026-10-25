@@ -91,8 +91,10 @@ void main() {
         ])));
     await tester.tap(find.byKey(const ValueKey('profile-total-favourites')));
     await tester.pumpAndSettle();
-    expect(find.text('Favourite movies'), findsOneWidget);
-    expect(find.text('1 of 10 favourites'), findsOneWidget);
+    expect(find.text('Favourite films & shows'), findsOneWidget);
+    expect(find.text('Films (1)'), findsOneWidget);
+    expect(find.text('Shows (1)'), findsOneWidget);
+    expect(find.text('Favourite show'), findsOneWidget);
     expect(find.byType(TabBar), findsNothing);
     await tester.tap(find.text('Favourite movie'));
     await tester.pumpAndSettle();
@@ -117,12 +119,13 @@ void main() {
                   .copyWith(textScaler: const TextScaler.linear(2)),
               child: child!),
           home: Scaffold(body: ProfileLibraryTotals(user: user))));
+      await tester.ensureVisible(find.byKey(const ValueKey('profile-total-favourites')));
       await tester.tap(find.byKey(const ValueKey('profile-total-favourites')));
       await tester.pumpAndSettle();
-      expect(find.text('Favourite movies'), findsOneWidget);
-      expect(find.text('0 of 10 favourites'), findsOneWidget);
+      expect(find.text('Favourite films & shows'), findsOneWidget);
+      expect(find.text('Films (0)'), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byTooltip('Close'));
+      await tester.tap(find.byTooltip('Close favourites'));
       await tester.pumpAndSettle();
     }
     addTearDown(tester.view.resetPhysicalSize);

@@ -26,7 +26,17 @@ Future<void> flush() => Future<void>.delayed(Duration.zero);
 
 class SessionAuth extends ChangeNotifier implements AuthProvider {
   User? user = viewer('first');
+  @override
+  List<MovieShort>? cachedTrending;
   int profiles = 0;
+  @override
+  Future<bool> ensureLibraryLoaded() async {
+    libraryReads++;
+    return libraryRequest == null ? true : await libraryRequest!();
+  }
+
+  int libraryReads = 0;
+  Future<bool> Function()? libraryRequest;
   @override
   User? get dbUser => user;
   @override
@@ -57,9 +67,11 @@ class SessionAuth extends ChangeNotifier implements AuthProvider {
 class Plans extends HomeWatchPlansController {
   Plans(super.cache);
   final loads = <bool>[];
+  Future<void> Function()? request;
   @override
   Future<void> load(User? user, {bool force = true}) async {
     loads.add(force);
+    await request?.call();
   }
 }
 
@@ -130,6 +142,25 @@ void main() {
     home.dispose();
     auth.dispose();
     cache.dispose();
+  });
+
+  test(
+      'bootstrap cached titles remain visible while refreshing and clear on account change',
+      () async {
+    home.dispose();
+    plans = Plans(cache);
+    auth.cachedTrending = [alien];
+    final pending = Completer<List<MovieShort>>();
+    data.trendingRequest = (_) => pending.future;
+    home = HomeController(auth: auth, watchPlans: plans, service: data);
+    expect(home.trending.value.data, [alien]);
+    home.start();
+    expect(home.trending.value.data, [alien]);
+    auth.cachedTrending = null;
+    auth.select(viewer('second'));
+    expect(home.trending.value.data, isEmpty);
+    pending.complete([odyssey]);
+    await flush();
   });
 
   for (final size in [0, 20, 400]) {
@@ -302,6 +333,67 @@ void main() {
     expect(home.friendActivityLoaded(alien.id), false);
   });
 
+  test(
+      'failed library hydration stays a retryable error, not empty recommendations',
+      () async {
+    auth.libraryRequest = () async => false;
+    await home.load();
+    await flush();
+    expect(data.calls, ['trending:false']);
+    expect(home.secondaryError.value, contains('library'));
+    expect(home.recommendations.value.error, isNotNull);
+    auth.libraryRequest = () async => true;
+    await home.load();
+    await flush();
+    expect(home.recommendations.value.data, [odyssey]);
+    expect(home.secondaryError.value, isNull);
+  });
+
+  test('Home is usable before library hydration starts and before it finishes',
+      () async {
+    final reveal = Completer<void>();
+    final library = Completer<bool>();
+    auth.libraryRequest = () => library.future;
+    home.dispose();
+    home = HomeController(
+        auth: auth,
+        watchPlans: Plans(cache),
+        service: data,
+        firstHomeReveal: reveal.future);
+    await home.load();
+    expect(home.trending.value.data, [alien]);
+    expect(auth.libraryReads, 0);
+    expect(data.calls, ['trending:false']);
+    reveal.complete();
+    await flush();
+    expect(auth.libraryReads, 1);
+    expect(data.calls, ['trending:false']);
+    library.complete(true);
+    await flush();
+    expect(home.recommendations.value.data, [odyssey]);
+  });
+
+  test('secondary requests wait for both opening sources, then load normally',
+      () async {
+    final planGate = Completer<void>();
+    final trendingGate = Completer<List<MovieShort>>();
+    plans.request = () => planGate.future;
+    data.trendingRequest = (_) => trendingGate.future;
+    final opening = home.load();
+    await flush();
+    expect(data.calls, ['trending:false']);
+    trendingGate.complete([alien]);
+    await flush();
+    expect(home.trending.value.data, [alien]);
+    expect(data.calls, ['trending:false']);
+    planGate.complete();
+    await opening;
+    await flush();
+    expect(data.calls, contains('recommendations:first:false'));
+    expect(data.calls, contains('continue:first'));
+    expect(home.recommendations.value.data, [odyssey]);
+  });
+
   test('trending becomes usable while independent recommendations are pending',
       () async {
     final pending = Completer<List<MovieShort>>();
@@ -310,6 +402,7 @@ void main() {
     expect(home.trending.value.data, [alien]);
     expect(home.trending.value.loading, false);
     expect(home.recommendations.value.loading, true);
+    await flush();
     expect(home.continueWatching.value.loading, false);
     var trendingChanges = 0;
     home.trending.addListener(() => trendingChanges++);

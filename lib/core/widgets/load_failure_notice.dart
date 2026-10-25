@@ -9,7 +9,7 @@ class LoadFailureNotice extends StatelessWidget {
       required this.onRetry,
       this.retrying = false});
   final String message;
-  final VoidCallback onRetry;
+  final VoidCallback? onRetry;
   final bool retrying;
 
   @override

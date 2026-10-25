@@ -66,8 +66,11 @@ dependencies:
   google_sign_in: ^7.2.0
   youtube_player_iframe: ^6.0.2
   audioplayers: ^6.8.1
+  posthog_flutter: ^5.55.0
+  intl: ^0.20.2
 
 dev_dependencies:
+  shared_preferences_platform_interface: ^2.4.2
   file: ^7.0.1
   flutter_cache_manager: ^3.4.1
   flutter_test:

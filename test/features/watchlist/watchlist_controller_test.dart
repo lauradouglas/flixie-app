@@ -13,10 +13,27 @@ import '../../support/watchlist_auth.dart';
 
 class FixtureAuth extends TestAuth {
   String owner = 'fixture-robin';
+  bool includeShow = false;
 
   @override
   User get dbUser => super.dbUser.copyWith(
         id: owner,
+        showWatchlist: includeShow
+            ? [
+                {
+                  'showId': 1,
+                  'show': {
+                    'id': 1,
+                    'title': 'Vision Quest',
+                    'posterPath': '/fixture.jpg',
+                    'firstAirDate': '2020-01-01',
+                    'numberOfSeasons': 1,
+                    'episodeRuntime': 40,
+                    'genres': ['Drama']
+                  }
+                }
+              ]
+            : [],
         movieWatchlist: ids.map((id) {
           final title = switch (id) {
             1 => 'The Odyssey',
@@ -40,6 +57,14 @@ class FixtureAuth extends TestAuth {
 }
 
 class FixtureData extends WatchlistDataService {
+  Completer<Set<int>>? availabilityGate;
+  bool availabilityFails = false;
+  @override
+  Future<Set<int>> getNewlyAvailableMovies(String date) async {
+    if (availabilityFails) throw StateError('fixture failure');
+    return availabilityGate?.future ?? Future.value({1, 3, 999});
+  }
+
   final requests = <List<int>>[];
   Completer<void>? gate;
 
@@ -125,6 +150,83 @@ void main() {
       expect(controller.visibleItems, hasLength(3));
       expect(data.requests, isEmpty);
       expect(controller.allWatchlist, hasLength(3));
+    });
+
+    test(
+        'dated availability intersects saved films and unticking restores the full watchlist',
+        () async {
+      await controller.setAvailabilityDate('2026-10-24');
+      expect(
+          controller.visibleItems
+              .whereType<WatchlistMovie>()
+              .map((m) => m.movieId),
+          [1, 3]);
+      controller.setNewlyAvailableOnly(false);
+      expect(controller.visibleItems, hasLength(3));
+      controller.setNewlyAvailableOnly(true);
+      expect(controller.visibleItems, hasLength(2));
+      final snapshot = controller.filters;
+      snapshot.availableMovieIds!.clear();
+      expect(controller.visibleItems, hasLength(2));
+      controller.clearFilters();
+      expect(controller.visibleItems, hasLength(3));
+    });
+
+    test(
+        'loading and failure do not expose the full watchlist as availability matches',
+        () async {
+      data.availabilityGate = Completer<Set<int>>();
+      final loading = controller.setAvailabilityDate('2026-10-24');
+      expect(controller.visibleItems, isEmpty);
+      expect(controller.loadingAvailability, isTrue);
+      controller.setNewlyAvailableOnly(false);
+      data.availabilityGate!.complete({1});
+      await loading;
+      expect(controller.visibleItems, hasLength(3),
+          reason: 'late results must not retoggle the filter');
+      data.availabilityFails = true;
+      await controller.setAvailabilityDate('2026-10-23');
+      expect(controller.visibleItems, isEmpty);
+      expect(controller.availabilityError, isNotNull);
+      controller.setNewlyAvailableOnly(false);
+      expect(controller.visibleItems, hasLength(3));
+    });
+
+    test('dated results cannot cross accounts or override a newer date',
+        () async {
+      final first = Completer<Set<int>>();
+      data.availabilityGate = first;
+      final old = controller.setAvailabilityDate('2026-10-23');
+      final second = Completer<Set<int>>();
+      data.availabilityGate = second;
+      auth.owner = 'fixture-ellie';
+      controller.onUserChanged();
+      expect(controller.visibleItems, isEmpty);
+      first.complete({2});
+      await old;
+      expect(controller.visibleItems, isEmpty);
+      second.complete({3});
+      await drain();
+      expect(
+          controller.visibleItems
+              .whereType<WatchlistMovie>()
+              .map((m) => m.movieId),
+          [3]);
+      await controller.setAvailabilityDate(null);
+      expect(controller.visibleItems, hasLength(3));
+    });
+
+    test('movie availability excludes a show with the same numeric ID',
+        () async {
+      auth.includeShow = true;
+      controller.loadWatchlist();
+      expect(controller.visibleItems, hasLength(4));
+      await controller.setAvailabilityDate('2026-10-24');
+      expect(controller.visibleItems, hasLength(2));
+      expect(controller.visibleItems.every((item) => item is WatchlistMovie),
+          isTrue);
+      controller.setNewlyAvailableOnly(false);
+      expect(controller.visibleItems, hasLength(4));
     });
 
     test('filter snapshots and library collections cannot mutate owned state',

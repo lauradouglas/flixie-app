@@ -619,6 +619,7 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                     headerAction: _connections == null
                         ? null
                         : CommunityFriendButton(
+                            iconOnly: true,
                             connections: _connections!,
                             author: FriendshipUser(
                                 id: item.userId,

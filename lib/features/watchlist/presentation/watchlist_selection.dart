@@ -56,6 +56,10 @@ class WatchlistSelection {
     final query = searchQuery.toLowerCase();
 
     _filteredWatchlist = movies.where((item) {
+      if (filters.availableMovieIds != null &&
+          !filters.availableMovieIds!.contains(item.movieId)) {
+        return false;
+      }
       final m = item.movie;
       if (m == null) return false;
       if (filters.release != null &&
@@ -93,6 +97,7 @@ class WatchlistSelection {
       return true;
     }).toList();
     _filteredShowWatchlist = shows.where((item) {
+      if (filters.availableMovieIds != null) return false;
       if (!item.title.toLowerCase().contains(query)) return false;
       if (filters.release != null &&
           releaseStatus(item.firstAirDate) != filters.release) {

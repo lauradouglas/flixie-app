@@ -326,13 +326,20 @@ class ApiClient {
             ? 'api.home-plans-group'
             : RegExp(r'^/requests/[^/]+/all$').hasMatch(uri.path)
                 ? 'api.home-plans-direct'
-                : 'api.other';
+                : uri.path.startsWith('/users/external-id/')
+                    ? 'api.profile'
+                    : uri.path == '/users/me/terms'
+                        ? 'api.terms'
+                        : 'api.other';
         final response = await StartupTrace.run(
             '$phase.transport',
             () => ((_testClient ?? _transport)?.get ?? http.get)(uri,
                     headers: headers)
                 .timeout(_timeout));
-        final server = <String, Object?>{'status': response.statusCode};
+        final server = <String, Object?>{
+          'status': response.statusCode,
+          'bytes': response.bodyBytes.length
+        };
         for (final match in RegExp(r'(app|auth|data);dur=([0-9.]+)')
             .allMatches(response.headers['server-timing'] ?? '')) {
           final value = double.tryParse(match.group(2)!);

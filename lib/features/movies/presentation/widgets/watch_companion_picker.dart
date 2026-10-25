@@ -24,6 +24,7 @@ class _WatchCompanionPickerState extends State<WatchCompanionPicker> {
   late Future<List<Friendship>> _friends;
   final _name = TextEditingController();
   bool _external = false;
+  bool _noFriends = false;
   late Map<String, FriendshipUser> _selected;
   @override
   void dispose() {
@@ -35,7 +36,12 @@ class _WatchCompanionPickerState extends State<WatchCompanionPicker> {
   void initState() {
     super.initState();
     _selected = {for (final friend in widget.selected) friend.id: friend};
-    _friends = widget.loadFriends();
+    _friends = widget.loadFriends().then((friends) {
+      if (mounted) {
+        setState(() => _noFriends = friends.isEmpty && _selected.isEmpty);
+      }
+      return friends;
+    });
     if (!StarredPeople.instance.loaded) {
       StarredPeople.instance.refresh().catchError((Object _) {});
     }
@@ -43,7 +49,10 @@ class _WatchCompanionPickerState extends State<WatchCompanionPicker> {
 
   Widget _header() => Row(children: [
         Expanded(
-            child: Text(_external ? 'Someone new to Flixie' : 'Watched with…',
+            child: Text(
+                _external || _noFriends
+                    ? 'Someone new to Flixie'
+                    : 'Watched with…',
                 style: Theme.of(context).textTheme.titleLarge)),
         IconButton(
             tooltip: 'Close',
@@ -69,12 +78,13 @@ class _WatchCompanionPickerState extends State<WatchCompanionPicker> {
                 : () => Navigator.pop(
                     context, ExternalWatchCompanion(_name.text.trim())),
             child: const Text('Add to my watch')),
-        TextButton(
-            onPressed: () {
-              FocusScope.of(context).unfocus();
-              setState(() => _external = false);
-            },
-            child: const Text('Back to friends')),
+        if (!_noFriends)
+          TextButton(
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                setState(() => _external = false);
+              },
+              child: const Text('Back to friends')),
       ]);
   Widget _friendsList() => FutureBuilder<List<Friendship>>(
       future: _friends,
@@ -93,8 +103,7 @@ class _WatchCompanionPickerState extends State<WatchCompanionPicker> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.data!.isEmpty) {
-          return const Center(
-              child: Text('Choose someone new to Flixie below.'));
+          return const Center(child: Text('No more friends to add right now.'));
         }
         return FriendSearchScope<Friendship>(
             items: snapshot.data!,
@@ -145,7 +154,10 @@ class _WatchCompanionPickerState extends State<WatchCompanionPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboard = MediaQuery.viewInsetsOf(context)
+        .bottom
+        .clamp(0.0, double.infinity)
+        .toDouble();
     final height = MediaQuery.sizeOf(context).height;
     final compact = keyboard > 0 && height - keyboard < 300;
     return Padding(
@@ -160,7 +172,7 @@ class _WatchCompanionPickerState extends State<WatchCompanionPicker> {
                 child: Padding(
                     padding: EdgeInsets.fromLTRB(
                         20, compact ? 4 : 8, 20, compact ? 4 : 12),
-                    child: _external
+                    child: _external || _noFriends
                         ? _externalForm()
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,

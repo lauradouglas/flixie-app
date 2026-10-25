@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
+import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import '../controllers/pip_pairs_controller.dart';
 import '../widgets/pip_pair_card.dart';
@@ -188,7 +189,7 @@ class _PipPairsScreenState extends State<PipPairsScreen> {
                                 Wrap(spacing: 10, runSpacing: 8, children: [
                                   for (final difficulty
                                       in PipPairsDifficulty.values)
-                                    ChoiceChip(
+                                    FlixiePill.choice(
                                       label: Text(difficulty.label),
                                       selected: game.difficulty == difficulty,
                                       onSelected: (selected) {
@@ -206,7 +207,7 @@ class _PipPairsScreenState extends State<PipPairsScreen> {
                                 const SizedBox(height: 12),
                                 Wrap(spacing: 10, runSpacing: 10, children: [
                                   for (final pairs in [6, 8, 12])
-                                    ChoiceChip(
+                                    FlixiePill.choice(
                                       label: Text('$pairs pairs'),
                                       selected: game.pairCount == pairs,
                                       onSelected: (selected) {

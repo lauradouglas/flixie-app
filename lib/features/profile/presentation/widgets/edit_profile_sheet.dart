@@ -1,37 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/api/api_client.dart';
+import 'package:flixie_app/core/widgets/flixie_editor_sheet.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
-import 'package:flixie_app/app/theme/app_theme.dart';
-import 'package:flixie_app/core/utils/app_logger.dart';
 
 class EditProfileSheet extends StatefulWidget {
-  const EditProfileSheet({
-    super.key,
-    required this.currentUsername,
-    required this.currentBio,
-  });
-
+  const EditProfileSheet(
+      {super.key, required this.currentUsername, required this.currentBio});
   final String currentUsername;
   final String? currentBio;
-
   @override
   State<EditProfileSheet> createState() => _EditProfileSheetState();
 }
 
 class _EditProfileSheetState extends State<EditProfileSheet> {
-  late final TextEditingController _usernameController;
-  late final TextEditingController _bioController;
-  bool _isSaving = false;
-  String? _errorMessage;
-
+  late final _usernameController =
+      TextEditingController(text: widget.currentUsername)
+        ..addListener(_changed);
+  late final _bioController =
+      TextEditingController(text: widget.currentBio ?? '')
+        ..addListener(_changed);
+  late final _auth = context.read<AuthProvider>();
+  late final _viewer = _auth.dbUser?.id;
+  late String _savedUsername = widget.currentUsername,
+      _savedBio = widget.currentBio ?? '';
+  bool _saving = false;
+  String? _error, _usernameError;
+  bool get _active => mounted && _auth.dbUser?.id == _viewer && _viewer != null;
+  bool get _dirty =>
+      _usernameController.text.trim() != _savedUsername ||
+      _bioController.text.trim() != _savedBio;
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController(text: widget.currentUsername);
-    _bioController = TextEditingController(text: widget.currentBio ?? '');
+    _viewer;
+  }
+
+  void _changed() {
+    if (mounted) {
+      setState(() {
+        _usernameError = null;
+      });
+    }
   }
 
   @override
@@ -42,134 +53,77 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   Future<void> _save() async {
-    final auth = context.read<AuthProvider>();
-    final userId = auth.dbUser?.id;
-    if (userId == null) return;
-
-    final username = _usernameController.text.trim();
-    if (username.isEmpty) {
-      setState(() => _errorMessage = 'Username cannot be empty.');
+    if (_saving) return;
+    if (!_active) {
+      setState(
+          () => _error = 'Your account changed. Close and reopen this editor.');
       return;
     }
-
+    final username = _usernameController.text.trim(),
+        bio = _bioController.text.trim();
+    if (username.isEmpty ||
+        (username != _savedUsername && username.length < 3)) {
+      setState(() => _usernameError = 'Use at least 3 characters.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
     setState(() {
-      _isSaving = true;
-      _errorMessage = null;
+      _saving = true;
+      _error = null;
+      _usernameError = null;
     });
-
     try {
-      final currentUser = auth.dbUser!;
-      final bio = _bioController.text.trim();
-      var updated = currentUser;
-
-      if (username != currentUser.username) {
-        updated =
-            await UserService.updateUserField(userId, 'username', username);
+      if (username != _savedUsername) {
+        final result =
+            await UserService.updateUserField(_viewer!, 'username', username);
+        if (!mounted || !_active) return;
+        _savedUsername = result.username.isEmpty ? username : result.username;
+        _auth.updateDbUser(_auth.dbUser!.copyWith(username: _savedUsername));
       }
-      if (bio != (updated.bio ?? '')) {
-        updated = await UserService.updateUserField(userId, 'bio', bio);
+      if (bio != _savedBio) {
+        await UserService.updateUserField(_viewer!, 'bio', bio);
+        if (!mounted || !_active) return;
+        _savedBio = bio;
+        _auth.updateDbUser(_auth.dbUser!.copyWith(bio: bio));
       }
-
-      auth.updateDbUser(updated);
-      if (mounted) Navigator.of(context).pop();
-    } on ApiException catch (e) {
-      logger.e('[EditProfileSheet] save error: $e');
+      if (mounted && _active) Navigator.pop(context);
+    } catch (error) {
       if (mounted) {
         setState(() {
-          _isSaving = false;
-          _errorMessage = e.code == 'USERNAME_NOT_AVAILABLE'
-              ? e.message
-              : 'Failed to save changes. Please try again.';
+          if (error is ApiException && error.code == 'USERNAME_NOT_AVAILABLE') {
+            _usernameError = error.message;
+          } else {
+            _error =
+                'Couldn’t save all changes. Your edits are still here. Retry saves only the remaining changes.';
+          }
         });
       }
-    } catch (e) {
-      logger.e('[EditProfileSheet] save error: $e');
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-          _errorMessage = 'Failed to save changes. Please try again.';
-        });
-      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.colors.medium.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Edit Profile',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          TextField(
+  Widget build(BuildContext context) => FlixieEditorSheet(
+      title: 'Edit profile',
+      dirty: _dirty,
+      busy: _saving,
+      onSave: _save,
+      error: _error,
+      child: Column(children: [
+        TextField(
             controller: _usernameController,
-            decoration: const InputDecoration(
-              labelText: 'Username',
-              prefixIcon: Icon(Icons.alternate_email),
-            ),
-            textInputAction: TextInputAction.next,
-          ),
-          const SizedBox(height: 16),
-          TextField(
+            decoration: InputDecoration(
+                labelText: 'Username',
+                errorText: _usernameError,
+                prefixIcon: const Icon(Icons.alternate_email)),
+            textInputAction: TextInputAction.next),
+        const SizedBox(height: 16),
+        TextField(
             controller: _bioController,
-            decoration: const InputDecoration(
-              labelText: 'Bio',
-              prefixIcon: Icon(Icons.info_outline),
-              alignLabelWithHint: true,
-            ),
+            decoration: const InputDecoration(labelText: 'Bio'),
+            minLines: 3,
             maxLines: 6,
-            maxLength: 500,
-            textInputAction: TextInputAction.done,
-          ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage!,
-              style: TextStyle(color: context.colors.danger, fontSize: 13),
-            ),
-          ],
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _save,
-              child: _isSaving
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Save Changes'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+            maxLength: 500),
+      ]));
 }

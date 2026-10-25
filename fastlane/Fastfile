@@ -122,21 +122,22 @@ platform :ios do
       changelog: options[:changelog] || "Explore Flixie without signing in, plus performance improvements."
     )
   end
-  desc "Upload a production build and submit for Apple review (manual release after approval)"
+  desc "Submit for Apple review; manual release by default, automatic_release:true for public rollout"
   lane :submit do |options|
     number = release_number(options)
     key = apple_key
     ipa = options[:ipa] ? release_file(options[:ipa]) : build(options)
+    notes = options[:notes_file] ? File.read(release_file(options[:notes_file])).strip : "Explore Flixie without signing in, plus performance improvements."
     upload_to_app_store(
       api_key: key, app_identifier: "com.flixie.flixieApp",
       ipa: options[:uploaded] == true ? nil : ipa,
       app_version: required_env("RELEASE_VERSION"),
       build_number: options[:uploaded] == true ? number : nil,
       skip_binary_upload: options[:uploaded] == true,
-      submit_for_review: true, automatic_release: false,
+      submit_for_review: true, automatic_release: options[:automatic_release] == true,
       reject_if_possible: options[:replace_review] == true,
       skip_screenshots: true, skip_metadata: false,
-      release_notes: { "en-GB" => options[:notes_file] ? File.read(release_file(options[:notes_file])).strip : "Explore Flixie without signing in, plus performance improvements." },
+      release_notes: { "en-GB" => notes, "en-US" => notes },
       force: true, run_precheck_before_submit: true, precheck_include_in_app_purchases: false
     )
   end
@@ -218,17 +219,19 @@ end
 # Fastlane invokes these for the completed top-level lane, including nested builds.
 after_all do |lane, options|
   labels = {
-    'ios beta' => 'TestFlight upload completed (processing may still be pending)',
-    'ios submit' => 'Submitted for Apple review (manual release after approval)',
-    'android draft' => 'Google Play draft uploaded',
-    'android promote' => 'Google Play production draft prepared',
-    'android submit' => 'Submitted to Google Play production (review/public availability may still be pending)'
+    'ios beta' => ['🛫 Flixie is off to TestFlight!', 'Upload complete · Apple may still be processing the build.'],
+    'ios submit' => ['🍎 Flixie is off for Apple review!', 'Submitted · manual release after approval.'],
+    'android draft' => ['🌱 A fresh Flixie draft has landed!', 'Google Play draft uploaded.'],
+    'android promote' => ['🎬 Flixie is getting ready for its premiere!', 'Google Play production draft prepared.'],
+    'android submit' => ['🚀 Flixie is off to Google Play!', 'Submitted to production · review/public availability may still be pending.']
   }
   platform = Actions.lane_context[SharedValues::PLATFORM_NAME].to_s
   key = [platform, lane.to_s.sub(/\A(?:ios|android)_/, '')].join(' ')
   label = labels[key]
   if label
-    FlixieSlack.notify("Flixie: #{label}. Version #{ENV['RELEASE_VERSION'] || 'unspecified'}, build #{options[:build_number] || ENV['BUILD_NUMBER'] || 'unspecified'}")
+    title, status = label
+    status = 'Submitted · releases automatically after Apple approval.' if key == 'ios submit' && options[:automatic_release] == true
+    FlixieSlack.notify("#{title}\n💜 Version #{ENV['RELEASE_VERSION'] || 'unspecified'} · Build #{options[:build_number] || ENV['BUILD_NUMBER'] || 'unspecified'}\n#{status}")
   end
 end
 
@@ -236,6 +239,6 @@ error do |lane, _exception, _options|
   platform = Actions.lane_context[SharedValues::PLATFORM_NAME].to_s
   key = [platform, lane.to_s.sub(/\A(?:ios|android)_/, '')].join('_')
   if %w[ios_beta ios_submit android_draft android_promote android_submit].include?(key)
-    FlixieSlack.notify("Flixie: #{lane} failed. Inspect the release log; no exception or credential details are sent to Slack.")
+    FlixieSlack.notify("🛠️ Flixie hit a snag\n#{platform.capitalize} · #{lane} failed\nCheck the release log for details.")
   end
 end

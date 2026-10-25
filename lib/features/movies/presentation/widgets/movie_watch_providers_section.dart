@@ -12,12 +12,14 @@ enum WatchProviderTab { stream, rent, buy }
 class MovieWatchProvidersSection extends StatefulWidget {
   const MovieWatchProvidersSection(
       {super.key,
+      this.onAddProviders,
       required this.providers,
       required this.userProviderIds,
       required this.userProviderMatchKeys,
       required this.region,
       required this.onChangeRegion});
 
+  final VoidCallback? onAddProviders;
   final List<WatchProvider> providers;
   final Set<int> userProviderIds;
   final Set<String> userProviderMatchKeys;
@@ -44,6 +46,19 @@ class _MovieWatchProvidersSectionState
           onChange: () async {
             await widget.onChangeRegion();
           }),
+      if (widget.onAddProviders != null &&
+          widget.userProviderIds.isEmpty &&
+          widget.userProviderMatchKeys.isEmpty) ...[
+        const SizedBox(height: 8),
+        const Text(
+            'Add your streaming services to spot your options more easily.'),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+            onPressed: widget.onAddProviders,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add watch providers')),
+        const SizedBox(height: 12),
+      ],
       if (hasOptions)
         Row(
             children: WatchProviderTab.values

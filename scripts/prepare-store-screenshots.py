@@ -122,7 +122,7 @@ def prepare(platform="ios"):
                 source = raw_directory(platform, config['locale'], screenshot_type) / entry['file']
                 filename = f"{manifest['device']}-{position:02}-{screen['scene'][3:]}.png"
                 jobs.append(dict(source=str(source), output=str(images_dir / filename),
-                                 headline=headline(screen, platform), width=entry['width'], height=entry['height'],
+                                 headline=headline(screen, platform), supportingText=screen.get('supporting_text'), width=entry['width'], height=entry['height'],
                                  pip=str(ROOT / screen.get('pip', config.get('pip'))) if screen.get('pip', config.get('pip')) else None,
                                  pipPosition=screen.get('pip_position', 'bottom-left')))
                 entries.append(dict(source=str(source.relative_to(ROOT)), source_sha256=digest(source),

@@ -1,3 +1,4 @@
+import '../../../watchlist/data/guest_watchlist_store.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -134,6 +135,11 @@ class ShowDetailController extends ChangeNotifier {
       inWatchlist = containsShowId(user?.showWatchlist, id);
       isFavorite = containsShowId(user?.favoriteShows, id);
     });
+    if (user == null) {
+      final guestPicks = await GuestWatchlistStore.instance.read();
+      if (!current()) return;
+      change(() => inWatchlist = guestPicks.any((p) => p.key == 'show:$id'));
+    }
     Future<void> section<T>(
         String name, Future<T> Function() fetch, void Function(T) apply) async {
       if (!current()) return;
@@ -193,7 +199,10 @@ class ShowDetailController extends ChangeNotifier {
     Future<void>? reviewsTask;
     void warmReviews() {
       if (!current()) return;
-      if (user == null) { reviewsLoading = false; return; }
+      if (user == null) {
+        reviewsLoading = false;
+        return;
+      }
       reviewsTask ??= section('reviews', () => service.reviews(id, user.id),
           (value) => reviews = List.unmodifiable(value));
     }

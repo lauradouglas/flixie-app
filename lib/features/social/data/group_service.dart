@@ -448,6 +448,7 @@ class GroupService {
     bool? recommended,
     String? reviewText,
     String? watchedAt,
+    bool? watchedAtCinema,
   }) async {
     var resolvedId = conversationId ?? request.conversationId;
     if (resolvedId == null || resolvedId.isEmpty) {
@@ -469,6 +470,7 @@ class GroupService {
       recommended: recommended,
       reviewText: reviewText,
       watchedAt: watchedAt,
+      watchedAtCinema: watchedAtCinema,
     );
   }
 
@@ -482,6 +484,7 @@ class GroupService {
     bool? recommended,
     String? reviewText,
     String? watchedAt,
+    bool? watchedAtCinema,
   }) async {
     final data = await ApiClient.patch(
       '/conversations/$conversationId/watch-requests/$requestId/complete',
@@ -493,6 +496,8 @@ class GroupService {
         if (watched && reviewText != null && reviewText.isNotEmpty)
           'reviewText': reviewText,
         if (watched && watchedAt != null) 'watchedAt': watchedAt,
+        if (watched && watchedAtCinema != null)
+          'watchedAtCinema': watchedAtCinema,
       },
     );
     final request = GroupWatchRequest.fromJson(data as Map<String, dynamic>);

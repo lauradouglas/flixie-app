@@ -154,7 +154,7 @@ Future<void> addToListJourney(WidgetTester tester,
   await tester.pumpAndSettle();
   expect(friends, before ? 1 : 0);
   await tester.enterText(
-      find.widgetWithText(TextField, 'List Name'), 'Alien and The Odyssey');
+      find.widgetWithText(TextField, 'List name'), 'Alien and The Odyssey');
   FocusManager.instance.primaryFocus?.unfocus();
   await tester.pumpAndSettle();
   await tester.ensureVisible(find.text('Just me'));

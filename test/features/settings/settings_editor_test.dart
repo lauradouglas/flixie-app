@@ -83,8 +83,8 @@ void main() {
       await tester.enterText(find.byType(TextField).at(1), 'A changed bio');
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Save Changes'));
-      await tester.tap(find.text('Save Changes'));
+      await tester.ensureVisible(find.text('Save changes'));
+      await tester.tap(find.text('Save changes'));
       await tester.pump();
       expect(writes, 1);
       auth.current = auth.current.copyWith(id: 'other-account');
@@ -144,7 +144,7 @@ void main() {
         ));
         await tester.tap(find.text('Edit'));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Save Changes'));
+        await tester.ensureVisible(find.text('Save changes'));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());

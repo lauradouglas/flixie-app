@@ -125,3 +125,25 @@ docs/product-ideas.md
 
 /fastlane/store-presentation-android/
 /docs/performance
+
+# Local Firebase emulator state (includes fictional login credentials).
+/.local/firebase/
+firebase-debug.log
+firestore-debug.log
+storage-debug.log
+
+# Private credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+!.env.*.example
+/android/local.properties
+**/service-account*.json
+**/serviceAccount*.json
+**/firebase-adminsdk*.json
+*.pem
+*.key
+
+# Local generated previews and scratch files
+/output/
+/tmp/

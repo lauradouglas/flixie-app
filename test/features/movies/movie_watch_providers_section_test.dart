@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/presentation/widgets/show_watch_providers_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/models/watch_provider.dart';
@@ -17,6 +18,37 @@ WatchProvider offer(int id, String name, String type, int priority) =>
         availabilityTypes: {type});
 
 void main() {
+  for (final show in [false, true]) {
+    testWidgets(
+        '${show ? 'show' : 'movie'} invites provider setup only with no saved services',
+        (tester) async {
+      var opened = 0;
+      Widget section(Set<int> ids) => show
+          ? ShowWatchProvidersSection(
+              providers: const [],
+              userProviderIds: ids,
+              userProviderMatchKeys: const {},
+              region: 'GB',
+              loading: false,
+              loaded: true,
+              failed: false,
+              onRetry: () async {},
+              onRegionChanged: () async {},
+              onAddProviders: () => opened++)
+          : MovieWatchProvidersSection(
+              providers: const [],
+              userProviderIds: ids,
+              userProviderMatchKeys: const {},
+              region: 'GB',
+              onChangeRegion: () async {},
+              onAddProviders: () => opened++);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: section({}))));
+      await tester.tap(find.text('Add watch providers'));
+      expect(opened, 1);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: section({8}))));
+      expect(find.text('Add watch providers'), findsNothing);
+    });
+  }
   testWidgets('saved subscriptions lead streaming; tabs show the right offers',
       (tester) async {
     final providers = [

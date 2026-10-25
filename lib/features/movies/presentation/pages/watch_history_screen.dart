@@ -1,3 +1,4 @@
+import '../widgets/watched_shows_history.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_entry_review_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/external_watch_invite_sheet.dart';
 import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
@@ -6,8 +7,7 @@ import 'package:flixie_app/features/movies/models/watch_log_details.dart';
 import 'package:flixie_app/features/social/data/friend_service.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/load_failure_notice.dart';
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/watch_history_card.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -57,12 +57,29 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
   int _loadGeneration = 0;
   // Sort options: dateDesc, dateAsc, titleAsc, titleDesc
   String _sortBy = 'dateDesc';
+  bool _showShows = false;
+  int? _showCount;
 
   @override
   void initState() {
     super.initState();
-    _load();
     _searchController.addListener(_applyFilter);
+  }
+
+  String? _viewer;
+  bool _initialized = false;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final viewer = context.watch<AuthProvider>().dbUser?.id;
+    if (!_initialized || viewer != _viewer) {
+      _initialized = true;
+      _viewer = viewer;
+      _showCount = null;
+      _all = [];
+      _filtered = [];
+      _load();
+    }
   }
 
   @override
@@ -73,8 +90,11 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
 
   Future<void> _load() async {
     final generation = ++_loadGeneration;
-    bool isCurrent() => mounted && generation == _loadGeneration;
     final userId = context.read<AuthProvider>().dbUser?.id;
+    bool isCurrent() =>
+        mounted &&
+        generation == _loadGeneration &&
+        context.read<AuthProvider>().dbUser?.id == userId;
     if (userId == null) {
       setState(() {
         _loading = false;
@@ -182,6 +202,10 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
     var writeReview = false;
     MovieWatchEntry? reviewWatch;
     await showMovieWatchLogSheet<void>(
+      movieId: entry.movieId,
+      movieTitle: entry.movie?.title,
+      releaseDate: entry.movie?.releaseDate,
+      editingExisting: initial != null,
       context: context,
       builder: (_) => RewatchLogSheet(
         movieTitle: entry.movie?.title,
@@ -207,6 +231,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
                 await WatchlistActionsController.instance.logMovieWatch(
               userId,
               LogMovieWatchRequest(
+                watchedAtCinema: details.watchedAtCinema,
                 draftId: draftId,
                 companionId: details.companion?.id,
                 companionIds:
@@ -227,6 +252,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
               userId,
               initial.id,
               UpdateMovieWatchRequest(
+                watchedAtCinema: details.watchedAtCinema,
                 companionIds:
                     details.companions.map((friend) => friend.id).toList(),
                 companionId:
@@ -345,7 +371,10 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
                     color: context.colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold)),
-            if (!_loading && (_error == null || _all.isNotEmpty))
+            if (_showShows && _showCount != null)
+              Text('$_showCount shows watched',
+                  style: TextStyle(color: context.colors.medium, fontSize: 12)),
+            if (!_showShows && !_loading && (_error == null || _all.isNotEmpty))
               Text('${_all.length} movies watched',
                   style: TextStyle(color: context.colors.medium, fontSize: 12)),
           ],
@@ -387,7 +416,9 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
               controller: _searchController,
               style: TextStyle(color: context.colors.white),
               decoration: InputDecoration(
-                hintText: 'Search watched movies...',
+                hintText: _showShows
+                    ? 'Search watched shows...'
+                    : 'Search watched films...',
                 hintStyle: TextStyle(color: context.colors.medium),
                 prefixIcon: Icon(Icons.search, color: context.colors.medium),
                 filled: true,
@@ -403,23 +434,44 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
           ),
         ),
       ),
-      body: _loading
-          ? const ContentListSkeleton()
-          : _error != null && _all.isEmpty
-              ? Center(
-                  child: SingleChildScrollView(
-                      child: LoadFailureNotice(
-                          message: _error!,
-                          onRetry: _load,
-                          retrying: _refreshing)))
-              : Column(children: [
-                  if (_error != null)
-                    LoadFailureNotice(
-                        message: _error!,
-                        onRetry: _load,
-                        retrying: _refreshing),
-                  Expanded(child: _buildHistory()),
-                ]),
+      body: Column(children: [
+        Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Wrap(spacing: 8, children: [
+              ChoiceChip(
+                  label: const Text('Films'),
+                  selected: !_showShows,
+                  onSelected: (_) => setState(() => _showShows = false)),
+              ChoiceChip(
+                  label: const Text('Shows'),
+                  selected: _showShows,
+                  onSelected: (_) => setState(() => _showShows = true)),
+            ])),
+        Expanded(
+            child: _showShows
+                ? WatchedShowsHistory(
+                    query: _searchController.text, sortBy: _sortBy,
+                    onCountChanged: (count) {
+                      if (mounted && count != _showCount) setState(() => _showCount = count);
+                    })
+                : _loading
+                    ? const ContentListSkeleton()
+                    : _error != null && _all.isEmpty
+                        ? Center(
+                            child: SingleChildScrollView(
+                                child: LoadFailureNotice(
+                                    message: _error!,
+                                    onRetry: _load,
+                                    retrying: _refreshing)))
+                        : Column(children: [
+                            if (_error != null)
+                              LoadFailureNotice(
+                                  message: _error!,
+                                  onRetry: _load,
+                                  retrying: _refreshing),
+                            Expanded(child: _buildHistory()),
+                          ])),
+      ]),
     );
   }
 
@@ -436,8 +488,12 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
           itemCount: _filtered.length,
           itemBuilder: (_, i) {
             final entry = _filtered[i];
-            return _WatchedMovieCard(
-              entry: entry,
+            return WatchHistoryCard(
+              title: entry.movie!.title,
+              posterPath: entry.movie!.posterPath,
+              rating: entry.rating,
+              reviewed: entry.review != null,
+              watchCount: entry.watches.isEmpty ? null : entry.watches.length,
               formattedDate: _formatDate(entry.watchedAt),
               onTap: () => context.push(movieDetailPath(
                 entry.movieId,
@@ -505,194 +561,3 @@ class _WatchedEntry {
 // Card widget
 // ---------------------------------------------------------------------------
 
-class _WatchedMovieCard extends StatelessWidget {
-  const _WatchedMovieCard({
-    required this.entry,
-    required this.formattedDate,
-    required this.onTap,
-    required this.onLogAgain,
-    this.onEditEntry,
-    this.onWriteReview,
-  });
-
-  final _WatchedEntry entry;
-  final String formattedDate;
-  final VoidCallback onTap;
-  final VoidCallback onLogAgain;
-  final VoidCallback? onEditEntry;
-  final VoidCallback? onWriteReview;
-
-  @override
-  Widget build(BuildContext context) {
-    final movie = entry.movie!;
-    final posterUrl = movie.posterPath != null
-        ? 'https://image.tmdb.org/t/p/w500${movie.posterPath}'
-        : null;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.colors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(12)),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    posterUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: posterUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => _PosterFallback(),
-                            errorWidget: (_, __, ___) => _PosterFallback(),
-                          )
-                        : _PosterFallback(),
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: PopupMenuButton<String>(
-                        tooltip: 'Actions for ${movie.title}',
-                        color: context.colors.surfaceElevated,
-                        onSelected: (value) {
-                          if (value == 'log') onLogAgain();
-                          if (value == 'edit') onEditEntry?.call();
-                          if (value == 'review') onWriteReview?.call();
-                        },
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(
-                            value: 'log',
-                            child: Text('Log another watch'),
-                          ),
-                          if (onEditEntry != null)
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Edit latest entry'),
-                            ),
-                          if (onWriteReview != null)
-                            const PopupMenuItem(
-                              value: 'review',
-                              child: Text('Write a review'),
-                            ),
-                        ],
-                        child: SizedBox(
-                          width: 44,
-                          height: 44,
-                          child: Center(
-                              child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.85),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.more_horiz,
-                                color: Colors.white, size: 24),
-                          )),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 7,
-                      bottom: 7,
-                      child: FlixiePill.label(
-                          label: Text(entry.watches.isEmpty
-                              ? 'Watched'
-                              : '${entry.watches.length}× watched')),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(
-              height: 102,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: 38,
-                      child: Text(
-                        movie.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          height: 1.24,
-                        ),
-                      ),
-                    ),
-                    if (formattedDate.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.check_circle,
-                              size: 12, color: context.colors.success),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              formattedDate,
-                              style: TextStyle(
-                                color: context.colors.medium,
-                                fontSize: 11,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (entry.rating != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Your rating: ${entry.rating!.toStringAsFixed(1)}/10${entry.review != null ? ' • Reviewed' : ''}',
-                        style: TextStyle(
-                          color: context.colors.tertiary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ] else if (entry.review != null) ...[
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Review added',
-                        style: TextStyle(
-                          color: FlixieColors.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PosterFallback extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF1E2D40),
-      child: Center(
-        child: Icon(Icons.movie_outlined, color: context.colors.medium),
-      ),
-    );
-  }
-}

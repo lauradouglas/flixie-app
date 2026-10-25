@@ -39,7 +39,7 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
 
   @override
   Widget build(BuildContext context) {
-    final movies = widget.movies.take(8).toList(growable: false);
+    final movies = widget.movies.take(20).toList(growable: false);
     if (movies.isEmpty) return const SizedBox.shrink();
     final movie = movies.where((m) => m.homeKey == _selectedId).firstOrNull ??
         movies.first;

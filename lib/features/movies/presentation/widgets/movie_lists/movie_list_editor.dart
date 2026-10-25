@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/flixie_editor_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -31,6 +32,8 @@ Future<void> showMovieListEditor(
     useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
+    enableDrag: false,
+    isDismissible: false,
     builder: (ctx) {
       route = ModalRoute.of(ctx);
       return _MovieListEditor(
@@ -104,12 +107,28 @@ class _MovieListEditorState extends State<_MovieListEditor> {
       widget.initialCollaborators.map((c) => c.id).toSet();
   late final selectedFriends = Set<String>.of(originalFriends);
   bool saving = false;
+  String? nameError, relationshipError, saveError;
+  bool get dirty =>
+      name.text != (widget.initialName ?? '') ||
+      description.text != (widget.initialDescription ?? '') ||
+      visibility != (widget.initialVisibility ?? ListVisibility.private) ||
+      whoCanAdd != (widget.initialWhoCanAddMovies ?? 'owner') ||
+      scope != widget.initialScope ||
+      groupId != widget.initialGroupId ||
+      selectedFriends.length != originalFriends.length ||
+      !selectedFriends.containsAll(originalFriends);
+  void changed() {
+    if (mounted) setState(() {});
+  }
+
   bool get isEdit => widget.listId != null;
   bool get active => mounted && widget.isCurrentUser();
 
   @override
   void initState() {
     super.initState();
+    name.addListener(changed);
+    description.addListener(changed);
     if (scope == ListScope.friends) relationships.load(scope);
   }
 
@@ -139,15 +158,22 @@ class _MovieListEditorState extends State<_MovieListEditor> {
   }
 
   Future<void> save() async {
-    if (!active || saving || name.text.trim().isEmpty) return;
+    if (!active || saving) return;
+    setState(() {
+      nameError = name.text.trim().isEmpty ? 'Give your list a name.' : null;
+      relationshipError = null;
+      saveError = null;
+    });
+    if (nameError != null) return;
     if (scope == ListScope.friends && selectedFriends.isEmpty) {
-      feedback('Select at least one friend', FlixieToastType.warning);
+      setState(() => relationshipError = 'Select at least one friend.');
       return;
     }
     if (scope == ListScope.group && groupId == null) {
-      feedback('Choose a group', FlixieToastType.warning);
+      setState(() => relationshipError = 'Choose a group.');
       return;
     }
+    FocusScope.of(context).unfocus();
     setState(() => saving = true);
     MovieList? created;
     var ok = false;
@@ -176,11 +202,13 @@ class _MovieListEditorState extends State<_MovieListEditor> {
           if (!active) return;
           await UserService.addMovieListMember(
               widget.userId, widget.listId!, id);
+          originalFriends.add(id);
         }
         for (final id in removed) {
           if (!active) return;
           await UserService.removeMovieListMember(
               widget.userId, widget.listId!, id);
+          originalFriends.remove(id);
         }
         if (!active) return;
         if (added.isNotEmpty || removed.isNotEmpty) {
@@ -189,12 +217,14 @@ class _MovieListEditorState extends State<_MovieListEditor> {
       }
     } catch (_) {
       ok = false;
+    } finally {
+      if (mounted && !widget.isCurrentUser()) setState(() => saving = false);
     }
     if (!mounted || !active) return;
     if (!ok) {
       setState(() => saving = false);
-      feedback(widget.provider.error ?? 'Unable to save list',
-          FlixieToastType.error);
+      setState(() => saveError =
+          'Couldn’t save all list changes. Your edits are still here.');
       return;
     }
     feedback(isEdit ? 'List renamed' : 'List created', FlixieToastType.success);
@@ -204,76 +234,67 @@ class _MovieListEditorState extends State<_MovieListEditor> {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: relationships,
-        builder: (context, _) => ConstrainedBox(
-          constraints:
-              BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .9),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-                16, 16, 16, MediaQuery.viewInsetsOf(context).bottom + 16),
-            child: AbsorbPointer(
-                absorbing: saving,
-                child: ListEditorLayout(children: [
-                  Text(isEdit ? 'Edit list' : 'Make a little collection.',
-                      style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 12),
-                  TextField(
-                      controller: name,
-                      maxLength: 50,
-                      decoration: const InputDecoration(
-                          labelText: 'List name',
-                          hintText: 'Films for a rainy Sunday')),
-                  TextField(
-                      controller: description,
-                      maxLength: 140,
-                      minLines: 2,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                          hintText: 'Description (optional)')),
-                  ListChoiceGroup(
-                      value: visibility,
-                      title: 'Who can see it?',
-                      items: const [
-                        DropdownMenuItem(
-                            value: ListVisibility.private,
-                            child: Text('Private')),
-                        DropdownMenuItem(
-                            value: ListVisibility.friends,
-                            child: Text('Friends only')),
-                        DropdownMenuItem(
-                            value: ListVisibility.public,
-                            child: Text('Public')),
-                      ],
-                      onChanged: (value) => setState(
-                          () => visibility = value ?? ListVisibility.private)),
-                  const SizedBox(height: 8),
-                  ListCollaboratorPicker(
-                      isEdit: isEdit,
-                      initialScope: widget.initialScope,
-                      scope: scope,
-                      groupId: groupId,
-                      selectedFriends: selectedFriends,
-                      relationships: relationships,
-                      onScope: changeScope,
-                      onGroup: (value) => setState(() => groupId = value),
-                      onFriend: (id, selected) => setState(() {
-                            if (selected) {
-                              selectedFriends.add(id);
-                            } else {
-                              selectedFriends.remove(id);
-                            }
-                          })),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                          onPressed: saving ? null : save,
-                          child: Text(saving
-                              ? 'Saving…'
-                              : isEdit
-                                  ? 'Save'
-                                  : 'Create'))),
-                ])),
-          ),
-        ),
+        builder: (context, _) => FlixieEditorSheet(
+            title: isEdit ? 'Edit list' : 'Create list',
+            dirty: dirty,
+            busy: saving,
+            saveLabel: isEdit ? 'Save' : 'Create',
+            onSave: save,
+            error: saveError,
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('A collection of films and shows.'),
+              TextField(
+                  controller: name,
+                  maxLength: 50,
+                  decoration: InputDecoration(
+                      errorText: nameError,
+                      labelText: 'List name',
+                      hintText: 'Films for a rainy Sunday')),
+              TextField(
+                  controller: description,
+                  maxLength: 140,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      labelText: 'Description (optional)')),
+              ListChoiceGroup(
+                  value: visibility,
+                  title: 'Who can see it?',
+                  items: const [
+                    DropdownMenuItem(
+                        value: ListVisibility.private, child: Text('Private')),
+                    DropdownMenuItem(
+                        value: ListVisibility.friends,
+                        child: Text('Friends only')),
+                    DropdownMenuItem(
+                        value: ListVisibility.public, child: Text('Public')),
+                  ],
+                  onChanged: (value) => setState(
+                      () => visibility = value ?? ListVisibility.private)),
+              const SizedBox(height: 8),
+              if (relationshipError != null)
+                Semantics(
+                    liveRegion: true,
+                    child: Text(relationshipError!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error))),
+              ListCollaboratorPicker(
+                  isEdit: isEdit,
+                  initialScope: widget.initialScope,
+                  scope: scope,
+                  groupId: groupId,
+                  selectedFriends: selectedFriends,
+                  relationships: relationships,
+                  onScope: changeScope,
+                  onGroup: (value) => setState(() => groupId = value),
+                  onFriend: (id, selected) => setState(() {
+                        if (selected) {
+                          selectedFriends.add(id);
+                        } else {
+                          selectedFriends.remove(id);
+                        }
+                      })),
+            ])),
       );
 }

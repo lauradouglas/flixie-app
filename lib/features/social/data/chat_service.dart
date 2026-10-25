@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/firebase_environment.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flixie_app/models/conversation.dart';
@@ -5,7 +6,9 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 
 class ChatService {
-  static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final FirebaseFirestore _db = FirebaseEnvironment.firestore;
+
+  static const messagePageSize = 20;
 
   // ---------------------------------------------------------------------------
   // REST - conversation management
@@ -65,7 +68,7 @@ class ChatService {
   // Firestore - real-time streams
   // ---------------------------------------------------------------------------
 
-  /// Real-time stream of messages (newest-first, capped at 50).
+  /// Real-time stream of messages (newest-first, capped at 20).
   static Stream<List<ChatMessage>> messagesStream(
       String conversationId) async* {
     await ApiClient.get('/users/me/chat-identity');
@@ -74,7 +77,8 @@ class ChatService {
         .doc(conversationId)
         .collection('messages')
         .orderBy('createdAt', descending: true)
-        .limit(50)
+        .orderBy(FieldPath.documentId, descending: true)
+        .limit(messagePageSize)
         .snapshots()
         .map((snap) {
       logger.d('[ChatService] messagesStream got ${snap.docs.length} docs');
@@ -84,6 +88,25 @@ class ChatService {
       }
       return snap.docs.map((d) => ChatMessage.fromFirestore(d)).toList();
     });
+  }
+
+  /// After the live stream establishes identity, page with an exclusive cursor.
+  /// Ties use document ID to avoid skipped messages; rules still enforce access.
+  static Future<List<ChatMessage>> olderMessages(
+      String conversationId, ChatMessage before) async {
+    final snapshot = await _db
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .orderBy('createdAt', descending: true)
+        .orderBy(FieldPath.documentId, descending: true)
+        .startAfter([
+          before.firestoreCreatedAt ?? Timestamp.fromDate(before.createdAt),
+          before.id
+        ])
+        .limit(messagePageSize)
+        .get(const GetOptions(source: Source.server));
+    return snapshot.docs.map(ChatMessage.fromFirestore).toList();
   }
 
   /// All direct and group conversations visible to [userId], updated live.
@@ -104,6 +127,37 @@ class ChatService {
         return rightAt.compareTo(leftAt);
       });
       return conversations;
+    });
+  }
+
+  /// One global-badge query, reusing existing server-owned member counters.
+  static Stream<Map<String, int>> unreadConversationsStream(
+      String userId) async* {
+    await ApiClient.get('/users/me/chat-identity');
+    yield* _db
+        .collectionGroup('members')
+        .where('userId', isEqualTo: userId)
+        .where('unreadCount', isGreaterThan: 0)
+        .snapshots()
+        .map((snapshot) {
+      logger.d(
+          '[ChatUnread] unread-only snapshot: ${snapshot.docs.length} documents');
+      final counts = <String, int>{};
+      for (final doc in snapshot.docs) {
+        // The collection name is reserved for chat memberships. Be defensive
+        // against malformed Admin data without performing another document read.
+        final path = doc.reference.path.split('/');
+        final value = doc.data()['unreadCount'];
+        if (path.length == 4 &&
+            path[0] == 'conversations' &&
+            path[2] == 'members' &&
+            path[3] == userId &&
+            value is num &&
+            value > 0) {
+          counts[path[1]] = value.toInt();
+        }
+      }
+      return counts;
     });
   }
 
@@ -132,10 +186,11 @@ class ChatService {
     return map;
   }
 
-  /// Real-time unread count for a user in a conversation.
+  /// Used by ChatUnreadController only after conversationsStream has established
+  /// this account's identity. Do not repeat that backend transaction for every
+  /// chat. Firestore rules still check membership/deletion on each read.
   static Stream<int> unreadCountStream(
       String conversationId, String userId) async* {
-    await ApiClient.get('/users/me/chat-identity');
     yield* _db
         .collection('conversations')
         .doc(conversationId)

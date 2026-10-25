@@ -20,6 +20,7 @@ import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/social/data/chat_service.dart';
+import 'package:flixie_app/features/social/presentation/widgets/paged_chat_builder.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_bubble.dart';
 import 'package:flixie_app/features/social/presentation/widgets/chat_input.dart';
 import 'package:flixie_app/features/social/presentation/utils/activity_reply_payload.dart';
@@ -323,14 +324,21 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<ChatMessage>>(
-              stream: ChatService.messagesStream(conversationId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
+            child: PagedChatBuilder(
+              source: (currentUserId, conversationId),
+              createStream: () => ChatService.messagesStream(conversationId),
+              loadPage: (before) =>
+                  ChatService.olderMessages(conversationId, before),
+              builder: (context, history, scroll) {
+                if (history.loading) {
                   return const ChatContentSkeleton();
                 }
-                final messages = snapshot.data ?? [];
+                if (history.liveError != null && history.messages.isEmpty) {
+                  return LoadFailureNotice(
+                      message: 'Could not load messages',
+                      onRetry: _initConversation);
+                }
+                final messages = history.messages;
                 if (messages.isEmpty) {
                   return Center(
                     child: Text(
@@ -341,15 +349,20 @@ class _DirectChatScreenState extends State<DirectChatScreen> {
                   );
                 }
                 return ChatReadObserver(
+                    canMarkRead: () => history.isAtLatest,
                     conversationId: conversationId,
                     child: ListView.builder(
+                      controller: scroll,
                       reverse: true,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 0,
                         vertical: 8,
                       ),
-                      itemCount: messages.length,
+                      itemCount: messages.length + 1,
                       itemBuilder: (_, index) {
+                        if (index == messages.length) {
+                          return ChatHistoryFooter(history: history);
+                        }
                         final msg = messages[index];
                         final isMe = msg.senderId == currentUserId;
                         // The list is reverse-rendered, so the visually first

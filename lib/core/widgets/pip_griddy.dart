@@ -16,6 +16,7 @@ class _PipGriddyState extends State<PipGriddy>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final _motion = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 3200));
+  static final _phaseClock = Stopwatch();
   ImageStream? _stream;
   ImageStreamListener? _listener;
   ui.Image? _image;
@@ -38,6 +39,9 @@ class _PipGriddyState extends State<PipGriddy>
         if (!mounted) return;
         _image?.dispose();
         setState(() => _image = info.image.clone());
+        _phaseClock.start();
+        _motion.value = (_phaseClock.elapsedMilliseconds % 3200) / 3200;
+        _syncMotion();
       }, onError: (Object error, StackTrace? stack) {
         // Keep the real hoodie artwork visible if sprite decoding fails.
       });
@@ -47,7 +51,8 @@ class _PipGriddyState extends State<PipGriddy>
   }
 
   void _syncMotion() {
-    if (_foreground &&
+    if (_image != null &&
+        _foreground &&
         TickerMode.valuesOf(context).enabled &&
         !MediaQuery.disableAnimationsOf(context)) {
       if (!_motion.isAnimating) _motion.repeat();
@@ -80,10 +85,8 @@ class _PipGriddyState extends State<PipGriddy>
           dimension: widget.size,
           child: RepaintBoundary(
               child: _image == null
-                  ? Image.asset(
-                      'assets/icon/community_pips/pip-flixie-hoodie.png',
-                      fit: BoxFit.contain,
-                      excludeFromSemantics: true)
+                  ? Image.asset('assets/splash/pip/launch-frame.png',
+                      fit: BoxFit.contain, excludeFromSemantics: true)
                   : CustomPaint(
                       painter: PipGriddyPainter(_image!, _motion,
                           reducedMotion:

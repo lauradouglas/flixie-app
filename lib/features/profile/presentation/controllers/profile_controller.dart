@@ -50,6 +50,7 @@ class ProfileController extends ChangeNotifier {
   bool activityLoading = true,
       ratingsLoading = true,
       profileExtrasLoading = true;
+  bool ratingsFailed = false;
   bool activityFailed = false,
       profileExtrasFailed = false,
       statsLoading = false,
@@ -88,6 +89,7 @@ class ProfileController extends ChangeNotifier {
         _statsDirty = true;
         _ratingsTask = null;
         ratings = [];
+        ratingsFailed = false;
         continueWatching = [];
         watchProviders = [];
         reviews = [];
@@ -270,7 +272,10 @@ class ProfileController extends ChangeNotifier {
     final viewer = auth.dbUser?.id;
     if (_disposed || viewer == null) return;
     final current = _request('ratings');
-    change(() => ratingsLoading = true);
+    change(() {
+      ratingsLoading = true;
+      ratingsFailed = false;
+    });
     if (!forceRefresh && auth.cachedRatings != null) {
       change(() {
         ratings = List.unmodifiable(auth.cachedRatings!);
@@ -290,6 +295,7 @@ class ProfileController extends ChangeNotifier {
       }
     } catch (_) {
       // Keep useful same-account ratings when a refresh fails.
+      if (current()) change(() => ratingsFailed = true);
     } finally {
       if (current()) change(() => ratingsLoading = false);
     }

@@ -59,21 +59,21 @@ class _AnalyticsConsentPromptState extends State<AnalyticsConsentPrompt> {
         content: const SingleChildScrollView(
           child: Text(
             'If you choose to allow analytics, Flixie uses Google Analytics '
-            'for Firebase to understand how the app is used and improve its '
+            'for Firebase and PostHog to understand how the app is used and improve its '
             'features and reliability. This may collect app interactions, '
             'session information, device and operating-system information, an '
             'app-instance identifier, and approximate location '
             'derived from a masked IP address. The app-instance identifier lets '
-            'Firebase associate events from this app installation.\n\n'
-            'Flixie does not send Firebase Analytics your name, email address, '
+            'the analytics providers associate events from this app installation.\n\n'
+            'Flixie does not send analytics providers your name, email address, '
             'username, reviews, messages, watch history, or the titles of '
             'movies and television programmes you interact with. We do not '
-            'use Firebase Analytics for advertising or cross-app tracking, '
+            'use analytics for advertising or cross-app tracking, '
             'and we do not link analytics data to your Flixie account.\n\n'
             'Analytics is disabled unless you choose to allow it. You can '
             'change your choice at any time under Settings → Share usage '
             'analytics. Data already processed may remain in aggregated '
-            'reports in accordance with Google’s retention and deletion '
+            'reports in accordance with the providers’ retention and deletion '
             'practices.',
           ),
         ),

@@ -54,7 +54,8 @@ class ProfileTabSelector extends StatelessWidget {
 
   String _tabLabel(ProfileTab tab) {
     return switch (tab) {
-      ProfileTab.library => 'Library',
+      ProfileTab.library => 'Taste',
+      ProfileTab.diary => 'Diary',
       ProfileTab.activity => 'Activity',
       ProfileTab.stats => 'Stats',
     };

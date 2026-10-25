@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
-import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/models/continue_watching_show.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/watch_providers_sheet.dart';
 import 'widgets/ratings_section.dart';
@@ -93,13 +92,12 @@ class ProfileActionFlow {
             listenable: _data,
             builder: (context, _) {
               if (!mounted) return const SizedBox.shrink();
-              return _data.ratingsLoading
-                  ? SizedBox(
-                      height: MediaQuery.sizeOf(context).height * .75,
-                      child: const SingleChildScrollView(
-                          padding: EdgeInsets.all(20),
-                          child: ContentPlaceholder(label: 'Loading ratings')))
-                  : AllRatingsSheet(ratings: _data.ratings);
+              return AllRatingsSheet(
+                ratings: _data.ratings,
+                loading: _data.ratingsLoading,
+                failed: _data.ratingsFailed,
+                onRetry: () => _data.loadRatings(forceRefresh: true),
+              );
             }));
   }
 }

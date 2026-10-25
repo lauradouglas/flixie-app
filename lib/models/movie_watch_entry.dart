@@ -5,6 +5,8 @@ import 'package:flixie_app/models/watchlist_movie.dart';
 class MovieWatchEntry {
   final FriendshipUser? companion;
   final List<FriendshipUser> companions;
+  // Read-only diary context; group attendees are not direct-plan edit selections.
+  final List<FriendshipUser> groupCompanions;
   List<FriendshipUser> get allCompanions =>
       companions.isNotEmpty ? companions : [if (companion != null) companion!];
   final ExternalWatchInvite? externalInvite;
@@ -17,6 +19,7 @@ class MovieWatchEntry {
   final double? rating;
   final bool? recommended;
   final String? notes;
+  final bool watchedAtCinema;
   final bool removed;
   final String? createdAt;
   final String? updatedAt;
@@ -25,11 +28,13 @@ class MovieWatchEntry {
   const MovieWatchEntry({
     this.companion,
     this.companions = const [],
+    this.groupCompanions = const [],
     this.externalInvite,
     this.planId,
     this.reviewBody,
     this.reviewTitle,
     this.reviewContainsSpoilers = false,
+    this.watchedAtCinema = false,
     required this.id,
     required this.userId,
     required this.movieId,
@@ -78,7 +83,27 @@ class MovieWatchEntry {
     }
     final review =
         (json['reviews'] as List? ?? []).whereType<Map>().firstOrNull;
+    final groupPeople = <String, FriendshipUser>{};
+    for (final link
+        in (json['groupPlanResponses'] as List? ?? const []).whereType<Map>()) {
+      for (final response
+          in (link['request']?['responses'] as List? ?? const [])
+              .whereType<Map>()) {
+        final person = response['responder'];
+        if (person is Map && person['id'] != json['userId']) {
+          final user =
+              FriendshipUser.fromJson(Map<String, dynamic>.from(person));
+          groupPeople[user.id] = user;
+        }
+      }
+    }
+    for (final person
+        in (json['groupCompanions'] as List? ?? const []).whereType<Map>()) {
+      final user = FriendshipUser.fromJson(Map<String, dynamic>.from(person));
+      groupPeople[user.id] = user;
+    }
     return MovieWatchEntry(
+      groupCompanions: groupPeople.values.toList(),
       externalInvite: json['externalInvite'] is Map<String, dynamic>
           ? ExternalWatchInvite.fromJson(
               json['externalInvite'] as Map<String, dynamic>)
@@ -100,6 +125,7 @@ class MovieWatchEntry {
       rating: _parseDouble(json['rating']),
       recommended: json['recommended'] as bool?,
       notes: json['notes'] as String?,
+      watchedAtCinema: json['watchedAtCinema'] == true,
       removed: json['removed'] as bool? ?? false,
       createdAt: json['createdAt'] as String?,
       updatedAt: json['updatedAt'] as String?,
@@ -112,6 +138,18 @@ class MovieWatchEntry {
 
   Map<String, dynamic> toJson() {
     return {
+      if (groupCompanions.isNotEmpty)
+        'groupCompanions': [
+          for (final p in groupCompanions)
+            {
+              'id': p.id,
+              'username': p.username,
+              'firstName': p.firstName,
+              'avatar': p.avatar?.toJson(),
+              'iconColor': p.iconColor,
+              'profileBadges': p.profileBadges
+            }
+        ],
       if (externalInvite != null) 'externalInvite': externalInvite!.toJson(),
       if (allCompanions.isNotEmpty)
         'companions': [
@@ -145,6 +183,7 @@ class MovieWatchEntry {
       'rating': rating,
       'recommended': recommended,
       'notes': notes,
+      'watchedAtCinema': watchedAtCinema,
       'removed': removed,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
@@ -156,6 +195,7 @@ class MovieWatchEntry {
 class LogMovieWatchRequest {
   final String? draftId, companionId, reviewBody, externalCompanionName;
   final List<String>? companionIds;
+  final bool? watchedAtCinema;
   final bool containsSpoilers;
 
   final int movieId;
@@ -166,6 +206,7 @@ class LogMovieWatchRequest {
 
   const LogMovieWatchRequest({
     this.draftId,
+    this.watchedAtCinema,
     this.externalCompanionName,
     this.companionId,
     this.companionIds,
@@ -181,6 +222,7 @@ class LogMovieWatchRequest {
   Map<String, dynamic> toJson() {
     return {
       if (draftId != null) 'draftId': draftId,
+      if (watchedAtCinema != null) 'watchedAtCinema': watchedAtCinema,
       if (externalCompanionName != null)
         'externalCompanionName': externalCompanionName,
       if (draftId != null) 'watchedAt': watchedAt,
@@ -200,6 +242,7 @@ class LogMovieWatchRequest {
 class UpdateMovieWatchRequest {
   final String? draftId, companionId, reviewBody, externalCompanionName;
   final List<String>? companionIds;
+  final bool? watchedAtCinema;
   final bool containsSpoilers;
   final int? movieId;
 
@@ -210,6 +253,7 @@ class UpdateMovieWatchRequest {
 
   const UpdateMovieWatchRequest({
     this.draftId,
+    this.watchedAtCinema,
     this.externalCompanionName,
     this.companionId,
     this.companionIds,
@@ -225,6 +269,7 @@ class UpdateMovieWatchRequest {
   Map<String, dynamic> toJson() {
     return {
       if (draftId != null) 'draftId': draftId,
+      if (watchedAtCinema != null) 'watchedAtCinema': watchedAtCinema,
       if (externalCompanionName != null)
         'externalCompanionName': externalCompanionName,
       if (draftId != null) 'watchedAt': watchedAt,

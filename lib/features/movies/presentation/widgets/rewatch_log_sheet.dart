@@ -1,3 +1,5 @@
+import 'unreleased_movie_prompt.dart';
+import '../../data/movie_service.dart';
 import 'package:flixie_app/features/movies/models/external_watch_invite.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -12,28 +14,59 @@ import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'watch_companion_picker.dart';
 
 Future<T?> showMovieWatchLogSheet<T>(
-        {required BuildContext context, required WidgetBuilder builder}) =>
-    showModalBottomSheet<T>(
-        context: context,
-        useRootNavigator: true,
-        useSafeArea: true,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).shortestSide >= 600
-                ? (MediaQuery.sizeOf(context).width >
-                        MediaQuery.sizeOf(context).height
-                    ? 820
-                    : 560)
-                : MediaQuery.sizeOf(context).width),
-        builder: builder);
+    {required BuildContext context,
+    required WidgetBuilder builder,
+    int? movieId,
+    String? movieTitle,
+    String? releaseDate,
+    String? status,
+    bool editingExisting = false}) async {
+  if (!editingExisting && movieId != null) {
+    if (releaseDate == null && status == null) {
+      try {
+        final movie = await MovieService().getMovieById(movieId);
+        releaseDate = movie.releaseDate;
+        status = movie.status;
+        movieTitle ??= movie.title;
+      } catch (_) {
+        // Unknown availability must not be presented as a definite unreleased title.
+      }
+    }
+    if (!context.mounted) return null;
+    if (!await confirmUnreleasedMovie(context,
+        title: movieTitle, releaseDate: releaseDate, status: status)) {
+      return null;
+    }
+    if (!context.mounted) return null;
+  }
+  return showModalBottomSheet<T>(
+      context: context,
+      useRootNavigator: true,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).shortestSide >= 600
+              ? (MediaQuery.sizeOf(context).width >
+                      MediaQuery.sizeOf(context).height
+                  ? 820
+                  : 560)
+              : MediaQuery.sizeOf(context).width),
+      builder: builder);
+}
 
 class RewatchLogSheet extends StatefulWidget {
   const RewatchLogSheet(
       {super.key,
+      this.embedded = false,
+      this.onBusyChanged,
+      this.onClose,
+      this.initialRating,
+      this.initialRecommended,
       this.initial,
       required this.onSubmit,
       this.showReviewOption = false,
+      this.showCinemaOption = true,
       this.onReviewSelected,
       this.isRewatch = false,
       this.previousWatch,
@@ -48,12 +81,18 @@ class RewatchLogSheet extends StatefulWidget {
       this.companions = const [],
       this.initialWatchedAt,
       this.initialDateUnknown = false});
+  final ValueChanged<bool>? onBusyChanged;
+  final bool embedded;
+  final VoidCallback? onClose;
+  final double? initialRating;
+  final bool? initialRecommended;
   final MovieWatchEntry? initial, previousWatch;
   final Future<void> Function(
       {required String? watchedAt,
       required double? rating,
       required bool? recommended,
       required String? notes}) onSubmit;
+  final bool showCinemaOption;
   final bool showReviewOption, isRewatch, isPlanReview, initialDateUnknown;
   final ValueChanged<bool>? onReviewSelected;
   final Future<List<MovieWatchPlanChoice>>? watchPlans;
@@ -73,6 +112,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   int? _rating;
   bool? _recommended;
   bool _saving = false, _writeReview = false;
+  bool _cinema = false;
   late TextEditingController _notes;
   List<FriendshipUser> _selectedCompanions = [];
   FriendshipUser? get _companion => _selectedCompanions.firstOrNull;
@@ -91,8 +131,9 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
     _known = widget.initial != null
         ? widget.initial!.watchedAt != null
         : !widget.initialDateUnknown;
-    _rating = widget.initial?.rating?.round();
-    _recommended = widget.initial?.recommended;
+    _cinema = widget.initial?.watchedAtCinema ?? false;
+    _rating = (widget.initial?.rating ?? widget.initialRating)?.round();
+    _recommended = widget.initial?.recommended ?? widget.initialRecommended;
     _selectedCompanions = widget.companions.isNotEmpty
         ? [...widget.companions]
         : widget.companion != null
@@ -108,6 +149,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   }
 
   void _details() => widget.onDetailsChanged?.call(WatchLogDetails(
+      watchedAtCinema: _cinema,
       companion: _companion,
       companions: List.unmodifiable(_selectedCompanions),
       externalCompanionName: _externalName,
@@ -148,6 +190,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
       _error = null;
     });
     _details();
+    widget.onBusyChanged?.call(true);
     try {
       await widget.onSubmit(
           watchedAt: _known ? _date.toUtc().toIso8601String() : null,
@@ -156,7 +199,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
           notes: _notes.text.trim().isEmpty ? null : _notes.text.trim());
       if (!mounted) return;
       widget.onReviewSelected?.call(_writeReview);
-      Navigator.of(context).pop();
+      if (!widget.embedded) Navigator.of(context).pop();
     } catch (error) {
       if (mounted) {
         setState(() => _error = error is ApiException
@@ -164,7 +207,10 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
             : 'Couldn’t save your watch. Your details are still here. Try again.');
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        widget.onBusyChanged?.call(false);
+      }
     }
   }
 
@@ -228,26 +274,58 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                     },
               child: const Text('Change'))
         ]),
-        CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: !_known,
-            onChanged:
-                _saving ? null : (v) => setState(() => _known = !(v ?? false)),
-            title: const Text('I don’t remember the date')),
+        LayoutBuilder(builder: (context, box) {
+          final sideBySide = widget.showCinemaOption &&
+              box.maxWidth >= MediaQuery.textScalerOf(context).scale(145) * 2;
+          final width = sideBySide ? (box.maxWidth - 12) / 2 : box.maxWidth;
+          return Wrap(spacing: 12, children: [
+            SizedBox(
+                width: width,
+                child: CheckboxListTile(
+                  key: const ValueKey('unknown-date-checkbox'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: !_known,
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _known = !(value ?? false)),
+                  title: const Text('Date unsure'),
+                )),
+            if (widget.showCinemaOption)
+              SizedBox(
+                  width: width,
+                  child: CheckboxListTile(
+                    key: const ValueKey('cinema-checkbox'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _cinema,
+                    onChanged: _saving
+                        ? null
+                        : (value) => setState(() => _cinema = value ?? false),
+                    title: const Text('At cinema'),
+                  )),
+          ]);
+        }),
       ]);
   Widget _companions() =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: _label('Watched with')),
-          if (widget.loadFriends != null && _plan == null)
-            TextButton(
-                onPressed: _saving ? null : _pick,
-                child: Text(_companion == null && _externalName == null
-                    ? 'Add someone'
-                    : 'Add people'))
-        ]),
+        SizedBox(
+            width: double.infinity,
+            child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                children: [
+                  _label('Watched with'),
+                  if (widget.loadFriends != null && _plan == null)
+                    TextButton(
+                        onPressed: _saving ? null : _pick,
+                        child: Text(_companion == null && _externalName == null
+                            ? 'Add someone'
+                            : 'Add people'))
+                ])),
         for (final friend in _selectedCompanions)
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Padding(
@@ -470,11 +548,14 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
         final size = MediaQuery.sizeOf(context),
-            inset = MediaQuery.viewInsetsOf(context).bottom;
+            inset = MediaQuery.viewInsetsOf(context)
+                .bottom
+                .clamp(0.0, double.infinity)
+                .toDouble();
         final tablet = size.shortestSide >= 600;
         final availableHeight =
             (constraints.maxHeight - inset).clamp(0.0, constraints.maxHeight);
-        final height = tablet
+        final height = tablet && !widget.embedded
             ? (size.height * .88).clamp(0.0, availableHeight)
             : availableHeight;
         final compactKeyboard = inset > 0 && height < 280;
@@ -484,7 +565,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                 height: height,
                 child: Material(
                     color: context.colors.surface,
-                    borderRadius: tablet
+                    borderRadius: tablet && !widget.embedded
                         ? const BorderRadius.vertical(top: Radius.circular(24))
                         : BorderRadius.zero,
                     clipBehavior: Clip.antiAlias,
@@ -525,12 +606,15 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                                                   color: context.colors.light))
                                         ]
                                       ])),
-                                  IconButton(
-                                      tooltip: 'Close',
-                                      onPressed: _saving
-                                          ? null
-                                          : () => Navigator.pop(context),
-                                      icon: const Icon(Icons.close_rounded))
+                                  if (!widget.embedded)
+                                    IconButton(
+                                        tooltip: 'Close',
+                                        onPressed: _saving
+                                            ? null
+                                            : () => widget.onClose != null
+                                                ? widget.onClose!()
+                                                : Navigator.pop(context),
+                                        icon: const Icon(Icons.close_rounded))
                                 ])),
                           Divider(
                               height: 1, color: context.colors.tabBarBorder),

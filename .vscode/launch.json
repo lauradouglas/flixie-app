@@ -2,44 +2,60 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "flixie-app (Chrome - Dev Env)",
+            "name": "flixie-app (Chrome - Local Firebase)",
             "cwd": "${workspaceFolder}",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
-                ".firebase.json"
+                ".firebase.local.json"
             ],
             "args": [
                 "-d",
                 "chrome",
                 "--web-port=5000"
-            ]
+            ],
+            "preLaunchTask": "Flixie: start local services"
         },
         {
-            "name": "flixie-app (Web - Dev Env)",
+            "name": "flixie-app (Web - Local Firebase)",
             "cwd": "${workspaceFolder}",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
-                ".firebase.json"
+                ".firebase.local.json"
             ],
             "args": [
                 "-d",
                 "web-server",
                 "--web-port=5000"
-            ]
+            ],
+            "preLaunchTask": "Flixie: start local services"
         },
         {
-            "name": "flixie-app (Mobile - Dev Env)",
+            "name": "flixie-app (Mobile - Local Firebase)",
             "cwd": "${workspaceFolder}",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
-                ".firebase.json"
-            ]
+                ".firebase.local.json"
+            ],
+            "preLaunchTask": "Flixie: start local services"
+        },
+        {
+            "name": "flixie-app (Android Emulator - Local Firebase)",
+            "cwd": "${workspaceFolder}",
+            "request": "launch",
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define-from-file",
+                ".firebase.local.json",
+                "--dart-define=FIREBASE_EMULATOR_HOST=10.0.2.2",
+                "--dart-define=API_BASE_URL=http://10.0.2.2:3000"
+            ],
+            "preLaunchTask": "Flixie: start local services"
         },
         {
             "name": "flixie-app (Chrome)",
@@ -48,13 +64,14 @@
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
-                ".firebase.json"
+                ".firebase.local.json"
             ],
             "args": [
                 "-d",
                 "chrome",
                 "--web-port=5000"
-            ]
+            ],
+            "preLaunchTask": "Flixie: start local services"
         },
         {
             "name": "flixie-app (Local Web)",
@@ -63,24 +80,27 @@
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
-                ".firebase.json"
+                ".firebase.local.json"
             ],
             "args": [
                 "-d",
                 "web-server",
                 "--web-port=5000"
-            ]
+            ],
+            "preLaunchTask": "Flixie: start local services"
         },
         {
-            "name": "flixie-app (Mobile - Production API)",
+            "name": "flixie-app (Profile - Production)",
             "cwd": "${workspaceFolder}",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
                 "--dart-define-from-file",
                 ".firebase.json",
+                "--dart-define=USE_FIREBASE_EMULATORS=false",
                 "--dart-define=USE_PROD_API=true"
-            ]
+            ],
+            "flutterMode": "profile"
         }
     ]
 }

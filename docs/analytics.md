@@ -212,3 +212,251 @@ Events may take a short time to appear in Firebase DebugView; the local
 `[Analytics]` debug lines confirm the app-side contract immediately.
 
 Privacy hardening (17 September 2026): the event dispatcher strips `watch_plan_id`, `content_id`, `parent_content_id`, and `person_id` from every event. Callers may keep those values for local app logic; they are not sent to Firebase. Historical events are unaffected by this code change and must be considered when updating published privacy disclosures.
+
+## PostHog configuration and Slack
+
+The existing event contract is sent to both Firebase and PostHog. PostHog is a
+no-op without a project token. Release builds default to the configured EU project
+311417 public ingestion token; debug/profile builds require an explicit token so
+local testing does not pollute product metrics. Pass an empty
+`--dart-define=POSTHOG_PROJECT_TOKEN=` to disable PostHog in a release build. Native mobile setup is configured manually after
+consent; do not add a native token or automatic screen observers. Flutter web
+PostHog setup is not included (it requires a separately configured JS SDK).
+
+Build/run with your project's public ingestion token (never a personal API key):
+
+```sh
+flutter run --dart-define=POSTHOG_PROJECT_TOKEN=phc_YOUR_PROJECT_TOKEN --dart-define=POSTHOG_HOST=https://eu.i.posthog.com
+```
+
+Use `https://us.i.posthog.com` for a US project. A new native build is necessary
+after adding the plugin; hot reload cannot install native dependencies or change
+compile-time defines. Test in a separate development PostHog project: decline and
+check no events, allow then complete a signup/watchlist action, inspect the live
+events, withdraw consent in Settings and verify later actions emit nothing.
+No database fixtures are needed: use existing fictional local test accounts.
+
+Requested Slack setup (pending project/channel connection):
+
+- Create a Flixie dashboard with daily signup completions, taste-profile
+  completions, watchlist additions, watches logged, ratings and completed watch
+  plans. Add a daily Slack subscription; agree its delivery time with the owner.
+- Create a Slack destination filtered to `signup_completed`,
+  `taste_profile_completed` and `watch_plan_completed`. Suggested message:
+  `Flixie: {event.event} completed`. Include no account or content identifiers.
+- Authorize PostHog's Slack app and invite it to the chosen channel. Test with
+  fictional local activity and confirm delivery. Keep webhook/bot credentials
+  in PostHog, never in the mobile app.
+
+References: [Flutter SDK](https://posthog.com/docs/libraries/flutter),
+[Slack event destination](https://posthog.com/docs/cdp/destinations/slack),
+[dashboard subscriptions](https://posthog.com/docs/product-analytics/subscriptions).
+
+
+### Connected setup status — 19 October 2026
+
+- Connected EU project: `311417` (currently named Default project), with approved
+  timezone **Europe/London**.
+- Dashboard: [Flixie product analytics](https://eu.posthog.com/project/311417/dashboard/1035487).
+- Daily report insight: [Flixie daily activity summary](https://eu.posthog.com/project/311417/insights/v5IupSUU), six consented event totals over the last day.
+- Existing private Slack channel: `analytics` (`C0CB4GVB35W`).
+- Owner selected daily delivery at **09:00 Europe/London**, with a test delivery
+  and an AI-written summary (AI credits approved).
+- PostHog-to-Slack integration `91025` is connected. PostHog was added to the
+  private analytics channel with explicit owner approval.
+- No app events have arrived yet. Saved queries follow the app's documented
+  event contract; live ingestion and native delivery remain unverified.
+- Daily insight subscription `53375` is enabled with an AI summary. Next delivery
+  verified as **20 October 2026 at 09:00 Europe/London** (`08:00Z`).
+- Test delivery `01a15379-ca7f-7f7e-b6bb-56b2255f13db` completed; report and AI
+  summary were verified in Slack:
+  [test report](https://flixieworkspace.slack.com/archives/C0CB4GVB35W/p1792401868796669).
+- Key-event destination `01a1537a-52f2-0000-2776-f694422af070` is enabled for
+  `signup_completed`, `taste_profile_completed`, `watch_plan_completed`. Its exact
+  message configuration passed a simulated invocation before enabling. No fake
+  product events were ingested or posted as real milestones. The default person
+  name/link template is replaced with an event-name-only message.
+- Live app ingestion remains unverified: no updated release has been deployed.
+  The native simulator build verifies compilation, not event receipt.
+
+Native verification: arm64 iOS simulator build succeeded on 19 October 2026 via
+Xcode after Flutter's generic simulator command hit a multi-architecture parsing
+failure. No app was deployed, installed or relaunched. Focused analytics tests:
+23 passed; targeted Dart analysis clean.
+
+
+### Release distribution — 19 October 2026
+
+Analytics-enabled 2.0.5 (128) was built and submitted to Apple and Google Play
+production. Both signed artifacts contain the expected EU project token and
+native automatic initialization remains disabled. Apple is WAITING_FOR_REVIEW
+with automatic release after approval; Google production submission was accepted.
+Public availability is not yet verified. Internal TestFlight build 128 is
+IN_BETA_TESTING and can generate real events after the tester allows analytics.
+The external privacy disclosure was updated and independently verified live before
+store submission. See `docs/fastlane.md` and the retained per-store release records.
+
+
+### Feature usage and product benefit — 19 October 2026
+
+Owner requested search/movie/show usage, most-clicked controls and most-used
+functionality, with emphasis on actionable product benefit. The existing PostHog
+dashboard now has verified seven-day charts for screen visits, movie/show opens,
+discovery source, and completed watchlist saves/watches/ratings/favourites.
+Real app ingestion is verified (initial sample: 5 movie opens, 2 show opens,
+2 saves, 2 ratings, 1 watch); too small to infer feature popularity. Prior setup
+notes saying no events have arrived are superseded by this check.
+
+New local app instrumentation, pending a release after build 128:
+
+- `search_completed`: successful current first-page search responses only;
+  `search_mode`, bounded `result_count`, `has_results` (0/1). Includes debounced
+  searches, resubmissions, mode changes and refreshes, not every keystroke.
+  Stale responses, failures and pagination do not count as completed searches.
+- `search_result_opened`: movie/show/person result tap or collection/studio
+  selection, with mode, result type and one-based result position. Collection
+  opens count after guest access succeeds. No query, title, catalogue ID or
+  account identifier is sent. Studio selection means switching the search,
+  rather than opening a studio detail page.
+- `detail_action_tapped`: enabled movie/show action-row buttons (watchlist,
+  favourite, list, plan, share, show rating) and movie activity rate/log-watch
+  controls. This measures intent, separate from successful mutation events.
+- `detail_tab_selected`: explicit change to overview, reviews, activity,
+  details or episodes; tapping the already-selected tab does not count.
+
+Three prepared dashboard charts for search results, detail actions and detail
+tabs clearly state that they require the next build. Existing 09:00 Slack
+subscription still sends its original six-metric daily summary; no extra
+scheduled Slack messages were created by this change.
+
+Consent gating and privacy allowlists remain in force; no replay/coordinate
+heatmaps or automatic input capture enabled. Screen visits are not unique
+accounts. Content IDs remain stripped, so an anonymous-installation journey
+cannot establish conversion for the same film/show. Existing data cannot
+backfill missing search/tap events. No new local database fixtures required:
+controller tests use fictional Alien search results and in-memory services.
+
+
+**Release follow-up — 19 October 2026:** Extra feature analytics shipped in signed
+2.0.5 (129) artifacts and submitted to both stores at the owner's request.
+Apple129 VALID and internally available in TestFlight; public submission is
+WAITING_FOR_REVIEW with release after approval. Google production129 submitted
+with UK/US changelogs, independently verified. Public rollout remains pending
+verification; no claim of new-event ingestion yet. Hourly monitor updated to129
+and will notify here/#analytics per existing authorization. See docs/fastlane.md.
+
+
+### Weekly Slack report — 19 October 2026
+
+Owner requested adding search activity/most-used features to the summary, then
+changed cadence to weekly. Active subscription53397 sends the weekly dashboard
+1036187 to private #analytics (C0CB4GVB35W), Monday09:00 Europe/London, first
+26October2026 09:00Z. Seven-day dashboard filter applies to all eight exported
+insights: activity outcomes, screens, movie/show interest, successful actions,
+discovery sources, search/empty results, detail buttons and tabs. AI summary
+retained as previously approved, with guidance on consent, sample size, taps vs
+completed actions, build129 coverage and evidence-based product improvements.
+Consumes PostHog AI credits as before. Daily subscription53375 is paused and its
+AI summary disabled; its history remains. No immediate test report was requested
+or sent. All eight dashboard queries verified; new search/tap charts currently
+empty pending rollout/usage. Key-event destination and store-live notifications
+remain separate from this weekly reporting change.
+
+
+### Search-result/iOS diagnostic — 19 October 2026
+
+No production search_result_opened or search-origin content_opened events observed
+in fresh24-hour queries; only two search responses received (one empty).
+PostHog has no active ingestion warnings. No runtime tracking defect reproduced:
+added actual Search screen movie/show/person tap regression in the existing
+Patrol journey harness; verifies navigation, type/mode/position payloads and
+withdrawal blocking events while retaining navigation. Focused journey/analytics
+suite31 tests passed; diagnostic code analysis clean.
+
+Native iOS SDK verification passed on a newly created disposable simulator via
+`tool/verify_ios_analytics.dart`: real platform plugin sends screen,
+search_completed, search_result_opened and detail_action_tapped after consent,
+none before consent or after withdrawal. Receiver is loopback with a fake project
+token; no synthetic production events ingested. SDK uses $os_name=iOS in native
+payloads; the diagnostic checks that field. Simulator was cleaned up afterwards.
+Production source/plugin registration and signed129 configuration were checked;
+no production code changes or release needed by this diagnostic.
+
+**Remaining verification:** Fresh production query including both $os and
+$os_name still contains Android traffic only. Physical iPhone unavailable to
+local tooling. Requested owner update/opt-in/search/result tap on iPhone to verify
+actual production receipt. Prior acceptance of Firebase-only consent does not
+auto-accept the newer PostHog consent. Native loopback success does not establish
+production iOS receipt, installed-version correctness or the phone's consent.
+
+
+### Store downloads alongside signups — requested 23 October 2026
+
+Owner explicitly requested Apple/Google download imports in PostHog311417 and
+weekly #analytics subscription53397. No warehouse sources or stored source
+credentials existed at preflight. Apple connectorAppStoreConnect supports analytics
+download reports but needs an Admin key; existing release configuration is
+documented as App Manager. Secure connect URL prepared:
+https://eu.posthog.com/project/311417/data-warehouse/connect?kind=AppStoreConnect
+Limit app_ids to6779375028. Owner requested help creating the key. Await user
+creation/entry through secure PostHog form; never collect private keys in chat.
+
+GooglePlayConsole native source covers quality/vitals, not acquisition. Download
+CSV reports require the Play developer reports bucket and report-read access.
+GoogleCloudStorage source exists but requires HMAC credentials; no stored ones
+found. Google exports may require UTF16 conversion before warehouse ingestion.
+Play Console browser currently signed out. Need authenticated console/report
+bucket discovery before configuring a verified import. Do not import upgrades or
+re-downloads as new downloads; avoid double-counting country/device dimensional
+exports and monthly restatements. Apple's connector retains report restatements:
+select latest processing date per report date/dimensions before summing.
+
+**Status:** Pending store report authorization. No connector or download chart
+created, no fake download events, no change to weekly delivery yet. Signups remain
+consent-only activity outcomes, not total server account creation. Final report
+must label definitions, freshness/delays and aggregate comparison limitations.
+
+
+### Download connection progress — 23 October 2026
+
+The new Apple Admin key C837DJ432Q was moved beside the existing release key and validated with read-only Apple API requests: app access and analyticsReportRequests both returned HTTP 200 (no report requests yet). The release key remains unchanged. Automatic approval review blocked passing private-key contents as a PostHog tool argument because of credential logging risk. The secure PostHog connection page is open with Issuer ID, Key ID and App ID populated; the user must enter the private key and save credentials there. No warehouse source has been created yet.
+
+Google Play Console independently exposes the Flixie October install exports in bucket `pubsite_prod_8927337084708858516`, including `stats/installs/installs_com.flixie.app_202610_overview.csv` and the country breakdown. Prefer one export family only to avoid double counting. Programmatic bucket access and recurring ingestion remain to be configured. The weekly subscription has not yet been changed to claim download coverage.
+
+
+### Secure Apple source created — 23 October 2026
+
+User approved standard secure setup. Created AppStoreConnect source `01a16a36-34e0-0000-bb3b-79f4888e42ca`, prefix `flixie_apple`, restricted by App ID `6779375028`. Metadata tables completed their first sync. Standard setup left analytics tables disabled; enabled `analytics_app_store_downloads` (`01a16a36-3537-0000-c197-83098ff99141`) explicitly with incremental processing_date/date, primary keys app_id/processing_date/_line, seven-day lookback, daily sync. Initial reload accepted and Running; no table/columns yet. Detailed analytics and sales remain disabled. Do not claim downloads ingested until actual rows verified.
+
+Google service account read-only bucket check returned HTTP403 storage.objects.list denied. Console confirms existing app-level permissions only; account-wide “View app information and download bulk reports (read-only)” is unchecked. Requested action-time approval to enable this specific account-wide read permission (includes future apps, excludes financial data); no permission changes made yet. Weekly Slack subscription unchanged pending verified data and charts.
+
+
+### Latest verified state — 23 October 2026
+
+Apple first download sync completed without error but has no table/rows yet. Read-only Apple API now lists two analytics report requests (previously zero), confirming report generation was requested; no download counts are claimed. Daily polling is enabled.
+
+User explicitly approved the Google account-wide read-only bulk-report permission. Enabled and saved it for the existing flixie-play-upload service account; reopened the permissions screen and verified it remains checked, with financial/admin/edit permissions unchanged at account level. Evidence screenshot: `/private/tmp/flixie-google-report-permission-saved.png`. Both storage.objects.list and direct storage.objects.get still return HTTP403 after save and a subsequent retry; propagation delay is possible, not proven. Google recurring import remains unconfigured; it will also need a secure supported credential/normalization route after access succeeds. The weekly dashboard and Slack subscription have not been changed to imply download data is available. Next: verify Google bucket access, configure ingestion, wait for Apple rows/columns, validate latest-revision deduplication and metric definitions, then add download chart(s) to weekly reporting alongside consented signup counts.
+
+
+### Recheck and weekly signup summary — 23 October 2026
+
+Apple API independently confirms both ONGOING and ONE_TIME_SNAPSHOT requests have App Downloads Standard report definitions, but both report instance lists are empty. This establishes a report-generation wait, rather than a zero-download count. Triggered another PostHog download-schema reload; do not claim imported download rows. Google bulk report bucket listing still returns HTTP403 after the approved account-wide read-only permission. No extra access changes made.
+
+Verified weekly subscription 53397 exports insight6672261, whose first series is signup_completed. Updated and re-read its summary_prompt_guide (495 characters) to explicitly summarize consented signup totals and require verified download charts, dates, definitions and freshness, treating unavailable download data as unavailable rather than zero and prohibiting person-level conversion claims from store aggregates. Eight chart selections, Slack #analytics, Monday09:00 UK schedule and AI summary remain enabled; next delivery 26October2026 09:00Z. No test delivery requested or sent. Actual download charts remain blocked by missing Apple report instances and denied Google report access; existing source is configured but the acquisition-reporting task is incomplete.
+
+
+### Contextual signup first actions
+The contextual signup route retains `signup_started` / `signup_completed` from
+the real auth flow and uses existing `watchlist_added`, `rating_added`,
+`review_created` and `watch_logged` events with `source: onboarding` after
+successful persistence. Episodes use the parent show ID and content type `show`
+(the existing content contract supports movies/shows). Optional extra saves use
+the same action event. `onboarding_started` is retained; a skipped taste step
+does not emit `taste_profile_completed`.
+
+Measure signup completion first, then conversion to a useful action by the same
+identified account within the session/24 hours. Compare first-action time and
+7-day return using existing app/session activity, and segment by the first action
+event. Signup alone is not activation. Existing event fields do not identify every
+entry-point variant; avoid claiming a precise entry-point comparison without an
+explicitly approved analytics contract extension.

@@ -8,6 +8,51 @@ import 'package:flixie_app/features/home/presentation/widgets/trending_carousel.
 import 'package:flixie_app/models/movie_short.dart';
 
 void main() {
+  for (final width in [320.0, 1024.0]) {
+    testWidgets('can browse the twentieth trending title at width $width',
+        (tester) async {
+      await tester.binding.setSurfaceSize(Size(width, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final movies = List.generate(24,
+          (index) => MovieShort(id: index + 1, name: 'Trending ${index + 1}'));
+      MovieShort? opened;
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: SingleChildScrollView(
+                  child: TrendingCarousel(
+        movies: movies,
+        onDetails: (movie) => opened = movie,
+        onSave: (_) {},
+        onTrailer: (_) {},
+      )))));
+      await tester.pumpAndSettle();
+      if (width < 560) {
+        final pages = tester.widget<PageView>(find.byType(PageView));
+        expect(pages.childrenDelegate.estimatedChildCount, 20);
+        pages.controller!.jumpToPage(19);
+        await tester.pumpAndSettle();
+        expect(find.text('Trending 20'), findsOneWidget);
+        await tester.tap(find.byTooltip('Details').last);
+        expect(opened?.id, 20);
+      } else {
+        final list = tester.widget<ListView>(find.byType(ListView));
+        expect(list.childrenDelegate.estimatedChildCount, 39);
+        final poster = find.byKey(const ValueKey('trending-poster-20'));
+        await tester.scrollUntilVisible(poster, 600,
+            scrollable: find.descendant(
+                of: find.byType(ListView), matching: find.byType(Scrollable)));
+        await tester
+            .tap(find.descendant(of: poster, matching: find.byType(InkWell)));
+        await tester.pumpAndSettle();
+        await tester
+            .ensureVisible(find.widgetWithText(TextButton, 'Trending 20'));
+        await tester.tap(find.widgetWithText(TextButton, 'Trending 20'));
+        expect(opened?.id, 20);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
         'carousel fits tallest card and keeps height after swipe at scale $scale',

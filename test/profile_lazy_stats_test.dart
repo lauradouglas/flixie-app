@@ -55,18 +55,18 @@ void main() {
       expect(paths.where((p) => p.endsWith('/reviews')), hasLength(1));
       expect(paths.where((p) => p.endsWith('/movies/ratings')), hasLength(1));
       expect(activityFilters, ['watches', 'all']);
-      await tester.tap(find.text('Library').first);
+      await tester.tap(find.text('Taste').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Stats').first);
       await tester.pumpAndSettle();
       expect(paths.where((p) => p.contains('/wrapped/')), hasLength(1));
       final tabs = find
-          .ancestor(of: find.text('Library'), matching: find.byType(Row))
+          .ancestor(of: find.text('Taste'), matching: find.byType(Row))
           .first;
-      expect(tester.getRect(tabs).left, 0);
+      expect(tester.getRect(tabs).left, 24);
       expect(tester.getSize(tabs).width,
-          tester.view.physicalSize.width / tester.view.devicePixelRatio);
-      expect(tester.getTopLeft(find.text('This month')).dx, 20);
+          tester.view.physicalSize.width / tester.view.devicePixelRatio - 48);
+      expect(tester.getTopLeft(find.text('This month')).dx, 44);
       await Scrollable.ensureVisible(tester.element(find.text('View stats')),
           alignment: 0.5);
       await tester.pumpAndSettle();

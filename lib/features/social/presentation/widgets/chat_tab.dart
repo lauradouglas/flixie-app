@@ -1,3 +1,4 @@
+import 'paged_chat_builder.dart';
 import 'group_chat/group_chat_messages.dart';
 import '../../data/group_chat_service.dart';
 import '../controllers/group_chat_session.dart';
@@ -343,22 +344,24 @@ class GroupChatTabState extends State<GroupChatTab> {
       child: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<ChatMessage>>(
+            child: PagedChatBuilder(
               key: ValueKey(_session.generation),
-              stream: _session.messages,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting &&
-                    !snapshot.hasData) {
+              source: (currentUserId, conversationId, _session.generation),
+              createStream: () => _session.messages!,
+              loadPage: (before) =>
+                  _session.service.olderMessages(conversationId, before),
+              builder: (context, history, scroll) {
+                if (history.loading) {
                   return const ChatContentSkeleton();
                 }
-                if (snapshot.hasError) {
+                if (history.liveError != null) {
                   return Center(
                       child: TextButton(
                           onPressed: _session.retry,
                           child:
                               const Text('Could not load messages · Retry')));
                 }
-                final messages = snapshot.data ?? [];
+                final messages = history.messages;
                 if (messages.isEmpty) {
                   return Center(
                     child: Text(
@@ -369,6 +372,9 @@ class GroupChatTabState extends State<GroupChatTab> {
                   );
                 }
                 return GroupChatMessages(
+                    scrollController: scroll,
+                    canMarkRead: () => history.isAtLatest,
+                    historyFooter: ChatHistoryFooter(history: history),
                     conversationId: conversationId,
                     groupId: widget.groupId,
                     currentUserId: currentUserId,

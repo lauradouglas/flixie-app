@@ -1,3 +1,4 @@
+import '../../../settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_count_label.dart';
 import '../widgets/show_viewing_timeline.dart';
 import 'package:flixie_app/features/sharing/presentation/media_chat_share.dart';
@@ -142,6 +143,8 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         context.read<AuthProvider>().dbUser == null) {
       return;
     }
+    final episodeId = GuestAccess.episodeId;
+    final seasonNumber = GuestAccess.seasonNumber;
     final intent = GuestAccess.takeAction('/shows/${widget.showId}');
     switch (intent) {
       case 'watchlist':
@@ -150,6 +153,17 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         if (!_data.isFavorite) await _flow.toggleFavorite();
       case 'list':
         await _flow.showAddToListSheet();
+      case 'episode':
+        final episode = TvShowEpisodeProgress(_data.show!)
+            .allEpisodes
+            .where((e) => e.id == episodeId)
+            .firstOrNull;
+        if (episode != null) await _flow.setEpisodeWatched(episode, true);
+      case 'season':
+        final season = _data.show!.seasons
+            .where((s) => s.seasonNumber == seasonNumber)
+            .firstOrNull;
+        if (season != null) await _flow.setSeasonWatched(season, true);
       case 'rate':
         _flow.showRatingSheet();
       case 'review':
@@ -226,9 +240,19 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _ShowTabsHeaderDelegate(
-                  reviewCount: context.read<AuthProvider>().dbUser != null && !_data.reviewsLoading && !_data.reviewsFailed ? _data.reviews.length : null,
+                  reviewCount: context.read<AuthProvider>().dbUser != null &&
+                          !_data.reviewsLoading &&
+                          !_data.reviewsFailed
+                      ? _data.reviews.length
+                      : null,
                   selected: _selectedTab,
-                  onSelected: (tab) => setState(() => _selectedTab = tab),
+                  onSelected: (tab) {
+                    if (_selectedTab == tab) return;
+                    context
+                        .read<AnalyticsController?>()
+                        ?.detailTabSelected(contentType: 'show', tab: tab.name);
+                    setState(() => _selectedTab = tab);
+                  },
                 ),
               ),
               SliverToBoxAdapter(
@@ -495,6 +519,13 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
 
   Widget _buildProviderSection(TvShow show) => ShowWatchProvidersSection(
       providers: _data.watchProviders,
+      onAddProviders: context.watch<AuthProvider>().dbUser == null ||
+              !_data.loadedDetails.contains('your services')
+          ? null
+          : () async {
+              await showWatchProvidersSetup(context);
+              if (mounted) await _load();
+            },
       userProviderIds: _data.userProviderIds,
       userProviderMatchKeys: _data.userProviderMatchKeys,
       region: context.select<AuthProvider, String>(
@@ -516,23 +547,22 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         ),
         const SizedBox(height: 12),
         Row(children: [
-          if (signedIn)
-            Expanded(
-              child: _statusActionItem(
-                icon: _data.userRating != null
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-                label: 'Rate',
-                badge:
-                    _data.userRating != null ? '${_data.userRating!}/10' : null,
-                color: context.colors.tertiary,
-                isActive: _data.userRating != null,
-                isLoading: _data.isRatingLoading,
-                onTap: _data.updatingAction != null || _data.isRatingLoading
-                    ? null
-                    : _flow.showRatingSheet,
-              ),
+          Expanded(
+            child: _statusActionItem(
+              icon: _data.userRating != null
+                  ? Icons.star_rounded
+                  : Icons.star_outline_rounded,
+              label: 'Rate',
+              badge:
+                  _data.userRating != null ? '${_data.userRating!}/10' : null,
+              color: context.colors.tertiary,
+              isActive: _data.userRating != null,
+              isLoading: _data.isRatingLoading,
+              onTap: _data.updatingAction != null || _data.isRatingLoading
+                  ? null
+                  : _flow.showRatingSheet,
             ),
+          ),
           Expanded(
             child: _statusActionItem(
               icon: _data.inWatchlist ? Icons.bookmark : Icons.bookmark_outline,
@@ -635,7 +665,13 @@ class _ShowDetailScreenState extends State<ShowDetailScreen> {
         badge: badge,
         isActive: isActive,
         isLoading: isLoading,
-        onTap: onTap);
+        onTap: onTap == null
+            ? null
+            : () {
+                context.read<AnalyticsController?>()?.detailActionTapped(
+                    contentType: 'show', action: label.toLowerCase());
+                onTap();
+              });
   }
 
   Widget _buildProgressSection(TvShow show) {
@@ -786,17 +822,22 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
                     selected: active,
                     button: true,
                     child: entry.key == _ShowDetailTab.reviews
-                        ? ReviewCountLabel(count: reviewCount,
-                            style: TextStyle(color: active ? context.colors.textPrimary : context.colors.light,
-                              fontWeight: active ? FontWeight.w800 : FontWeight.w500))
+                        ? ReviewCountLabel(
+                            count: reviewCount,
+                            style: TextStyle(
+                                color: active
+                                    ? context.colors.textPrimary
+                                    : context.colors.light,
+                                fontWeight:
+                                    active ? FontWeight.w800 : FontWeight.w500))
                         : Text(entry.value,
-                        style: TextStyle(
-                          color: active
-                              ? context.colors.textPrimary
-                              : context.colors.light,
-                          fontWeight:
-                              active ? FontWeight.w800 : FontWeight.w500,
-                        ))),
+                            style: TextStyle(
+                              color: active
+                                  ? context.colors.textPrimary
+                                  : context.colors.light,
+                              fontWeight:
+                                  active ? FontWeight.w800 : FontWeight.w500,
+                            ))),
               ),
             );
           }).toList(),
@@ -807,7 +848,8 @@ class _ShowTabsHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _ShowTabsHeaderDelegate oldDelegate) =>
-      oldDelegate.selected != selected || oldDelegate.reviewCount != reviewCount;
+      oldDelegate.selected != selected ||
+      oldDelegate.reviewCount != reviewCount;
 }
 
 class _ErrorState extends StatelessWidget {

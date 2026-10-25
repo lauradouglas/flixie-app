@@ -1,3 +1,4 @@
+import 'package:flixie_app/models/movie_watch_entry.dart';
 import 'milestone_cache.dart';
 import 'package:flixie_app/models/profile_milestone.dart';
 import 'package:flixie_app/models/activity_list_item.dart';
@@ -15,6 +16,8 @@ import 'user_service.dart';
 /// Injectable access to existing profile services; adds no cache.
 class ProfileDataService {
   const ProfileDataService();
+  Future<List<MovieWatchEntry>> movieWatches(String userId) =>
+      UserService.getUserMovieWatches(userId);
   Future<({List<ActivityListItem> items, String? nextCursor})> activity(
           String userId,
           {String filter = 'all',

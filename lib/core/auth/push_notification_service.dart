@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/firebase_environment.dart';
 import 'package:flixie_app/core/navigation/current_route.dart';
 import 'foreground_inbox_tracker.dart';
 import 'package:flixie_app/models/notification.dart';
@@ -35,6 +36,7 @@ bool _hasFirebaseDartDefines(FirebaseOptions options) {
 /// FCM can invoke it in a separate isolate.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (FirebaseEnvironment.useEmulators) return;
   try {
     if (Firebase.apps.isEmpty) {
       final options = DefaultFirebaseOptions.currentPlatform;
@@ -346,6 +348,7 @@ class PushNotificationService {
   /// redirects start. Navigation is deliberately deferred until [initialize]
   /// confirms that the signed-in app shell is ready.
   static Future<void> captureInitialNotification() async {
+    if (FirebaseEnvironment.useEmulators) return;
     _initializeNativeTapBridge();
     _ensureRemoteTapListener();
     try {
@@ -419,6 +422,7 @@ class PushNotificationService {
     required String databaseUserId,
     required GlobalKey<NavigatorState> navigatorKey,
   }) {
+    if (FirebaseEnvironment.useEmulators) return Future<void>.value();
     _currentUserId = databaseUserId;
     if (_initializedUserId == userId && _initializationFuture != null) {
       logger.d('[FCM] Push service already initialized for userId=$userId');
@@ -573,6 +577,7 @@ class PushNotificationService {
   /// from FCM so no further messages are delivered after sign-out.
   static Future<void> removeToken(String userId,
       {bool removeFromBackend = true}) async {
+    if (FirebaseEnvironment.useEmulators) return;
     _watchPlanNotices.reset();
     _currentUserId = null;
     _inboxTracker.reset();

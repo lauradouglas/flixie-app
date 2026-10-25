@@ -1,4 +1,4 @@
-# Privacy-minimised Firebase Analytics
+# Privacy-minimised product analytics
 
 This document records Flixie's approved Analytics implementation. It is an
 engineering inventory, not legal advice.
@@ -6,7 +6,7 @@ engineering inventory, not legal advice.
 ## Consent
 
 Firebase Analytics collection defaults to disabled in both native apps.
-The versioned local preference `analytics_consent_v1` records `accepted` or
+The versioned local preference `analytics_consent_v2` records `accepted` or
 `declined`; a missing value is treated as unknown. Unknown and declined consent
 keep collection disabled. The initial prompt offers separate, equally sized
 Decline and Allow analytics controls. A saved decision prevents the prompt from
@@ -89,3 +89,20 @@ Before distribution, the owner should review:
   advertising settings.
 - The published external privacy policy, updating it before distributing this
   build so it accurately explains consent and Firebase Analytics.
+
+## PostHog
+
+PostHog receives the same allowlisted events and screen names as Firebase when
+`POSTHOG_PROJECT_TOKEN` is supplied. No setup or requests occur before consent.
+Native automatic initialization is disabled. Replay, automatic lifecycle/rage
+click capture, feature-flag preloading and person profiles are disabled. No
+account identification is sent. The SDK adds installation/device/session metadata;
+configure IP geolocation and retention in the project settings before release.
+Previously accepted v1 consent is re-requested because a provider was added;
+a previous decline remains declined. Provider failures are isolated.
+
+Slack receives only consented events through PostHog's server-side destinations
+and aggregate dashboard subscriptions. Counts therefore represent opted-in app
+usage, not all accounts or authoritative backend transactions. Review PostHog,
+Slack and Firebase disclosures in the external privacy policy and store forms
+before distributing a configured build.

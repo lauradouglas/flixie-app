@@ -13,6 +13,9 @@ import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 class WriteReviewSheet extends StatefulWidget {
   const WriteReviewSheet({
     super.key,
+    this.embedded = false,
+    this.onBusyChanged,
+    this.onClose,
     this.movieId,
     this.showId,
     required this.userId,
@@ -28,6 +31,9 @@ class WriteReviewSheet extends StatefulWidget {
     this.initialContainsSpoilers = false,
   }) : assert((movieId == null) != (showId == null));
 
+  final ValueChanged<bool>? onBusyChanged;
+  final bool embedded;
+  final VoidCallback? onClose;
   final String? mediaTitle, initialWatchedAt;
   final int? movieId;
   final int? showId;
@@ -87,6 +93,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
       return;
     }
     setState(() => _isSubmitting = true);
+    widget.onBusyChanged?.call(true);
 
     try {
       final draft = Review(
@@ -109,14 +116,21 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
 
       final created = await _reviewReactions.addReview(draft);
       if (mounted) {
-        await context.read<AnalyticsController>().reviewCreated(
+        await context
+            .read<AnalyticsController>()
+            .reviewCreated(
               contentType: widget.showId == null ? 'movie' : 'show',
               contentId: widget.movieId ?? widget.showId!,
-              source: widget.showId == null ? 'movie_detail' : 'show_detail',
-            );
+              source: widget.embedded
+                  ? 'onboarding'
+                  : widget.showId == null
+                      ? 'movie_detail'
+                      : 'show_detail',
+            )
+            .catchError((Object _) {});
         if (!mounted) return;
         widget.onSubmitted(created);
-        Navigator.of(context).pop(created);
+        if (!widget.embedded) Navigator.of(context).pop(created);
       }
     } catch (e) {
       if (mounted) {
@@ -136,7 +150,10 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        widget.onBusyChanged?.call(false);
+      }
     }
   }
 
@@ -379,10 +396,15 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
   Widget build(BuildContext context) =>
       LayoutBuilder(builder: (context, constraints) {
         final size = MediaQuery.sizeOf(context);
-        final inset = MediaQuery.viewInsetsOf(context).bottom;
+        final inset = MediaQuery.viewInsetsOf(context)
+            .bottom
+            .clamp(0.0, double.infinity)
+            .toDouble();
         final available =
             (constraints.maxHeight - inset).clamp(0.0, constraints.maxHeight);
-        final height = (size.height * .9).clamp(0.0, available);
+        final height = widget.embedded
+            ? available
+            : (size.height * .9).clamp(0.0, available);
         final compact = height < 300;
         return Padding(
             padding: EdgeInsets.only(bottom: inset),
@@ -395,13 +417,15 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                       height: height,
                       child: Material(
                         color: context.colors.surface,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(24)),
+                        borderRadius: widget.embedded
+                            ? BorderRadius.zero
+                            : const BorderRadius.vertical(
+                                top: Radius.circular(24)),
                         clipBehavior: Clip.antiAlias,
                         child: SafeArea(
                             top: false,
                             child: Column(children: [
-                              if (!compact) ...[
+                              if (!compact && !widget.embedded) ...[
                                 Container(
                                     margin: const EdgeInsets.only(
                                         top: 12, bottom: 4),
@@ -421,8 +445,9 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                                           tooltip: 'Close review',
                                           onPressed: _isSubmitting
                                               ? null
-                                              : () =>
-                                                  Navigator.of(context).pop(),
+                                              : () => widget.onClose != null
+                                                  ? widget.onClose!()
+                                                  : Navigator.of(context).pop(),
                                           icon:
                                               const Icon(Icons.close_rounded)),
                                     ])),
@@ -439,7 +464,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         children: [
-                                          if (!compact) ...[
+                                          if (!compact && !widget.embedded) ...[
                                             Row(
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.center,

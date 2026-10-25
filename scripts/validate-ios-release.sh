@@ -18,6 +18,7 @@ for encoded in ${DART_DEFINES:-}; do
   decoded=$(printf '%s' "$encoded" | /usr/bin/base64 --decode)
   case "$decoded" in
     API_BASE_URL=*) api_url=${decoded#API_BASE_URL=} ;;
+    USE_FIREBASE_EMULATORS=true) echo 'error: Release builds cannot use local Firebase emulators.' >&2; exit 1 ;;
     USE_PROD_API=*) use_prod_api=${decoded#USE_PROD_API=} ;;
   esac
 done

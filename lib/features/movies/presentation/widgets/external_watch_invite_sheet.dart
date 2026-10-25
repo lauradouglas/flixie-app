@@ -11,17 +11,27 @@ Future<void> showExternalWatchInviteSheet(
         useRootNavigator: true,
         useSafeArea: true,
         isScrollControlled: true,
-        builder: (_) => _InviteSheet(invite: invite, movieTitle: movieTitle));
+        builder: (_) =>
+            ExternalWatchInviteContent(invite: invite, movieTitle: movieTitle));
 
-class _InviteSheet extends StatefulWidget {
-  const _InviteSheet({required this.invite, required this.movieTitle});
+class ExternalWatchInviteContent extends StatefulWidget {
+  const ExternalWatchInviteContent(
+      {super.key,
+      required this.invite,
+      required this.movieTitle,
+      this.onDone,
+      this.embedded = false});
   final ExternalWatchInvite invite;
   final String movieTitle;
+  final VoidCallback? onDone;
+  final bool embedded;
   @override
-  State<_InviteSheet> createState() => _InviteSheetState();
+  State<ExternalWatchInviteContent> createState() =>
+      _ExternalWatchInviteContentState();
 }
 
-class _InviteSheetState extends State<_InviteSheet> {
+class _ExternalWatchInviteContentState
+    extends State<ExternalWatchInviteContent> {
   bool _busy = false;
   String? _error;
   Future<void> _send(bool copy) async {
@@ -56,9 +66,12 @@ class _InviteSheetState extends State<_InviteSheet> {
   @override
   Widget build(BuildContext context) => ConstrainedBox(
       constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * .85, maxWidth: 560),
+          maxHeight: widget.embedded
+              ? double.infinity
+              : MediaQuery.sizeOf(context).height * .85,
+          maxWidth: 560),
       child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: widget.embedded ? EdgeInsets.zero : const EdgeInsets.all(24),
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -85,8 +98,9 @@ class _InviteSheetState extends State<_InviteSheet> {
                     onPressed: _busy ? null : () => _send(true),
                     icon: const Icon(Icons.copy),
                     label: const Text('Copy invite')),
-                TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Done')),
+                if (!widget.embedded)
+                  TextButton(
+                      onPressed: widget.onDone ?? () => Navigator.pop(context),
+                      child: const Text('Done')),
               ])));
 }

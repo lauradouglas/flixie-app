@@ -93,7 +93,7 @@ void main() {
     final plan = MovieWatchPlanChoice(
         id: 'group:1',
         label: 'With Film Club',
-        save: ({watchedAt, rating, recommended, notes}) async {
+        save: ({watchedAtCinema, watchedAt, rating, recommended, notes}) async {
           savedRating = rating;
           savedReview = notes;
         });

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ void main() {
   Completer<http.Response>? gate;
   bool failSecond = false;
   setUp(() async {
+    GuestAccess.clear();
     requests.clear();
     gate = null;
     failSecond = false;
@@ -49,6 +51,7 @@ void main() {
       auth.dispose();
     });
   });
+  tearDown(GuestAccess.clear);
   Future<void> mount(WidgetTester tester) async {
     await tester.pumpWidget(MultiProvider(
         providers: [
@@ -62,6 +65,26 @@ void main() {
         })))));
   }
 
+  testWidgets(
+      'new TV bookmark confirms only after save and offers optional setup',
+      (tester) async {
+    auth.account = auth.account!.copyWith(completedSetup: false);
+    GuestAccess.bookmarkSetupPath = '/shows/1';
+    await mount(tester);
+    gate = Completer<http.Response>();
+    final saving = flow.toggleWatchlist(offerUndo: false);
+    await tester.pump();
+    expect(data.inWatchlist, false);
+    expect(find.text('Set up Flixie'), findsNothing);
+    gate!.complete(http.Response('{}', 200));
+    await saving;
+    await tester.pump();
+    expect(data.inWatchlist, true);
+    expect(auth.account!.completedSetup, false);
+    expect(
+        find.text('${data.show!.name} is on your watchlist'), findsOneWidget);
+    expect(find.text('Set up Flixie'), findsOneWidget);
+  });
   testWidgets('watchlist remains usable at favourites capacity',
       (tester) async {
     auth.account = auth.account!

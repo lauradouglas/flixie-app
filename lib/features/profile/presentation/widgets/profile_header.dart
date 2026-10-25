@@ -15,6 +15,7 @@ class ProfileHeader extends StatelessWidget {
     required this.username,
     this.memberSince,
     this.onPreview,
+    this.onPeople,
     this.bio,
     this.iconColor,
     this.avatar,
@@ -25,6 +26,7 @@ class ProfileHeader extends StatelessWidget {
   final String username;
   final String? memberSince;
   final VoidCallback? onPreview;
+  final VoidCallback? onPeople;
   final String? bio;
   final Map<String, dynamic>? iconColor;
   final ProfileAvatar? avatar;
@@ -43,6 +45,8 @@ class ProfileHeader extends StatelessWidget {
       useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
+      enableDrag: false,
+      isDismissible: false,
       backgroundColor: context.colors.tabBarBackgroundFocused,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -58,6 +62,8 @@ class ProfileHeader extends StatelessWidget {
         context: context,
         useRootNavigator: true,
         isScrollControlled: true,
+        enableDrag: false,
+        isDismissible: false,
         useSafeArea: true,
         backgroundColor: context.colors.background,
         builder: (_) => const FractionallySizedBox(
@@ -77,14 +83,29 @@ class ProfileHeader extends StatelessWidget {
               label: 'Change profile avatar',
               child: InkWell(
                   onTap: () => _openAvatarSheet(context),
-                  child: ProfileAvatarView(
-                      avatar: avatar,
-                      fallbackText: displayName.isEmpty
-                          ? '?'
-                          : displayName[0].toUpperCase(),
-                      fallbackColor: _avatarColor,
-                      size: 76,
-                      profileBadges: profileBadges))),
+                  child: Stack(children: [
+                    Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: ProfileAvatarView(
+                            avatar: avatar,
+                            fallbackText: displayName.isEmpty
+                                ? '?'
+                                : displayName[0].toUpperCase(),
+                            fallbackColor: _avatarColor,
+                            size: 76,
+                            profileBadges: profileBadges)),
+                    Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: ExcludeSemantics(
+                            child: Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                    color: context.colors.background,
+                                    shape: BoxShape.circle),
+                                child: const Icon(Icons.edit_outlined,
+                                    size: 18, color: FlixieColors.primary)))),
+                  ]))),
           const SizedBox(width: 16),
           Expanded(
               child: Column(
@@ -110,16 +131,23 @@ class ProfileHeader extends StatelessWidget {
           ExpandableProfileBio(text: bio!),
         ],
         const SizedBox(height: 0),
-        Wrap(spacing: 12, children: [
+        Wrap(spacing: 4, children: [
           TextButton.icon(
               onPressed: () => _openEditSheet(context),
               icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Edit profile')),
+              label:
+                  const Text('Edit profile', style: TextStyle(fontSize: 13))),
           if (onPreview != null)
             TextButton.icon(
                 onPressed: onPreview,
                 icon: const Icon(Icons.visibility_outlined, size: 18),
-                label: const Text('Preview profile')),
+                label: const Text('Preview profile',
+                    style: TextStyle(fontSize: 13))),
+          if (onPeople != null)
+            TextButton.icon(
+                onPressed: onPeople,
+                icon: const Icon(Icons.people_outline, size: 18),
+                label: const Text('Friends', style: TextStyle(fontSize: 13))),
         ]),
       ]),
     );

@@ -15,8 +15,12 @@ class InCinemasSection extends StatefulWidget {
       this.savedIds = const {},
       this.pendingIds = const {},
       this.loader,
+      this.initialMovies = const [],
+      this.loadingPlaceholder = const TrendingCarouselSkeleton(),
       this.mediaBuilder});
   final String region;
+  final List<MovieShort> initialMovies;
+  final Widget loadingPlaceholder;
   final ValueChanged<MovieShort> onDetails, onSave, onTrailer;
   final Set<int> savedIds, pendingIds;
   final Future<List<MovieShort>> Function(String region)? loader;
@@ -34,6 +38,7 @@ class InCinemasSectionState extends State<InCinemasSection> {
   @override
   void initState() {
     super.initState();
+    _movies = widget.initialMovies;
     refresh();
   }
 
@@ -78,7 +83,7 @@ class InCinemasSectionState extends State<InCinemasSection> {
         Text('${widget.region == 'GB' ? 'UK' : widget.region} cinema releases',
             style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 14),
-        if (_loading && _movies.isEmpty) const TrendingCarouselSkeleton(),
+        if (_loading && _movies.isEmpty) widget.loadingPlaceholder,
         if (_failed)
           Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,

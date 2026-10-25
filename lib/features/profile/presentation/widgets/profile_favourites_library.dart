@@ -1,3 +1,4 @@
+import 'profile_favourite_people.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_poster_rail.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +14,14 @@ class ProfileFavouritesLibrary extends StatelessWidget {
     required this.movies,
     required this.shows,
     required this.people,
+    this.featuredPeople = const {},
+    this.onChoosePerson,
+    this.savingPeople = false,
   });
 
+  final Map<String, int> featuredPeople;
+  final Future<void> Function(String, int?)? onChoosePerson;
+  final bool savingPeople;
   final List<dynamic> movies;
   final List<dynamic> people;
   final List<dynamic> shows;
@@ -34,36 +41,7 @@ class ProfileFavouritesLibrary extends StatelessWidget {
   Widget build(BuildContext context) {
     final movieItems =
         favouriteMovieItems(movies.whereType<FavoriteMovie>().toList());
-    final rankedShows = shows
-        .whereType<Map>()
-        .where((e) => e['removed'] != true)
-        .toList()
-      ..sort((a, b) => ((a['rank'] as num?)?.toInt() ?? 999)
-          .compareTo((b['rank'] as num?)?.toInt() ?? 999));
-    final showItems = rankedShows.map((raw) {
-      final outer =
-          raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
-      final show = outer['show'] is Map<String, dynamic>
-          ? outer['show'] as Map<String, dynamic>
-          : outer;
-      final id = show['id'] ?? outer['showId'];
-      return FavouriteDisplayItem(
-        title: (show['title'] ?? show['name'] ?? 'Show').toString(),
-        imagePath: show['posterPath']?.toString(),
-        route: id == null ? null : '/shows/$id',
-      );
-    }).toList(growable: false);
-    final peopleItems = people.map((raw) {
-      final person =
-          raw is Map<String, dynamic> ? raw : const <String, dynamic>{};
-      final id = person['id'] ?? person['personId'];
-      return FavouriteDisplayItem(
-        title: (person['name'] ?? 'Person').toString(),
-        imagePath:
-            (person['profileImgUrl'] ?? person['profilePath'])?.toString(),
-        route: id == null ? null : '/people/$id',
-      );
-    }).toList(growable: false);
+    final showItems = favouriteShowItems(shows);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,14 +66,11 @@ class ProfileFavouritesLibrary extends StatelessWidget {
         if (showItems.isEmpty)
           _empty(context, 'Favourite shows', 'Add favourite shows'),
         const SizedBox(height: 18),
-        if (peopleItems.isNotEmpty)
-          FavouritePosterRail(
-            title: 'Favourite people',
-            items: peopleItems,
-            circular: true,
-          ),
-        if (peopleItems.isEmpty)
-          _empty(context, 'Favourite people', 'Add favourite people'),
+        ProfileFavouritePeople(
+            people: people,
+            featured: featuredPeople,
+            onChoose: onChoosePerson,
+            saving: savingPeople),
       ],
     );
   }

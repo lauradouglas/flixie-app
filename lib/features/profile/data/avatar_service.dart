@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/auth/firebase_environment.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import 'package:flixie_app/core/api/api_client.dart';
@@ -19,7 +20,7 @@ class AvatarUrlResolver {
       storagePath,
       () =>
           _loader?.call(storagePath) ??
-          (_storage ?? FirebaseStorage.instance)
+          (_storage ?? FirebaseEnvironment.storage)
               .ref(storagePath)
               .getDownloadURL(),
     );

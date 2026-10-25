@@ -13,7 +13,8 @@ class MovieWatchPlanChoice {
   final String id;
   final String label;
   final Future<void> Function(
-      {String? watchedAt,
+      {bool? watchedAtCinema,
+      String? watchedAt,
       double? rating,
       bool? recommended,
       String? notes}) save;
@@ -61,12 +62,18 @@ class MovieWatchPlanChoice {
                     }),
               label:
                   'With ${plan.otherUser(userId)?.displayName ?? 'your friends'}',
-              save: ({watchedAt, rating, recommended, notes}) async {
+              save: (
+                  {watchedAtCinema,
+                  watchedAt,
+                  rating,
+                  recommended,
+                  notes}) async {
                 await RequestService.confirmWatchRequest(
                     watchRequestId: plan.id,
                     userId: userId,
                     watched: true,
                     watchedAt: watchedAt,
+                    watchedAtCinema: watchedAtCinema,
                     rating: rating?.round(),
                     recommended: recommended,
                     reviewText: notes ?? '');
@@ -78,9 +85,15 @@ class MovieWatchPlanChoice {
           MovieWatchPlanChoice(
               id: 'group:${item.request.id}',
               label: 'With ${item.group.name}',
-              save: ({watchedAt, rating, recommended, notes}) async {
+              save: (
+                  {watchedAtCinema,
+                  watchedAt,
+                  rating,
+                  recommended,
+                  notes}) async {
                 await GroupService.logGroupWatchPlan(item.request, userId,
                     watchedAt: watchedAt,
+                    watchedAtCinema: watchedAtCinema,
                     rating: rating?.round(),
                     recommended: recommended,
                     reviewText: notes ?? '');

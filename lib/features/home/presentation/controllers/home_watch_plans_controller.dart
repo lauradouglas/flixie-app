@@ -14,7 +14,14 @@ import 'package:flixie_app/models/user.dart' as models;
 
 /// Owns Home's direct/group plan loading, visibility and reminder synchronisation.
 class HomeWatchPlansController extends ChangeNotifier {
-  HomeWatchPlansController(WatchRequestCache cache) : _cache = cache;
+  HomeWatchPlansController(
+    WatchRequestCache cache, {
+    Future<void> Function(String id)? cancelGroupReminders,
+  })  : _cache = cache,
+        _cancelGroupReminders = cancelGroupReminders ??
+            ((id) => PushNotificationService.cancelWatchPlanReminders(id,
+                scope: 'GROUP'));
+  final Future<void> Function(String id) _cancelGroupReminders;
   final WatchRequestCache _cache;
   String? _userId;
   bool _disposed = false;
@@ -304,26 +311,30 @@ class HomeWatchPlansController extends ChangeNotifier {
         generation != _watchPlansLoadGeneration) {
       return const [];
     }
-    for (final entry in entries) {
-      if (_disposed ||
-          _userId != userId ||
-          generation != _watchPlansLoadGeneration) {
-        return const [];
+    // Notification housekeeping must not delay publishing ready Home cards.
+    unawaited(() async {
+      for (final entry in entries) {
+        if (_disposed ||
+            _userId != userId ||
+            generation != _watchPlansLoadGeneration) {
+          return;
+        }
+        final request = entry.request;
+        final canonicalId = request.databaseRequestId;
+        final declined = request.memberStatuses.any((member) =>
+            member.memberId == userId && member.status == 'DECLINED');
+        if (declined || request.isArchived) {
+          await _cancelGroupReminders(canonicalId ?? request.id);
+        }
+        if (canonicalId != null && canonicalId != request.id) {
+          await _cancelGroupReminders(request.id);
+        }
       }
-      final request = entry.request;
-      final canonicalId = request.databaseRequestId;
-      final declined = request.memberStatuses.any(
-          (member) => member.memberId == userId && member.status == 'DECLINED');
-      if (declined || request.isArchived) {
-        await PushNotificationService.cancelWatchPlanReminders(
-            canonicalId ?? request.id,
-            scope: 'GROUP');
-      }
-      if (canonicalId != null && canonicalId != request.id) {
-        await PushNotificationService.cancelWatchPlanReminders(request.id,
-            scope: 'GROUP');
-      }
-    }
+    }()
+        .catchError((Object error, StackTrace stack) {
+      logger.w('Could not clean up group plan reminders',
+          error: error, stackTrace: stack);
+    }));
     return entries
         .map((entry) => asHomeGroupWatchPlan(entry.group, entry.request))
         .toList(growable: false);

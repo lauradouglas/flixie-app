@@ -92,8 +92,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('United States'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Save Changes'));
-      await tester.tap(find.text('Save Changes'));
+      await tester.ensureVisible(find.text('Save changes'));
+      await tester.tap(find.text('Save changes'));
       await tester.pumpAndSettle();
       expect(saved, {'countryId': 2});
       expect(auth.dbUser.watchProviderRegion, 'US');

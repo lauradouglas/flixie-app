@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/movies/models/watch_log_details.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_entry_review_sheet.dart';
 import 'package:flixie_app/core/auth/pending_watch_invite_store.dart';
 import 'package:go_router/go_router.dart';
@@ -39,17 +40,23 @@ class WatchRequestCompletionFlow extends WatchRequestActionContext {
         .where((c) => c.userId == userId && c.watched)
         .firstOrNull;
     var saved = false;
+    var details = const WatchLogDetails();
     var writeReview = false;
     String? reviewWatchEntryId, reviewWatchedAt;
     int? savedRating;
     bool? savedRecommended;
     String? savedNote;
     await showMovieWatchLogSheet<void>(
+      movieId: request.movieId,
+      movieTitle: request.movie?.title,
+      editingExisting: existing != null,
       context: context,
       builder: (_) => SocialAccountSheet(
           viewer: controller.viewer,
           child: RewatchLogSheet(
+            onDetailsChanged: (value) => details = value,
             isPlanReview: true,
+            showCinemaOption: request.movieId != null,
             movieTitle: request.movie?.title,
             companions: request.isSharedViewing
                 ? [
@@ -79,6 +86,7 @@ class WatchRequestCompletionFlow extends WatchRequestActionContext {
                 ? null
                 : MovieWatchEntry(
                     id: existing.watchEntryId ?? existing.id,
+                    watchedAtCinema: existing.watchedAtCinema,
                     watchedAt: existing.watchedAt,
                     reviewBody: existing.reviewBody,
                     reviewTitle: existing.reviewTitle,
@@ -105,6 +113,7 @@ class WatchRequestCompletionFlow extends WatchRequestActionContext {
                   () async {
                 final state = await RequestService.confirmWatchRequest(
                   watchRequestId: request.id,
+                  watchedAtCinema: details.watchedAtCinema,
                   userId: userId,
                   watched: true,
                   rating: rating?.round(),

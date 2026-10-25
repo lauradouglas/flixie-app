@@ -10,31 +10,39 @@ Use **Flutter 3.44.0**, the version pinned by the regression workflow. Native
 builds also need Xcode/CocoaPods for iOS or the Android SDK/JDK for Android.
 See [testing setup](docs/testing.md) for the pinned Patrol tools.
 
-Obtain the development Firebase configuration, using `.firebase.json.example`
-as the field reference. Keep the local `.firebase.json` out of Git. Native runs
-also need the project's `GoogleService-Info.plist` / `google-services.json`.
-Configuration is read by `lib/core/auth/firebase_options.dart`; contributors
-should not replace generated options or create a new Firebase project to run
-this existing app.
+Daily debug builds use **local Firebase Auth, Firestore and Storage**, under
+`demo-flixie-local`, with the existing local PostgreSQL backend. They do not use
+the production Firebase credentials or bucket. See
+[local Firebase development](docs/firebase-local-development.md) for setup,
+Dougasaur login, persistence and device notes.
 
 ```sh
-flutter pub get
-flutter run --dart-define-from-file=.firebase.json -d <development-device>
+# Start Docker Desktop first, then run from the app checkout:
+scripts/dev.sh -d <ios-simulator-id>
 ```
 
-Debug runs use `http://localhost:3000`; start the sibling backend for local API
-work. Android emulators reach the host through `http://10.0.2.2:3000`; physical
-devices need the host's LAN address:
+This starts/reuses the local Firebase emulators, starts the existing `postgresql`
+container if needed, restores local fixtures and cached original avatars, waits
+for the local backend, and runs Flutter. Use `q` or Ctrl-C to stop the session;
+only services started by this command are stopped. Existing services and the
+shared database stay running. Logs are in `.local/firebase/logs/`.
 
-```sh
-flutter run --dart-define-from-file=.firebase.json -d <development-device> \
-  --dart-define=API_BASE_URL=http://10.0.2.2:3000
-```
+For Android use `FLIXIE_ANDROID_EMULATOR=true scripts/dev.sh -d
+<android-device-id>`. Omit `-d` for Flutter's normal device selection.
+In VS Code, select **flixie-app (Mobile - Local Firebase)** (or the Android/Web
+local entry) in Run and Debug, then press **Run/F5**. The configured background
+task starts the same local services and waits until they are ready before Flutter
+launches. Services remain available between debug sessions; use **Tasks: Terminate
+Task → Flixie: start local services** to stop services owned by that task.
+The VS Code development launch entries also select local
+Firebase. Local builds show a `LOCAL` banner and omit cloud push and analytics.
+A full restart is required when changing environments.
 
-Profile/release runs default to the production API. `USE_PROD_API=true` selects
-it for debug runs; an explicit `API_BASE_URL` takes precedence. Restart the run
-after changing compile-time flags. The VS Code launch menu contains development
-and production API configurations.
+**Profile/release builds keep production Firebase and the production API.** Keep
+`.firebase.json` and the bundled native production configuration for releases;
+never replace them with emulator values. Release builds reject the emulator flag.
+The existing release preparation scripts remain the release path. The explicit
+“Profile - Production” launch entry is available for intentional production checks.
 
 ## Find the code
 

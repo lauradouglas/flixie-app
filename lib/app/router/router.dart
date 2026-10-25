@@ -1,3 +1,8 @@
+import 'package:flixie_app/features/taste/presentation/pages/build_taste_page.dart';
+import 'package:flixie_app/features/watchlist/presentation/pages/guest_watchlist_page.dart';
+import 'package:flixie_app/features/authentication/presentation/pages/signup_journey_page.dart';
+import 'package:flixie_app/features/profile/presentation/pages/profile_diary_screen.dart';
+import 'package:flixie_app/features/guest/presentation/pages/why_flixie_screen.dart';
 import 'package:flixie_app/features/movies/presentation/pages/watch_invite_saved_screen.dart';
 import 'package:flixie_app/core/auth/pending_watch_invite_store.dart';
 import 'package:flixie_app/features/movies/presentation/pages/external_watch_invite_screen.dart';
@@ -32,6 +37,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flixie_app/core/widgets/library_readiness_gate.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
@@ -81,11 +87,24 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
+Widget _withLibraryReadiness(GoRouterState state, Widget child) {
+  // Diary reads its own watch entries; it does not consume library collections.
+  if (state.uri.path == '/profile/diary') return child;
+  final needsLibrary = RegExp(
+          r'^/(around-flixie|community|genre-communities|private-communities|trending|search|social|plans|watch-requests|group|messages|chat|notifications|friends|watchlist|profile|stats|wrapped|history|watch-history|my-reviews|movie|show|people|person|collection|settings|pick-for-us)')
+      .hasMatch(state.uri.path);
+  if (!needsLibrary) return child;
+  return LibraryReadinessGate(
+      requiredForRoute: true,
+      onHome: () => rootNavigatorKey.currentContext?.go('/'),
+      child: child);
+}
+
 Page<void> _calmPage(GoRouterState state, Widget child) {
   return NoTransitionPage<void>(
     key: state.pageKey,
     name: _screenNameFor(state),
-    child: child,
+    child: _withLibraryReadiness(state, child),
   );
 }
 
@@ -107,13 +126,13 @@ Page<void> _pushPage(GoRouterState state, Widget child) {
       dismissDuration: Duration(milliseconds: activityPost ? 180 : 300),
       swipeSettleDuration:
           activityPost ? const Duration(milliseconds: 180) : null,
-      child: child,
+      child: _withLibraryReadiness(state, child),
     );
   }
   return MaterialPage<void>(
     key: state.pageKey,
     name: _screenNameFor(state),
-    child: child,
+    child: _withLibraryReadiness(state, child),
   );
 }
 
@@ -136,6 +155,7 @@ String _screenNameFor(GoRouterState state) {
     '/chat/:id' => 'Friend Chat',
     '/notifications' => 'Notifications',
     '/watch-history' => 'Watch History',
+    '/profile/diary' => 'Film diary',
     '/movie-lists' => 'Lists',
     '/movie-lists/:id' => 'List Detail',
     '/my-reviews' => 'My Reviews',
@@ -372,6 +392,10 @@ GoRouter buildRouter(
         unawaited(referralStore.clear().catchError((_) {}));
         // Invited members can log this one viewing before optional setup.
         // This does not mark onboarding complete or unlock other app routes.
+        if (GuestAccess.action == 'guest-watchlist' &&
+            GuestAccess.claimJourney(authProvider.dbUser!.id) != null) {
+          return state.uri.path == '/signup-journey' ? null : '/signup-journey';
+        }
         if (!hasCompletedSetup) {
           final pendingLog =
               await PendingWatchInviteStore.readLog(authProvider.dbUser?.id);
@@ -381,6 +405,18 @@ GoRouter buildRouter(
               (state.uri.path == '/watch-requests/$pendingLog' ||
                   state.uri.path == '/watch-entry-saved/$pendingLog');
           if (invitePath || logPath) return null;
+          final journey = GuestAccess.claimJourney(authProvider.dbUser!.id);
+          if (journey != null) {
+            return state.uri.path == '/signup-journey'
+                ? null
+                : '/signup-journey';
+          }
+          // Fulfil a guest's explicit bookmark before optional personalisation.
+          if (GuestAccess.allowBookmarkBeforeSetup(state.uri.path)) return null;
+          final bookmarkPath = GuestAccess.bookmarkSetupPath;
+          if (bookmarkPath != null && GuestAccess.pendingBookmarkPath != null) {
+            return bookmarkPath;
+          }
           if (isOnboarding) return null;
           return Uri(
                   path: '/onboarding',
@@ -414,9 +450,21 @@ GoRouter buildRouter(
     },
     routes: [
       GoRoute(
+          path: '/signup-journey',
+          builder: (_, __) => const SignupJourneyPage()),
+      GoRoute(
           path: '/around-flixie',
           builder: (_, __) => const GuestCommunityFeed()),
+      GoRoute(
+          path: '/build-your-taste',
+          pageBuilder: (_, state) => _pushPage(state, const BuildTastePage())),
+      GoRoute(
+          path: '/guest-watchlist',
+          builder: (_, __) => const GuestWatchlistPage()),
       GoRoute(path: '/welcome', builder: (_, __) => const GuestWelcomeScreen()),
+      GoRoute(
+          path: '/why-flixie',
+          pageBuilder: (_, state) => _pushPage(state, const WhyFlixieScreen())),
       GoRoute(
         path: '/splash',
         pageBuilder: (context, state) => _calmPage(state, const SplashScreen()),
@@ -528,8 +576,10 @@ GoRouter buildRouter(
               _pushPage(state, const _MessagesPage())),
       GoRoute(
           path: '/watchlist',
-          pageBuilder: (context, state) =>
-              _pushPage(state, const WatchlistScreen())),
+          pageBuilder: (context, state) => _pushPage(
+              state,
+              WatchlistScreen(
+                  availableOn: state.uri.queryParameters['availableOn']))),
       GoRoute(
         path: '/pick-for-us',
         pageBuilder: (context, state) => _pushPage(
@@ -672,8 +722,10 @@ GoRouter buildRouter(
       ),
       GoRoute(
           path: '/collections/:id',
-          builder: (_, state) => CollectionScreen(
-              collectionId: int.parse(state.pathParameters['id']!))),
+          builder: (_, state) => _withLibraryReadiness(
+              state,
+              CollectionScreen(
+                  collectionId: int.parse(state.pathParameters['id']!)))),
       GoRoute(
         path: '/movies/:id',
         pageBuilder: (context, state) => _pushPage(
@@ -788,6 +840,10 @@ GoRouter buildRouter(
         pageBuilder: (context, state) =>
             _calmPage(state, const NotificationScreen()),
       ),
+      GoRoute(
+          path: '/profile/diary',
+          pageBuilder: (context, state) =>
+              _pushPage(state, const ProfileDiaryScreen())),
       GoRoute(
         path: '/watch-history',
         pageBuilder: (context, state) =>

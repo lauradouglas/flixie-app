@@ -1,3 +1,4 @@
+import '../../../settings/presentation/widgets/watch_providers_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/review_count_label.dart';
 import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
 import '../widgets/movie_detail_loading_sections.dart';
@@ -127,6 +128,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         if (!_data.isFavorite) await _actionFlow.toggleFavorite();
       case 'list':
         await _actionFlow.showAddToListSheet();
+      case 'rate':
+        await _actionFlow.showRatingSheet();
       case 'log':
         await _actionFlow.showLogWatchSheet();
       case 'review':
@@ -281,7 +284,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             key: _heroKey,
             animateBackdropInset: true,
             movie: movie,
-            onShowScoreInfo: () => _showFlixScoreInfo(context));
+            onShowScoreInfo: () => _showTmdbScoreInfo(context));
         return RefreshIndicator(
           color: FlixieColors.primary,
           onRefresh: _refresh,
@@ -328,6 +331,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       MovieWatchProvidersSection(
         key: _providersKey,
         providers: _data.watchProviders,
+        onAddProviders: context.watch<AuthProvider>().dbUser == null ||
+                !_data.loadedSections.contains('your services')
+            ? null
+            : () async {
+                await showWatchProvidersSetup(context);
+                if (mounted) await _load();
+              },
         userProviderIds: _data.userProviderIds,
         userProviderMatchKeys: _data.userProviderMatchKeys,
         region:
@@ -422,53 +432,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
 
   // ---- Hero top actions ----------------------------------------------------
 
-  void _showFlixScoreInfo(BuildContext context) {
+  void _showTmdbScoreInfo(BuildContext context) {
     showFlixiePromptSheet<void>(
       context: context,
       builder: (context) => FlixiePromptSheetContent(
-        title: Text(
-          'FLIXSCORE',
-          style: TextStyle(
-            color: context.colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Community ratings from Flixie.',
-              style: TextStyle(
-                color: context.colors.light,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Rating Guide:',
-              style: TextStyle(
-                color: context.colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '🔥 8.1+ · Loved\n'
-              '😀 7.0-8.1 · Liked\n'
-              '🙂 6.0-7.0 · Okay\n'
-              '😐 5.0-6.0 · Meh\n'
-              '😕 Below 5.0 · Disliked\n'
-              'N/A · No ratings yet.',
-              style: TextStyle(
-                color: context.colors.light,
-                fontSize: 13,
-                height: 1.6,
-              ),
-            ),
-          ],
+        title: const Text('TMDB movie ratings'),
+        content: const Text(
+          'Scores come from TMDB. Ratings submitted through Flixie also '
+          'contribute to TMDB, while being saved separately in Flixie.',
         ),
         actions: [
           TextButton(
@@ -608,7 +579,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
           FilledButton.icon(
             onPressed: () => _actionFlow.showLogWatchSheet(),
             icon: const Icon(Icons.edit_note_outlined),
-            label: const Text('Log an entry'),
+            label: const Text('Log watch & rate'),
           ),
         const SizedBox(height: 8),
         Divider(
@@ -788,8 +759,19 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
       });
     }
 
-    void logAgain() => _actionFlow.showLogWatchSheet();
-    void rateLatest() => _actionFlow.showLogWatchSheet(entry: latest);
+    void logAgain() {
+      context
+          .read<AnalyticsController?>()
+          ?.detailActionTapped(contentType: 'movie', action: 'log_watch');
+      _actionFlow.showLogWatchSheet();
+    }
+
+    void rateLatest() {
+      context
+          .read<AnalyticsController?>()
+          ?.detailActionTapped(contentType: 'movie', action: 'rate');
+      _actionFlow.showLogWatchSheet(entry: latest);
+    }
 
     final needsRating = watchedCount > 0 && !latestRated;
     final primaryLabel = watchedCount == 0
@@ -987,7 +969,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         badge: badge,
         isActive: isActive,
         isLoading: isLoading,
-        onTap: onTap);
+        onTap: onTap == null
+            ? null
+            : () {
+                context.read<AnalyticsController?>()?.detailActionTapped(
+                    contentType: 'movie', action: label.toLowerCase());
+                onTap();
+              });
   }
 
   String _formatWatchDate(String? iso) {
@@ -1005,7 +993,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               selected: selected,
               button: true,
               child: InkWell(
-                  onTap: () => setState(() => _movieDetailTab = tab),
+                  onTap: () {
+                    if (_movieDetailTab == tab) return;
+                    context.read<AnalyticsController?>()?.detailTabSelected(
+                        contentType: 'movie', tab: tab.name);
+                    setState(() => _movieDetailTab = tab);
+                  },
                   child: Container(
                     constraints: const BoxConstraints(minHeight: 48),
                     padding:
@@ -1021,27 +1014,33 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     child: tab == MovieDetailTab.reviews
                         ? ReviewCountLabel(
                             count: _data.loadedSections.contains('reviews')
-                                ? _data.reviews.length : null,
+                                ? _data.reviews.length
+                                : null,
                             style: TextStyle(
-                              color: selected ? context.colors.textPrimary : context.colors.light,
-                              fontSize: 13,
-                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500),
+                                color: selected
+                                    ? context.colors.textPrimary
+                                    : context.colors.light,
+                                fontSize: 13,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500),
                           )
                         : Text(
-                        switch (tab) {
-                          MovieDetailTab.overview => 'Overview',
-                          MovieDetailTab.reviews => 'Reviews',
-                          MovieDetailTab.activity => 'My Activity',
-                          MovieDetailTab.details => 'Details',
-                        },
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: selected
-                                ? context.colors.textPrimary
-                                : context.colors.light,
-                            fontSize: 13,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500)),
+                            switch (tab) {
+                              MovieDetailTab.overview => 'Overview',
+                              MovieDetailTab.reviews => 'Reviews',
+                              MovieDetailTab.activity => 'My Activity',
+                              MovieDetailTab.details => 'Details',
+                            },
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: selected
+                                    ? context.colors.textPrimary
+                                    : context.colors.light,
+                                fontSize: 13,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500)),
                   ))));
     }).toList());
   }

@@ -59,6 +59,36 @@ void main() {
     cache.dispose();
   });
 
+  test('ready group cards do not wait for reminder cleanup', () async {
+    final cleanup = Completer<void>();
+    var cancellations = 0;
+    plans.dispose();
+    plans = HomeWatchPlansController(cache, cancelGroupReminders: (_) {
+      cancellations++;
+      return cleanup.future;
+    });
+    cache.groupRequest = () async => [
+          const HomeGroupWatchPlan(
+            Group(
+                id: 'fictional-group',
+                name: 'Film friends',
+                ownerId: 'fictional-friend'),
+            GroupWatchRequest(
+                id: 'legacy-plan',
+                databaseRequestId: 'canonical-plan',
+                groupId: 'fictional-group',
+                userId: 'fictional-friend'),
+          )
+        ];
+    await plans.load(viewer('first')).timeout(const Duration(seconds: 1));
+    expect(cancellations, 1);
+    expect(cleanup.isCompleted, false);
+    expect(plans.loading, false);
+    expect(plans.plans, hasLength(1));
+    cleanup.complete();
+    await flush();
+  });
+
   test('direct cards appear independently while group plans are still pending',
       () async {
     final groups = Completer<List<HomeGroupWatchPlan>>();

@@ -598,3 +598,191 @@ Published 2.0.3 is locked, so created an editable 2.0.4 App Store draft. Replace
 User authorised a TestFlight build and initially requested App Review, then explicitly revoked review submission and instructed immediate stop. Signed production main/Firebase/HTTPS API build 120 validated, with source integrity unchanged during build. Includes smaller Griddy Pip and removal of the signed-in Home catch-up banner. Guest Home design exploration is separate and is not in this binary. Apple processing and internal distribution succeeded: build `162854d5-fee8-4bbe-9deb-66bc6c8dddde`, VALID / IN_BETA_TESTING.
 
 The submission command was interrupted at the user's stop instruction. Independent Apple read confirms version 2.0.4 is DEVELOPER_REJECTED, manual release, with no active review submission. Build 120 remains on TestFlight. Release notes and build selection were staged before interruption; existing screenshots were preserved. Do not restart or submit for App Review without a new explicit user request. Evidence: `build/releases/ios/2.0.4-120/review-stop-verification.json`. No backend or Android deployment.
+
+## Apple and Android production submission 2.0.4 (123) — 17 October 2026
+
+The user explicitly authorised Apple review, Android production and a compatible backend rollout. Existing TestFlight build 123 matches the current runtime source/assets exactly; its signed production entitlements were revalidated. Submitted that existing binary without reuploading. Apple independently confirms 2.0.4 build 123 WAITING_FOR_REVIEW, submission `a7c90066-ae78-4568-a6ac-22450fb79833`, manual release after approval, and the existing eight iPhone/eight iPad screenshots. Release notes include the optional signed-out tour, startup improvements, shared watches, reviews and Pip games. This new request supersedes the earlier stop instruction for build 120.
+
+Built and retained signed Android production AAB 2.0.4 version code 123 using `lib/main.dart`, production Firebase and HTTPS API. Signature, merged-manifest version and unchanged runtime source hashes verified. Uploaded and committed to Google Play production with a completed rollout configuration and en-GB notes, preserving listing artwork. Independent API confirms production code 123. Play Console confirms Changes in review / Production 2.0.4 / Start full rollout, automated quick checks running and managed publishing off. Google approval/public availability is pending.
+
+Validation: production lib analysis clean, 19 Fastlane checks/107 assertions and iOS release guard passed. Focused app checks passed 103 tests with one retained failure in `home_subscriptions_test.dart`: it expects no initial friend reads, while the startup flow now loads visible-card friend previews after reveal. Controller checks for bounded friend requests and reuse pass; no assertions were weakened. Full app regression/Patrol was not run.
+
+Backend runtime source, package files and migrations already match successful production commit `061ed2d15c7a9a6609a30eede5b5020f4a8c3914`, deployed by https://github.com/lauradouglas/FlixieBE/actions/runs/38988233802. Independently verified successful backup, migration and Azure steps; exact deployed-source TypeScript and all 675 tests pass. Live API root returns HTTP 200. No further backend deployment or production migration was required. The older local deployment workflow was not published over production. An initial sandbox test attempt could not bind localhost; the unrestricted release verification passed.
+
+Evidence and retained binaries: `build/releases/ios/2.0.4-123/` and `build/releases/android/2.0.4-123/`, including source/SHA-256 manifests, submission logs, Apple/API readbacks, backend checks and Google Play review screenshot.
+
+## TMDB rating TestFlight 124 — 17 October 2026
+
+User authorised TestFlight only after stashing unrelated work. Compared with 123, exactly four app source files changed for TMDB score selection, cached source refresh requests, source explanation and separate info button. Production 2.0.4 (124) uploaded and independently confirmed VALID / IN_BETA_TESTING; Apple build `7db338de-9f1b-4758-aa20-8bbdc71f4a3f`, tester notes attached. Nineteen focused app tests, clean lib analysis, release guard, 19 Fastlane tests/107 assertions and signed-entitlement checks pass. Source integrity unchanged during archive. Signed IPA/manifests/logs in `build/releases/ios/2.0.4-124/`. Existing Apple submission remains WAITING_FOR_REVIEW on build 123; no review submission/replacement performed.
+
+## Combined release 2.0.4 (126) — 17 October 2026
+
+User authorised all current app/backend changes for TestFlight, replacement Apple
+submission and Android production. Production `lib/main.dart`, Firebase and HTTPS
+API used for both signed builds. Includes weekly own-profile film diary with
+calendar/companions, per-viewing cinema flag, compact profile links, TMDB scores,
+startup/tour and existing shared-watch/game improvements. Source SHA-256 maps
+match both builds (generated plugin registrants and cache directories excluded).
+Android built from an isolated source copy; signed AAB version code 126 verified.
+iOS signed production entitlements/version 2.0.4 (126) verified.
+
+Backend `a9e459f` deployed successfully through run 39034529591: complete CI tests,
+private pre-migration backup, additive cinema migration and Azure deployment all
+succeeded. Local backend TypeScript and all 704 regressions pass; production API
+healthcheck HTTP 200. No production fixtures seeded.
+
+Client focused release batch: 93 passing tests and the retained known Home
+subscription expectation failure (expects no initial friend reads; current flow
+loads visible-card previews). No assertion weakened. Production lib analysis,
+20 Fastlane checks/108 assertions and iOS release guard pass. Full app regression
+and Patrol were not requested or run.
+
+TestFlight build `124f6572-d228-45de-bd1b-1287879922f5` independently verified VALID /
+IN_BETA_TESTING, notes attached. Google Play upload/commit succeeds; independent
+production track readback confirms version code 126 with completed rollout
+configuration and new en-GB notes. Public availability remains subject to Google
+review. Apple replacement submission `50b88d60-263a-4314-a504-8c8fc58df2c0` independently verifies WAITING_FOR_REVIEW on build 126, manual release, and eight iPhone/eight iPad screenshots. Existing
+screenshots/artwork preserved. Signed artifacts, hashes and verification logs:
+`build/releases/ios/2.0.4-126/` and `build/releases/android/2.0.4-126/`.
+
+
+**Darker navy screenshots and store name uploaded — 17 October 2026:** User approved uploading the final `#0A1424` navy / `#596980` fine-border artwork and explicitly authorised withdrawal/resubmission after being told the Apple review queue position may reset. User also explicitly requested the app name update. Backed up the prior 16 screenshot previews and metadata, withdrew submission `50b88d60-263a-4314-a504-8c8fc58df2c0`, uploaded eight iPhone/eight iPad presentations, and set en-GB name to **Flixie: Movies, TV & Friends**. Subtitle remains “Watchlists, ratings & friends”; description (including no-streaming explanation) and release notes verified unchanged. Independently read back all 16 COMPLETE assets in correct order with exact local MD5 matches. Same 2.0.4 build 126, same build ID `124f6572-d228-45de-bd1b-1287879922f5`, resubmitted as `91661de0-6f71-427b-9ca9-afed6bfd0176`; both version and submission independently confirm WAITING_FOR_REVIEW, manual release retained. These listing changes become public with the approved release; no new binary, Android upload, app theme or backend change. Evidence and previous-image backups: `build/store-screenshots/navy-2026-10-17/`, final readback `final-verification.json`. Automatic approval initially blocked withdrawal until the user provided explicit informed approval; no bypass used.
+
+
+## Matching UK and US store artwork delivered — 17 October 2026
+
+User explicitly requested matching Google Play screenshots/name and corrected scope to **both UK and US English**. This is a durable requirement for future store changes: verify `en-GB` and `en-US` separately. User also explicitly approved another Apple withdrawal/resubmission to correct US coverage, acknowledging the possible queue reset, and explicitly approved sending both Google locales for review.
+
+**Google Play:** Regenerated all 24 presentations from existing native Android phone, 7-inch and 10-inch captures using approved `#0A1424` navy canvas, subtle `#596980` borders, lilac accents and positive friends/discovery/planning copy. Original app captures unchanged. Replaced all eight screenshots in each device category for both `en-GB` and `en-US` (48 listing placements); verified their order and both localized names in the Console review step. Both names are **Flixie: Movies, TV & Friends**. Existing localized short/full descriptions, no-streaming explanation, icon and feature graphic retained. Pip screenshot composites labeled as created/edited with AI. Sent exactly eight listing changes (name plus three device categories per locale) after explicit user approval; Console independently shows **Changes in review** with all eight UK/US rows. Managed publishing remains off, so approved changes may publish automatically. No bundle upload or track change by this work. UI proof: `output/store-clarity/google-play/uk-us-in-review.jpg`; saved publishing tree: `build/store-screenshots/google-navy-2026-10-17/publishing-in-review.txt`. Google server-side source checksums were not fetched; validation is local source/hash/dimension checks plus Console count/order/content evidence.
+
+**Apple US correction:** API inspection found only explicit en-GB app-info and version localizations. With informed approval, withdrew `91661de0-6f71-427b-9ca9-afed6bfd0176`, added explicit en-US name/subtitle, description/support/keywords/release metadata and all 16 matching screenshots. Apple auto-created an empty US version locale when app-info US was added; verification caught missing description/notes, which were filled from the approved existing listing before resubmission. Existing UK content preserved. Independently verified both localized names/subtitles and all 32 COMPLETE image assets in correct order with exact local MD5 matches. Same 2.0.4 build 126/build ID `124f6572-d228-45de-bd1b-1287879922f5`, manual release; new submission `1dd36d12-8297-4e76-803f-a48b1eef8766`. Both version and submission independently **WAITING_FOR_REVIEW**. Evidence/backups: `build/store-screenshots/navy-us-2026-10-17/final-verification.json` and adjacent files. No new binary or backend deployment.
+
+## No-streaming paragraph appended across both stores — 17 October 2026
+
+User approved appending the recommended social/discovery paragraph to existing descriptions, preserving the rest. Completed in Apple and Google Play for both en-GB and en-US. Added: “Flixie brings your film life together: discover recommendations, share ratings with friends and plan what to watch next. Flixie doesn’t stream movies or TV episodes—you watch them through external streaming, rental or purchase services.” US uses “movie life”. Existing early no-streaming notice and external-service/subscription paragraph retained.
+
+Apple accepted both description patches while version 2.0.4/build 126 remained WAITING_FOR_REVIEW; exact readback verified, no withdrawal needed. Google Play saved both full descriptions and submitted precisely two changes; Console shows both locale description rows under Changes in review, with automated quick checks still running. Managed publishing off. Evidence/backups: `build/store-screenshots/descriptions-2026-10-17/`; UI proof `output/store-clarity/google-play/descriptions-submitted.jpg`.
+
+## Release-awareness TestFlight 2.0.4 (127) — 17 October 2026
+
+User requested TestFlight deployment of the approved release labels and movie confirmation. Signed production main.dart build 127 uploaded successfully to Apple and independently verified VALID / IN_BETA_TESTING (Apple build b8d62414-6f7f-40d8-b7cd-0b064bdbd77e). Testing notes attached and internal distribution confirmed. Source hashes remained unchanged across the archive. Production lib analysis and iOS release guard pass; 25 focused feature/caller regressions passed during implementation. Artifacts, notes, source hashes and logs are in build/releases/ios/2.0.4-127/. Existing build 126 App Store submission preserved. Continue Watching backend filter is still local and was not deployed by this TestFlight-only request.
+
+## Final Apple build replacement — 17 October 2026
+
+User requested one final build update for the release submission. Withdrew the waiting build 126 submission and selected the already tested 2.0.4 (127), then resubmitted. Independent readback confirms version and submission WAITING_FOR_REVIEW, build 127, MANUAL release; submission 50211aa7-5ab0-4f88-8f90-920853a0a35f. UK and US descriptions, release notes and screenshot IDs match the saved pre-change listing exactly. Evidence: build/releases/ios/2.0.4-127/submission-before.json and app-store-submission.json. No new binary or backend deployment.
+
+
+## Analytics public release 2.0.5 (128) — 19 October 2026
+
+The user explicitly requested the entire current app on public App Store and Google
+Play. Apple preflight showed 2.0.4 already READY_FOR_SALE on build 127; Google
+production was 2.0.4 (126), so this release uses 2.0.5 (128). Saved runtime source
+hashes remained unchanged throughout both builds. The PostHog public project token
+is present in both signed artifacts; native automatic initialization is disabled.
+
+Android signed AAB was uploaded to production with completed rollout and changes
+sent for review. Independent Google API readback confirms version 2.0.5/code 128
+and its intended consent-focused release note. This does not establish Google
+review approval or public availability.
+
+The signed iOS IPA passed production-entitlement validation; main app and Search
+Widget both report 2.0.5 (128). Apple processing completed VALID, and internal
+TestFlight distribution is independently confirmed IN_BETA_TESTING. Public App
+Review submission succeeded. Independent readback confirms version
+`c3b70c85-18c0-44e5-b5f6-110e81146c99` WAITING_FOR_REVIEW, build
+`98ca6060-7e6f-4a09-8f62-bef7d6055fa2` (128), and AFTER_APPROVAL release. Both en-GB
+and en-US have the intended release notes, descriptions and 16 COMPLETE screenshots.
+There was no waiting prior submission to withdraw: 2.0.4 was already live.
+Artifacts, hashes, verification and logs are in `build/releases/ios/2.0.5-128/`
+and `build/releases/android/2.0.5-128/`. Public availability remains subject to
+Apple/Google review; internal testers can use 128 and opt into analytics now.
+
+For explicitly authorised public releases, the Apple submit lane now accepts
+`automatic_release:true`; default behaviour remains manual release. Supplied
+release notes are applied to both existing en-GB and en-US locales. The focused
+release harness passes 20 tests/112 assertions. Existing analytics regressions
+passed 23 tests, and the iOS release guard passed. The full regression suite was
+not requested or run.
+
+With separate explicit approval, the website privacy policy was updated to name
+PostHog and private Slack analytics reporting. Corporate commit
+`c4de5e92c6ac6292b3b813af362b50e2156c9bf6` deployed successfully; independent public
+HTML checks verified the new disclosure and publication date. Website TypeScript,
+production/prerender build and SEO/link checks passed. Its existing release
+notification was authorised; mobile uploader Slack notifications were suppressed.
+
+
+## Extra feature analytics release 2.0.5 (129) — 19 October 2026
+
+User explicitly requested release to both public stores. Only five runtime Dart
+files differ from the build128 source snapshot, all added search/detail usage
+tracking. New signed IPA/AAB contain all four new event names and the expected
+public PostHog token; iOS manual initialization remains disabled. Runtime source
+hashes were unchanged during builds. Production lib analysis clean, 37 focused
+analytics/search tests passed, 20 release harness tests/112 assertions and iOS
+release guard passed. Full regression suite not requested/run.
+
+Google Play production submission succeeded; independent API readback confirms
+code129, version2.0.5, completed track release and intended en-GB/en-US changelogs.
+This does not establish review approval/public availability. Signed AAB signature
+verified with the existing upload key.
+
+Apple processed129 VALID and distributed it internally in TestFlight. Replaced
+waiting128 and resubmitted129; this restarted the review submission. Final API
+readback confirms WAITING_FOR_REVIEW, AFTER_APPROVAL, build
+`09201dac-bd24-4ad4-8d56-852ffc87353a`. Both locales' notes match; descriptions and
+all prior screenshot IDs preserved. No backend/DB/website deployment. Uploader
+Slack messages suppressed. Existing hourly live-release monitor now targets129,
+with #analytics announcements authorized for each store once publicly live.
+Google versionName remains2.0.5, so the monitor must verify code129 or its updated
+public notes before announcing. Evidence: `build/releases/ios/2.0.5-129/` and
+`build/releases/android/2.0.5-129/`.
+
+## Signup and taste TestFlight 2.0.6 (130) — 24 October 2026
+
+User requested TestFlight for phone testing. Includes contextual signup journeys,
+device-local guest watchlist carry-through, optional Build your taste from Home
+and Profile after the first saved action, and removal of the Home Make a Watch
+Plan introductory card. Built current working tree with production main.dart,
+HTTPS API and Firebase; emulator definitions excluded by release guards.
+Production lib analysis, 53 focused signup/watchlist/taste checks, release guard,
+and 20 release harness tests (111 assertions) passed. Earlier local native taste
+journey evidence remains documented in docs/signup-testing.md.
+
+Initial 2.0.5 (130) upload was rejected because the released 2.0.5 train is closed.
+Rebuilt as 2.0.6 (130), without changing app source. Both signed artifacts passed
+entitlement validation and source-hash comparison. Apple accepted the final
+upload at 22:53 London, completed processing and distributed to internal testers
+at 22:58. Tester notes attached. Evidence and retained IPA under
+build/releases/ios/2.0.6-130/; rejected-version evidence under 2.0.5-130/.
+No App Review submission, Android or backend deployment. Uploader Slack
+notifications suppressed. Full regression suite was not requested or run.
+
+## Signup polish TestFlight 2.0.6 (131–132) — 25 October 2026
+
+User authorised the latest UI changes for TestFlight, adding provider and screenshot
+feedback during the release. Build131 contains the guest-watchlist shared-sheet
+confirmation/serialized navigation, immediate taste-route opening, single-item
+favourite spinner with other hearts disabled, outlined rating/favourite actions
+and purple confirmation tick. Apple independently confirmed VALID /
+IN_BETA_TESTING (1dfe6f60-0b16-4d09-a833-3d19569ac86f).
+
+Build132 additionally clarifies Favourites in taste, offers optional provider setup
+through the existing searchable provider/logo sheet, and adds provider setup on
+signed-in movie/show availability when no services are selected. The action waits
+for saved-service loading and refreshes the page afterwards. Failed provider loads
+cannot be saved as empty selections; retry is available. Signed-out movies use one
+Log watch & rate action. Around Flixie feed friendship controls use accessible
+icons to preserve author-name space. Signup username uses email-style keyboard;
+episode confirmation includes larger season artwork with show fallback.
+
+Build132's first archive was interrupted before the final feedback edits. The
+retained final IPA/source manifest match; signed production entitlements and
+production lib analysis pass. Final focused regression run:95 passed. Earlier
+movie-loading failures were fixture issues from unmocked device guest storage
+and stale generic prompt assertions; fixed without removing assertions. Release
+guard and20 release-harness tests/111 assertions also passed for this release.
+Apple accepted132 at11:48 London, completed processing/internal distribution at
+11:54, tester notes attached. Artifacts/logs/readback under
+build/releases/ios/2.0.6-132/. No backend deployment, App Review, Android upload or
+Slack messages. Optional new referral-resolver endpoint remains undeployed.

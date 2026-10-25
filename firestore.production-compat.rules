@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Conversations
+    // NOTE: memberIds stores Postgres UUIDs, not Firebase Auth UIDs.
+    // Membership is enforced by the backend (Admin SDK) at write time.
+    // Client reads are gated to any authenticated user — the backend ensures
+    // only members ever receive a conversationId.
+    // -------------------------------------------------------------------------
+    match /conversations/{conversationId} {
+      allow read: if request.auth != null;
+
+      // All writes are performed server-side via the Admin SDK.
+      allow write: if false;
+
+      // -----------------------------------------------------------------------
+      // Messages subcollection
+      // -----------------------------------------------------------------------
+      match /messages/{messageId} {
+        allow read: if request.auth != null;
+
+        // Messages are written by the backend only.
+        allow write: if false;
+      }
+
+      // -----------------------------------------------------------------------
+      // Members subcollection (stores unreadCount per user)
+      // -----------------------------------------------------------------------
+      match /members/{userId} {
+        allow read: if request.auth != null;
+
+        // Writes are backend-only.
+        allow write: if false;
+      }
+    }
+    // Additive unread-badge rollout. Existing released-client grants above
+    // remain unchanged until identity-readiness is verified for those clients.
+    // members: server-owned {userId: Postgres UUID string, unreadCount: number}.
+    // userIdentities/{Firebase UID}: server-owned {userId: Postgres UUID string}.
+    // accountDeletions/{Firebase UID}: server-owned deletion marker.
+    // Backend atomically removes membership records when membership ends.
+    match /{parent=**}/members/{memberId} {
+      allow list: if request.auth != null &&
+        exists(/databases/$(database)/documents/userIdentities/$(request.auth.uid)) &&
+        !exists(/databases/$(database)/documents/accountDeletions/$(request.auth.uid)) &&
+        resource.data.userId ==
+          get(/databases/$(database)/documents/userIdentities/$(request.auth.uid)).data.userId &&
+        resource.data.unreadCount > 0;
+    }
+
+  }
+}

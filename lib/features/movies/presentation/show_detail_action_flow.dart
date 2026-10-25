@@ -1,7 +1,11 @@
+import 'dart:async';
+import '../../taste/data/taste_setup_store.dart';
+import '../../watchlist/data/guest_watchlist_store.dart';
+import 'widgets/title_rating_editor.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'controllers/show_detail_controller.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_ranking_sheet.dart';
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -16,7 +20,6 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/core/utils/favourite_limits.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/favourite_limit_sheet.dart';
 import 'package:flixie_app/features/movies/data/show_service.dart';
-import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/add_show_to_list_sheet.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/write_review_sheet.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
@@ -33,13 +36,28 @@ class ShowDetailActionFlow {
   final int _generation;
   final String? _viewer;
   bool get mounted => context.mounted && _data.owns(_generation, _viewer);
+  void _tasteReady() {
+    if (!mounted) return;
+    final id = context.read<AuthProvider>().dbUser?.id;
+    if (id != null) {
+      unawaited(const TasteSetupStore().enable(id).catchError((Object _) {}));
+    }
+  }
+
   Future<void> toggleWatchlist({bool offerUndo = true}) async {
     if (!await GuestAccess.require(context,
         title: 'Save this show for later',
         message:
             'Create an account to keep your watchlist and come back to this show whenever you’re ready.',
         path: '/shows/${_data.showId}',
+        mediaTitle: _data.show?.name,
+        mediaPoster: _data.show?.posterPath,
         intent: 'watchlist')) {
+      if (mounted && _data.auth.dbUser == null) {
+        _data.change(() => _data.inWatchlist = GuestWatchlistStore
+            .instance.homeKeys
+            .contains(-(_data.showId ?? 0)));
+      }
       return;
     }
     if (!context.mounted) return;
@@ -82,22 +100,34 @@ class ShowDetailActionFlow {
           ),
         )
         ..markActivityChanged();
+      _tasteReady();
       final savedState = _data.inWatchlist;
       ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
         type: FlixieToastType.success,
-        content:
-            Text(savedState ? 'Added to watchlist' : 'Removed from watchlist'),
-        action: offerUndo
+        content: Text(savedState
+            ? (GuestAccess.bookmarkSetupPath != null
+                ? '${_data.show?.name ?? 'Title'} is on your watchlist'
+                : 'Added to watchlist')
+            : 'Removed from watchlist'),
+        action: savedState &&
+                !user.completedSetup &&
+                GuestAccess.bookmarkSetupPath != null
             ? SnackBarAction(
-                label: 'Undo',
+                label: 'Set up Flixie',
                 onPressed: () {
-                  if (mounted &&
-                      _data.updatingAction == null &&
-                      _data.inWatchlist == savedState) {
-                    toggleWatchlist(offerUndo: false);
-                  }
+                  if (context.mounted) context.go('/onboarding');
                 })
-            : null,
+            : offerUndo
+                ? SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () {
+                      if (mounted &&
+                          _data.updatingAction == null &&
+                          _data.inWatchlist == savedState) {
+                        toggleWatchlist(offerUndo: false);
+                      }
+                    })
+                : null,
       ));
     } catch (e) {
       if (!context.mounted || !mounted) return;
@@ -118,6 +148,8 @@ class ShowDetailActionFlow {
     if (!await GuestAccess.require(context,
         title: 'Save your favourites',
         path: '/shows/${_data.showId}',
+        mediaTitle: _data.show?.name,
+        mediaPoster: _data.show?.posterPath,
         intent: 'favorite')) {
       return;
     }
@@ -172,6 +204,7 @@ class ShowDetailActionFlow {
                 ),
         )
         ..markActivityChanged();
+      _tasteReady();
       final savedState = _data.isFavorite;
       ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
         type: FlixieToastType.success,
@@ -257,7 +290,11 @@ class ShowDetailActionFlow {
   Future<void> setSeasonWatched(TvSeason season, bool watched) async {
     if (!await GuestAccess.require(context,
         title: 'Keep track of what you watch',
-        path: '/shows/${_data.showId}')) {
+        path: '/shows/${_data.showId}',
+        mediaTitle: _data.show?.name,
+        mediaPoster: _data.show?.posterPath,
+        intent: watched ? 'season' : null,
+        selectedSeasonNumber: season.seasonNumber)) {
       return;
     }
     if (!context.mounted) return;
@@ -375,6 +412,7 @@ class ShowDetailActionFlow {
       _data.updatingSeasonNumbers.remove(seasonNumber);
     });
     context.read<AuthProvider>().markActivityChanged();
+    _tasteReady();
     final failed = episodes.length - applied.length;
     if (applied.isEmpty) {
       _showSnack('Unable to update season progress',
@@ -405,7 +443,14 @@ class ShowDetailActionFlow {
       {bool undo = false}) async {
     if (!await GuestAccess.require(context,
         title: 'Keep track of what you watch',
-        path: '/shows/${_data.showId}')) {
+        path: '/shows/${_data.showId}',
+        mediaTitle: _data.show?.name,
+        mediaPoster: _data.show?.posterPath,
+        intent: watched ? 'episode' : null,
+        selectedEpisodeId: episode.id,
+        selectedSeasonNumber: episode.seasonNumber,
+        selectedEpisodeNumber: episode.episodeNumber,
+        selectedEpisodeTitle: episode.name)) {
       return;
     }
     if (!context.mounted) return;
@@ -440,6 +485,7 @@ class ShowDetailActionFlow {
                 watched ? (undo ? episode.watchedAt : DateTime.now()) : null),
           }));
       context.read<AuthProvider>().markActivityChanged();
+      _tasteReady();
       if (context.mounted && mounted) {
         ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
           type: FlixieToastType.success,
@@ -599,94 +645,32 @@ class ShowDetailActionFlow {
     if (!await GuestAccess.require(context,
         title: 'Rate this show',
         path: '/shows/${_data.showId}',
+        mediaTitle: _data.show?.name,
+        mediaPoster: _data.show?.posterPath,
         intent: 'rate')) {
       return;
     }
     if (!context.mounted) return;
     if (!context.mounted || !mounted) return;
-    var selectedRating = _data.userRating;
-    var selectedRecommendation = _data.userRecommendation;
-    showModalBottomSheet<void>(
+    await showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
-      clipBehavior: Clip.antiAlias,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Container(
+      builder: (sheetContext) => ConstrainedBox(
           constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * .85),
-          color: context.colors.tabBarBackgroundFocused,
+              maxHeight: MediaQuery.sizeOf(sheetContext).height * .85),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Rate this show',
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 4),
-                Text(
-                  'Choose a score for the overall series.',
-                  style: TextStyle(color: context.colors.medium, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (var rating = 1; rating <= 10; rating++)
-                    FlixiePill.choice(
-                        avatar:
-                            const Icon(Icons.star_outline_rounded, size: 18),
-                        label: Text('$rating'),
-                        selected: selectedRating == rating,
-                        showCheckmark: false,
-                        onSelected: (_) =>
-                            setSheetState(() => selectedRating = rating)),
-                ]),
-                const SizedBox(height: 20),
-                Text('Would you recommend it? (optional)',
-                    style: TextStyle(
-                        color: context.colors.light,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 10),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  for (final option in [
-                    ('recommend', 'Yes', Icons.thumb_up_alt_outlined),
-                    ('neutral', 'No opinion', Icons.remove_rounded),
-                    ('avoid', 'No', Icons.thumb_down_alt_outlined),
-                  ])
-                    FlixiePill.choice(
-                        avatar: Icon(option.$3, size: 20),
-                        label: Text(option.$2),
-                        selected: selectedRecommendation == option.$1,
-                        showCheckmark: false,
-                        onSelected: (selected) => setSheetState(() =>
-                            selectedRecommendation =
-                                selected ? option.$1 : null)),
-                ]),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: selectedRating == null
-                        ? null
-                        : () {
-                            final rating = selectedRating!;
-                            Navigator.pop(sheetContext);
-                            setUserRating(rating,
-                                recommendation: selectedRecommendation);
-                          },
-                    child: const Text('Save rating'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+              padding: const EdgeInsets.all(24),
+              child: TitleRatingEditor(
+                  title: 'Rate this show',
+                  subtitle: 'Choose a score for the overall series.',
+                  initialRating: _data.userRating,
+                  initialRecommendation: _data.userRecommendation,
+                  onSave: (rating, recommendation) async {
+                    Navigator.pop(sheetContext);
+                    await setUserRating(rating, recommendation: recommendation);
+                  }))),
     );
   }
 
@@ -696,6 +680,8 @@ class ShowDetailActionFlow {
         message:
             'Create an account to write your review and discuss it with other film fans.',
         path: '/shows/${_data.showId}',
+        mediaTitle: _data.show?.name,
+        mediaPoster: _data.show?.posterPath,
         intent: 'review')) {
       return;
     }
@@ -721,6 +707,7 @@ class ShowDetailActionFlow {
           final auth = context.read<AuthProvider>();
           auth.invalidateCachedReviews();
           auth.markActivityChanged();
+          _tasteReady();
         },
       ),
     );

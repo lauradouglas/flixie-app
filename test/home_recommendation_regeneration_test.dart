@@ -12,7 +12,7 @@ import 'package:flixie_app/features/movies/data/movie_service.dart';
 import 'package:flixie_app/features/home/presentation/pages/home_screen.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'home_startup_recovery_test.dart' show Session;
-import 'auth_recovery_test.dart' show profile;
+import 'auth_recovery_test.dart' show libraryProfile;
 
 void main() {
   testWidgets(
@@ -22,7 +22,8 @@ void main() {
     RecommendationService.invalidateCache();
     final session = Session();
     final auth = AuthProvider(session, MovieService(),
-        prefetchAfterAuth: false, profileLoader: (id) async => profile(id));
+        prefetchAfterAuth: false,
+        profileLoader: (id) async => libraryProfile(id));
     final cache = WatchRequestCache();
     final requests = <Map<String, String>>[];
     http.Response response(Object value) =>

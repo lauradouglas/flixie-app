@@ -23,6 +23,9 @@ class WatchlistFilters {
     maxRuntime = source.maxRuntime;
     release = source.release;
     friendsOnly = source.friendsOnly;
+    availableMovieIds = source.availableMovieIds == null
+        ? null
+        : Set.of(source.availableMovieIds!);
   }
 
   int media = 0;
@@ -41,4 +44,5 @@ class WatchlistFilters {
   int? maxRuntime;
   ReleaseStatus? release;
   bool friendsOnly = false;
+  Set<int>? availableMovieIds;
 }

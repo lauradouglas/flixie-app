@@ -13,13 +13,37 @@ import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/splash_screen.dart';
 
 class _SplashAuth extends ChangeNotifier implements AuthProvider {
+  String? error;
+  int retries = 0;
   @override
-  String? get recoveryError => null;
+  Future<void> retrySession() async {
+    retries++;
+  }
+
+  @override
+  String? get recoveryError => error;
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 void main() {
+  testWidgets('slow session retains an accessible retry without a spinner',
+      (tester) async {
+    final auth = _SplashAuth()..error = 'Could not restore your session.';
+    await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+        value: auth,
+        child: MaterialApp(
+            home: MediaQuery(
+                data: const MediaQueryData(disableAnimations: true),
+                child: const SplashScreen()))));
+    expect(find.text(auth.error!), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.tap(find.text('Retry'));
+    expect(auth.retries, 1);
+    await tester.pumpWidget(const SizedBox());
+    auth.dispose();
+  });
+
   testWidgets('Pip boot preview', (tester) async {
     for (final family in ['Manrope', 'Roboto', '.SF Pro Display']) {
       final fonts = FontLoader(family)
@@ -77,13 +101,20 @@ void main() {
                 ),
             home: const SplashScreen()),
       ));
-      await tester.runAsync(() => precacheImage(const AssetImage(PipGriddy.asset),
+      await tester.runAsync(() => precacheImage(
+          const AssetImage(PipGriddy.asset),
           tester.element(find.byType(SplashScreen))));
       await tester.pump(const Duration(seconds: 1));
       expect(find.bySemanticsLabel('Flixie'), findsOneWidget);
       expect(tester.takeException(), isNull);
       expect(find.byType(PipStartupBrand), findsOneWidget);
       expect(find.byType(PipGriddy), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find.byType(SplashScreen),
+              matching: find.byType(FadeTransition)),
+          findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
       await tester.pumpWidget(
           const MaterialApp(home: Scaffold(body: HomeBootLoadingScreen())));
       await tester.pump();

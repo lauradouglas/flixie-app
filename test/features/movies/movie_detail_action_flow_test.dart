@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -123,6 +124,27 @@ void main() {
                                     child: const Text('Toggle favourite')),
                               ]))))));
 
+  testWidgets(
+      'new bookmark saves before setup and only confirms after persistence',
+      (tester) async {
+    final (auth, data, actions) = await fixture();
+    GuestAccess.bookmarkSetupPath = '/movies/1';
+    addTearDown(GuestAccess.clear);
+    actions.gate = Completer<WatchlistMovie>();
+    await tester.pumpWidget(app(auth, data));
+    await tester.tap(find.text('Save title'));
+    await tester.pump();
+    expect(find.text('The Odyssey is on your watchlist'), findsNothing);
+    expect(auth.dbUser!.movieWatchlist, isEmpty);
+    actions.gate!.complete(
+        WatchlistMovie(id: 'saved', userId: auth.dbUser!.id, movieId: 1));
+    await tester.pumpAndSettle();
+    expect(auth.dbUser!.movieWatchlist!.single.movieId, 1);
+    expect(auth.dbUser!.completedSetup, isFalse);
+    expect(find.text('The Odyssey is on your watchlist'), findsOneWidget);
+    expect(find.text('Set up Flixie'), findsOneWidget);
+    expect(actions.watchlistSaves, 1);
+  });
   testWidgets('failed save preserves library and Retry commits the title',
       (tester) async {
     final (auth, data, actions) = await fixture();

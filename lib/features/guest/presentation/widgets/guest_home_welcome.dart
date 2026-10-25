@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'why_flixie_button.dart';
 
 /// A brief introduction that leaves the catalogue as Home's main content.
 class GuestHomeWelcome extends StatelessWidget {
@@ -19,7 +20,8 @@ class GuestHomeWelcome extends StatelessWidget {
                       .headlineLarge
                       ?.copyWith(fontWeight: FontWeight.w800, height: 1.12)),
               const SizedBox(height: 12),
-              Text('Explore films and shows. Find something worth watching.',
+              Text(
+                  'See what friends love, find where it’s streaming, and plan your next watch together.',
                   style: Theme.of(context)
                       .textTheme
                       .bodyLarge
@@ -33,18 +35,26 @@ class GuestHomeWelcome extends StatelessWidget {
                 fit: BoxFit.contain));
         return Padding(
             padding: const EdgeInsets.only(bottom: 24),
-            child: compact
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                        pip,
-                        const SizedBox(height: 12),
-                        copy,
-                      ])
-                : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                    Expanded(child: copy),
-                    const SizedBox(width: 16),
-                    pip,
-                  ]));
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                              pip,
+                              const SizedBox(height: 12),
+                              copy,
+                            ])
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                              Expanded(child: copy),
+                              const SizedBox(width: 16),
+                              pip,
+                            ]),
+                  const SizedBox(height: 16),
+                  const WhyFlixieButton(),
+                ]));
       });
 }

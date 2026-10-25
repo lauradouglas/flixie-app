@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/auth/firebase_environment.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flixie_app/core/app_icon/app_icon_service.dart';
 import 'package:flixie_app/features/library_import/data/library_import_session.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -26,6 +28,7 @@ import 'package:flixie_app/core/auth/firebase_options.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'package:flixie_app/core/analytics/analytics_backend.dart';
+import 'package:flixie_app/core/analytics/posthog_analytics_backend.dart';
 import 'package:flixie_app/core/analytics/analytics_consent_prompt.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/analytics/shared_preferences_analytics_consent_store.dart';
@@ -64,42 +67,57 @@ Future<void> _activateFirebaseAppCheck() async {
   }
 }
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ApiClient.initializeTransport();
 
-  try {
-    // Initialize Firebase only if not already initialized
-    if (Firebase.apps.isEmpty) {
-      logger.i('Initializing Firebase');
-      final options = DefaultFirebaseOptions.currentPlatform;
-      if (_hasFirebaseDartDefines(options)) {
-        await Firebase.initializeApp(
-          options: options,
-        );
+  FirebaseEnvironment.validate(
+      local: FirebaseEnvironment.useEmulators,
+      release: kReleaseMode,
+      apiUrl: ApiClient.baseUrl,
+      emulatorHost: FirebaseEnvironment.host);
+  if (FirebaseEnvironment.useEmulators) {
+    await FirebaseEnvironment.initializeLocal();
+    // Native platform config may still create its default app; disable telemetry.
+    if (Firebase.apps.any((app) => app.name == defaultFirebaseAppName)) {
+      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(false);
+    }
+  } else {
+    try {
+      // Initialize Firebase only if not already initialized
+      if (Firebase.apps.isEmpty) {
+        logger.i('Initializing Firebase');
+        final options = DefaultFirebaseOptions.currentPlatform;
+        if (_hasFirebaseDartDefines(options)) {
+          await Firebase.initializeApp(
+            options: options,
+          );
+        } else {
+          logger.w(
+            'Firebase dart-defines missing; using native Firebase config fallback (GoogleService-Info.plist/google-services.json)',
+          );
+          await Firebase.initializeApp();
+        }
+        logger.i('Firebase initialized successfully');
       } else {
-        logger.w(
-          'Firebase dart-defines missing; using native Firebase config fallback (GoogleService-Info.plist/google-services.json)',
-        );
-        await Firebase.initializeApp();
+        logger.d('Firebase already initialized, skipping');
       }
-      logger.i('Firebase initialized successfully');
-    } else {
-      logger.d('Firebase already initialized, skipping');
+    } catch (e) {
+      // Only log non-duplicate app errors
+      if (!e.toString().contains('duplicate-app')) {
+        logger.e('Firebase initialization error: $e');
+      }
     }
-  } catch (e) {
-    // Only log non-duplicate app errors
-    if (!e.toString().contains('duplicate-app')) {
-      logger.e('Firebase initialization error: $e');
-    }
-  }
 
-  if (Firebase.apps.isNotEmpty) {
-    await _activateFirebaseAppCheck();
+    if (Firebase.apps.isNotEmpty) {
+      await _activateFirebaseAppCheck();
+    }
   }
 
   // Register FCM background message handler (must be called before runApp).
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  if (!FirebaseEnvironment.useEmulators) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
   // Capture a notification that launched the terminated app before auth and
   // splash redirects can consume its intended destination.
   unawaited(PushNotificationService.captureInitialNotification());
@@ -108,7 +126,10 @@ void main() async {
   MovieCacheService().clearStaleCache();
 
   final analyticsController = AnalyticsController(
-    backend: FirebaseAnalyticsBackend(),
+    backend: CompositeAnalyticsBackend([
+      if (!FirebaseEnvironment.useEmulators) FirebaseAnalyticsBackend(),
+      if (!FirebaseEnvironment.useEmulators) PostHogAnalyticsBackend(),
+    ]),
     consentStore: SharedPreferencesAnalyticsConsentStore(),
   );
   await analyticsController.initialize();
@@ -185,6 +206,7 @@ void main() async {
               (controller ?? ChatUnreadController())..syncUser(auth.dbUser?.id),
         ),
         ChangeNotifierProxyProvider<AuthProvider, WatchRequestCache>(
+          lazy: false,
           create: (_) => WatchRequestCache(),
           update: (_, auth, cache) {
             final requestCache = cache ?? WatchRequestCache();
@@ -282,7 +304,12 @@ class _FlixieAppState extends State<FlixieApp> with WidgetsBindingObserver {
             child: AnalyticsConsentPrompt(
               child: ColoredBox(
                 color: context.colors.background,
-                child: child ?? const SizedBox.shrink(),
+                child: FirebaseEnvironment.useEmulators
+                    ? Banner(
+                        message: 'LOCAL',
+                        location: BannerLocation.topEnd,
+                        child: child ?? const SizedBox.shrink())
+                    : child ?? const SizedBox.shrink(),
               ),
             ),
           )),

@@ -135,6 +135,7 @@ class RequestService {
     String? watchedAt,
     bool? recommended,
     String? watchComment,
+    bool? watchedAtCinema,
     bool publishReview = false,
     bool containsSpoilers = false,
   }) async {
@@ -146,6 +147,8 @@ class RequestService {
         if (watched) 'rating': rating,
         if (watched && reviewText != null) 'reviewText': reviewText.trim(),
         if (watched) 'watchedAt': watchedAt,
+        if (watched && watchedAtCinema != null)
+          'watchedAtCinema': watchedAtCinema,
         'publishReview': publishReview,
         if (watched && publishReview) 'watchComment': watchComment,
         'containsSpoilers': containsSpoilers,
@@ -298,7 +301,7 @@ class RequestService {
       // the current person just sent is still PENDING, but must be visible in
       // their Planning section straight away.
       data = await ApiClient.get(
-          '/requests/$userId/all${activeOnly ? '?activeOnly=true' : ''}',
+          '/requests/$userId/all${activeOnly ? '?activeOnly=true' : ''}${includeHomeState ? '${activeOnly ? '&' : '?'}homeOnly=true' : ''}',
           requestScope: requestScope);
     } on ApiException catch (e) {
       if (e.statusCode == 404) return [];

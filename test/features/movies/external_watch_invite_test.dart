@@ -79,7 +79,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Add someone'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Someone who isn’t on Flixie'));
       await tester.pumpAndSettle();
       if (Platform.environment['FLIXIE_INVITE_PREVIEW'] == '1') {
         final boundary = previewKey.currentContext!.findRenderObject()!

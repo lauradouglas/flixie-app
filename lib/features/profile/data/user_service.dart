@@ -28,6 +28,15 @@ class UserService {
     return ReferralSummary.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<({String code, String username})> resolveReferral(
+      String value) async {
+    final data = await ApiClient.get(
+      '/referrals/resolve/${Uri.encodeComponent(value.trim())}',
+      authenticated: false,
+    ) as Map<String, dynamic>;
+    return (code: data['code'] as String, username: data['username'] as String);
+  }
+
   static Future<String> lookupReferralUsername(String code) async {
     final normalizedCode = code.trim().toUpperCase();
     final data = await ApiClient.get(
@@ -136,6 +145,14 @@ class UserService {
     return User.fromJson(data as Map<String, dynamic>);
   }
 
+  static Future<List<Map<String, dynamic>>> getUserWatchedShows(
+      String userId) async {
+    final data = await ApiClient.get('/users/$userId/shows/watched');
+    return (data as List)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+  }
+
   static Future<User> getUserById(String id) async {
     final data = await ApiClient.get('/users/$id');
     return User.fromJson(data as Map<String, dynamic>);
@@ -157,10 +174,15 @@ class UserService {
         .toList();
   }
 
-  static Future<User> getUserByExternalId(String externalId) async {
+  static Future<User> getStartupUserByExternalId(String externalId) =>
+      getUserByExternalId(externalId, profileOnly: true);
+
+  static Future<User> getUserByExternalId(String externalId,
+      {bool profileOnly = false}) async {
     apiLogger.d('GET /users/external-id/$externalId');
     try {
-      final data = await ApiClient.get('/users/external-id/$externalId');
+      final data = await ApiClient.get(
+          '/users/external-id/$externalId${profileOnly ? '?profileOnly=true' : ''}');
       if (data == null) {
         throw const ApiException(
             statusCode: 404, message: 'Profile not found.');

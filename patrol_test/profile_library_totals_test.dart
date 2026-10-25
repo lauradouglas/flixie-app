@@ -76,10 +76,10 @@ void main() {
       await $.pumpAndSettle();
     }
     await $(find.byKey(const ValueKey('profile-total-favourites'))).tap();
-    await $('Favourite movies').waitUntilVisible();
+    await $('Favourite films & shows').waitUntilVisible();
     await $('Favourite film').waitUntilVisible();
     expect(find.byType(TabBar), findsNothing);
-    await $(find.byTooltip('Close')).tap();
+    await $(find.byTooltip('Close favourites')).tap();
     await $.platform.mobile.pressHome();
     await $.platform.mobile.openApp();
     await $(find.byKey(const ValueKey('profile-total-watched')))

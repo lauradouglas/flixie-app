@@ -73,14 +73,29 @@ class FastlaneTest < Minitest::Test
       @runner.completed(:android, :submit, build_number: 102)
       @runner.completed(:ios, :screenshots)
       @runner.failed(:android, :submit)
+      @runner.completed(:ios, :submit, build_number: 103, automatic_release: true)
     ensure
       FlixieSlack.define_singleton_method(:notify, original)
     end
-    assert_equal 3, messages.size
+    assert_equal 4, messages.size
     assert_includes messages[0], 'manual release after approval'
     assert_includes messages[0], '101'
     assert_includes messages[1], 'review/public availability may still be pending'
     assert_includes messages[2], 'failed'
+    assert_includes messages[3], 'releases automatically after Apple approval'
+  end
+
+  def test_testflight_notification_has_friendly_title_version_and_processing_status
+    messages = []
+    original = FlixieSlack.method(:notify)
+    FlixieSlack.define_singleton_method(:notify) { |text| messages << text }
+    ENV['RELEASE_VERSION'] = '2.0.4'
+    begin
+      @runner.completed(:ios, :beta, build_number: 124)
+    ensure
+      FlixieSlack.define_singleton_method(:notify, original)
+    end
+    assert_equal ["🛫 Flixie is off to TestFlight!\n💜 Version 2.0.4 · Build 124\nUpload complete · Apple may still be processing the build."], messages
   end
 
   def test_production_submit_sends_for_review_and_includes_notes
@@ -113,6 +128,9 @@ class FastlaneTest < Minitest::Test
     replacement = @runner.calls.reverse.find { |kind, _| kind == :apple_screenshots }.last
     assert_equal true, replacement[:reject_if_possible]
     assert_equal '100', replacement[:build_number]
+    @runner.run(:ios, :submit, build_number: 101, uploaded: true, automatic_release: true)
+    public_release = @runner.calls.reverse.find { |kind, _| kind == :apple_screenshots }.last
+    assert_equal true, public_release[:automatic_release]
   end
 
   def test_screenshot_sdk_process_does_not_inherit_fastlane_bundle
@@ -192,6 +210,7 @@ class FastlaneTest < Minitest::Test
     notes = @runner.calls.last.last[:release_notes]['en-GB']
     assert_includes notes, 'Pip reactions'
     assert_includes notes, 'review counts'
+    assert_equal notes, @runner.calls.last.last[:release_notes]['en-US']
   end
 
   def test_ios_build_validates_signed_ipa_before_returning

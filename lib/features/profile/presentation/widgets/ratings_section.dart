@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/load_failure_notice.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -145,7 +146,14 @@ class _RatingCard extends StatelessWidget {
 }
 
 class AllRatingsSheet extends StatefulWidget {
-  const AllRatingsSheet({super.key, required this.ratings});
+  const AllRatingsSheet(
+      {super.key,
+      required this.ratings,
+      this.loading = false,
+      this.failed = false,
+      this.onRetry});
+  final bool loading, failed;
+  final VoidCallback? onRetry;
   final List<MovieRating> ratings;
 
   @override
@@ -169,6 +177,12 @@ class _AllRatingsSheetState extends State<AllRatingsSheet> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant AllRatingsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _filterRatings();
+  }
+
   void _filterRatings() {
     final query = _searchController.text.toLowerCase();
     setState(() {
@@ -187,115 +201,141 @@ class _AllRatingsSheetState extends State<AllRatingsSheet> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scrollController) => Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.colors.medium.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Text(
-                  'My Ratings',
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                FlixiePill.label(label: Text('${widget.ratings.length}')),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(color: context.colors.light),
-              decoration: InputDecoration(
-                hintText: 'Search ratings...',
-                hintStyle: TextStyle(
-                    color: context.colors.medium.withValues(alpha: 0.6)),
-                prefixIcon: Icon(Icons.search, color: context.colors.medium),
-                filled: true,
-                fillColor: context.colors.tabBarBorder.withValues(alpha: 0.3),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+    return Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) => Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.colors.medium.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: _filteredRatings.isEmpty
-                ? Center(
-                    child: Text(
-                      _searchController.text.isEmpty
-                          ? 'No ratings yet.'
-                          : 'No ratings found.',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: context.colors.medium,
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                        child: Text(
+                      'Your film ratings',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
+                    )),
+                    IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close)),
+                    FlixiePill.label(label: Text('${widget.ratings.length}')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: context.colors.light),
+                  decoration: InputDecoration(
+                    hintText: 'Search ratings...',
+                    hintStyle: TextStyle(
+                        color: context.colors.medium.withValues(alpha: 0.6)),
+                    prefixIcon:
+                        Icon(Icons.search, color: context.colors.medium),
+                    filled: true,
+                    fillColor:
+                        context.colors.tabBarBorder.withValues(alpha: 0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
-                  )
-                : LayoutBuilder(builder: (context, constraints) {
-                    const columns = 3;
-                    final width =
-                        (constraints.maxWidth - 40 - (columns - 1) * 12) /
-                            columns;
-                    const titleStyle = TextStyle(
-                        fontSize: 12, height: 1.3, fontWeight: FontWeight.w700);
-                    var titleHeight = 0.0;
-                    for (final rating in _filteredRatings) {
-                      final painter = TextPainter(
-                        text: TextSpan(
-                            text: rating.movie?.title ?? 'Unknown',
-                            style: titleStyle),
-                        textDirection: Directionality.of(context),
-                        textScaler: MediaQuery.textScalerOf(context),
-                      )..layout(maxWidth: width);
-                      if (painter.height > titleHeight) {
-                        titleHeight = painter.height;
-                      }
-                      painter.dispose();
-                    }
-                    return GridView.builder(
-                      controller: scrollController,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 8),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: columns,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 16,
-                        mainAxisExtent: width * 1.5 + 8 + titleHeight,
-                      ),
-                      itemCount: _filteredRatings.length,
-                      itemBuilder: (_, i) =>
-                          _RatingGridCard(rating: _filteredRatings[i]),
-                    );
-                  }),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (widget.failed)
+                LoadFailureNotice(
+                    message: widget.ratings.isEmpty
+                        ? 'Couldn’t load your ratings.'
+                        : 'Couldn’t refresh your ratings. Your saved ratings are still here.',
+                    onRetry: widget.onRetry ?? () {},
+                    retrying: widget.loading),
+              if (widget.loading) const LinearProgressIndicator(),
+              Expanded(
+                child: _filteredRatings.isEmpty &&
+                        (widget.failed || widget.loading)
+                    ? ListView(
+                        controller: scrollController,
+                        children: const [SizedBox(height: 24)])
+                    : _filteredRatings.isEmpty
+                        ? Center(
+                            child: Text(
+                              _searchController.text.isEmpty
+                                  ? 'No ratings yet.'
+                                  : 'No ratings found.',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: context.colors.medium,
+                              ),
+                            ),
+                          )
+                        : LayoutBuilder(builder: (context, constraints) {
+                            const columns = 3;
+                            final width = (constraints.maxWidth -
+                                    40 -
+                                    (columns - 1) * 12) /
+                                columns;
+                            const titleStyle = TextStyle(
+                                fontSize: 12,
+                                height: 1.3,
+                                fontWeight: FontWeight.w700);
+                            var titleHeight = 0.0;
+                            for (final rating in _filteredRatings) {
+                              final painter = TextPainter(
+                                text: TextSpan(
+                                    text: rating.movie?.title ?? 'Unknown',
+                                    style: titleStyle),
+                                textDirection: Directionality.of(context),
+                                textScaler: MediaQuery.textScalerOf(context),
+                              )..layout(maxWidth: width);
+                              if (painter.height > titleHeight) {
+                                titleHeight = painter.height;
+                              }
+                              painter.dispose();
+                            }
+                            return GridView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 8),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 16,
+                                mainAxisExtent: width * 1.5 + 8 + titleHeight,
+                              ),
+                              itemCount: _filteredRatings.length,
+                              itemBuilder: (_, i) =>
+                                  _RatingGridCard(rating: _filteredRatings[i]),
+                            );
+                          }),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        ));
   }
 }
 

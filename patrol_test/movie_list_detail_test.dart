@@ -37,6 +37,7 @@ void main() {
         .tap();
     await $('Remove from list').tap();
     await $('Remove').tap();
+    await $('Removed from list').waitUntilVisible();
     expect(api.entries.where((e) => e['movieId'] == 3), isEmpty);
     expect(api.entries.where((e) => e['showId'] == 3), hasLength(1));
     expect(api.unexpected, isEmpty);

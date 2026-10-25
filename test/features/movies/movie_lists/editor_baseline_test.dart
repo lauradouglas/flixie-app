@@ -44,7 +44,7 @@ void main() {
     await tester.tap(find.text('New list').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
-    expect(find.text('Make a little collection.'),
+    expect(find.text('Create list'),
         before ? findsNothing : findsOneWidget);
     expect(
         requests
@@ -56,7 +56,7 @@ void main() {
         '{"friendships":[],"pendingFriends":[],"requestedFriends":[]}', 200));
     groups.complete(http.Response('[]', 200));
     await tester.pumpAndSettle();
-    expect(find.text('Make a little collection.'), findsOneWidget);
+    expect(find.text('Create list'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
   });

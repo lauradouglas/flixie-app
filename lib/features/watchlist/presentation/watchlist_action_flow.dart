@@ -128,6 +128,9 @@ class WatchlistActionFlow {
     var writeReview = false;
     MovieWatchEntry? reviewWatch;
     await showMovieWatchLogSheet<void>(
+      movieId: item.movieId,
+      movieTitle: item.movie?.title,
+      releaseDate: item.movie?.releaseDate,
       context: context,
       builder: (_) => RewatchLogSheet(
         movieTitle: item.movie?.title,
@@ -149,6 +152,7 @@ class WatchlistActionFlow {
           final savedWatch = await _service.logMovieWatch(
             userId,
             LogMovieWatchRequest(
+              watchedAtCinema: details.watchedAtCinema,
               draftId: draftId,
               companionId: details.companion?.id,
               externalCompanionName: details.externalCompanionName,

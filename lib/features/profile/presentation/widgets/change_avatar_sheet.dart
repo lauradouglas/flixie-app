@@ -1,8 +1,6 @@
-import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import 'package:flixie_app/app/theme/app_theme.dart';
+import 'package:flixie_app/core/widgets/flixie_editor_sheet.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/profile/data/avatar_service.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/avatar_picker.dart';
@@ -10,7 +8,6 @@ import 'package:flixie_app/models/profile_avatar.dart';
 
 class ChangeAvatarSheet extends StatefulWidget {
   const ChangeAvatarSheet({super.key});
-
   @override
   State<ChangeAvatarSheet> createState() => _ChangeAvatarSheetState();
 }
@@ -18,87 +15,118 @@ class ChangeAvatarSheet extends StatefulWidget {
 class _ChangeAvatarSheetState extends State<ChangeAvatarSheet> {
   List<ProfileAvatar> _avatars = const [];
   int? _selectedId;
-  bool _loading = true;
-  bool _saving = false;
-  String? _error;
-
+  bool _loading = true, _saving = false;
+  String? _loadError, _saveError;
+  late final AuthProvider _auth;
+  late final String? _viewer;
+  late final ProfileAvatar? _original;
+  bool get _active => mounted && _auth.dbUser?.id == _viewer && _viewer != null;
   @override
   void initState() {
     super.initState();
-    _selectedId = context.read<AuthProvider>().dbUser?.avatar?.id;
+    _auth = context.read<AuthProvider>();
+    _viewer = _auth.dbUser?.id;
+    _original = _auth.dbUser?.avatar;
+    _selectedId = _original?.id;
     _load();
   }
 
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
+      _loadError = null;
     });
     try {
       final avatars = await AvatarService.getAvatars();
-      if (mounted) setState(() => _avatars = avatars);
+      if (_active) setState(() => _avatars = avatars);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Unable to load avatars.');
+      if (mounted) setState(() => _loadError = 'Unable to load avatars.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _save() async {
-    if (_selectedId == null) return;
-    setState(() => _saving = true);
+    if (_saving || _selectedId == null || !_active) return;
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    final messenger = ScaffoldMessenger.of(context);
+    final auth = _auth, viewer = _viewer, original = _original;
     try {
       final avatar = await AvatarService.selectAvatar(_selectedId!);
-      if (!mounted) return;
-      final auth = context.read<AuthProvider>();
-      final user = auth.dbUser;
-      if (user != null) auth.updateCachedUser(user.copyWith(avatar: avatar));
+      if (!mounted || !_active) return;
+      auth.updateCachedUser(auth.dbUser!.copyWith(avatar: avatar));
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
-        type: FlixieToastType.success,
-        content: const Text('Profile avatar updated'),
-        backgroundColor: context.colors.surfaceElevated,
-      ));
+      var undoing = false;
+      Future<void> undo() async {
+        if (undoing ||
+            auth.dbUser?.id != viewer ||
+            auth.dbUser?.avatar?.id != avatar.id) {
+          return;
+        }
+        undoing = true;
+        try {
+          if (original == null) {
+            await AvatarService.removeAvatar();
+          } else {
+            await AvatarService.selectAvatar(original.id);
+          }
+          if (auth.dbUser?.id != viewer ||
+              auth.dbUser?.avatar?.id != avatar.id) {
+            return;
+          }
+          auth.updateCachedUser(auth.dbUser!
+              .copyWith(avatar: original, clearAvatar: original == null));
+          if (messenger.mounted) {
+            messenger.showSnackBar(
+                const SnackBar(content: Text('Previous avatar restored')));
+          }
+        } catch (_) {
+          if (messenger.mounted && auth.dbUser?.id == viewer) {
+            messenger.showSnackBar(SnackBar(
+                content: const Text('Couldn’t restore your avatar.'),
+                action: SnackBarAction(label: 'Retry', onPressed: undo)));
+          }
+        } finally {
+          undoing = false;
+        }
+      }
+
+      messenger.showSnackBar(SnackBar(
+          content: const Text('Profile avatar updated'),
+          action: original?.id == avatar.id
+              ? null
+              : SnackBarAction(label: 'Undo', onPressed: undo)));
     } catch (_) {
-      if (mounted) setState(() => _error = 'Unable to update avatar.');
+      if (mounted) {
+        setState(() => _saveError =
+            'Couldn’t save your avatar. Your selection is still here.');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Text('Change avatar',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: AvatarPicker(
-                    avatars: _avatars,
-                    selectedId: _selectedId,
-                    loading: _loading,
-                    error: _error,
-                    onRetry: _load,
-                    onSelected: (avatar) =>
-                        setState(() => _selectedId = avatar.id),
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saving || _selectedId == null ? null : _save,
-                  child: _saving
-                      ? const CircularProgressIndicator()
-                      : const Text('Save avatar'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+  Widget build(BuildContext context) => FlixieEditorSheet(
+      title: 'Change avatar',
+      dirty: _selectedId != _original?.id,
+      busy: _saving,
+      saveLabel: 'Save avatar',
+      onSave:
+          _loading || _selectedId == null || _loadError != null ? null : _save,
+      error: _saveError,
+      child: AvatarPicker(
+          avatars: _avatars,
+          profileBadges: _auth.dbUser?.profileBadges ?? const [],
+          selectedId: _selectedId,
+          loading: _loading,
+          error: _loadError,
+          onRetry: _load,
+          onSelected: (avatar) => setState(() {
+                _selectedId = avatar.id;
+                _saveError = null;
+              })));
 }

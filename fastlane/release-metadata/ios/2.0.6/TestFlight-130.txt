@@ -1,0 +1,2 @@
+Try saving films while browsing as a guest, then create an account to keep your picks. Signup resumes the action you started. After your first save, optionally build your taste with favourites and ratings; resume anytime from Home or Profile. The Home Make a Watch Plan introduction has been removed.
+Please test email, Apple or Google signup; saved watchlist picks; ratings, reviews and watch logging; and skipping/resuming Build your taste.

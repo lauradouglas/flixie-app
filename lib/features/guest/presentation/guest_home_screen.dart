@@ -1,8 +1,11 @@
+import '../../watchlist/data/guest_watchlist_store.dart';
+import 'widgets/why_flixie_button.dart';
 import 'widgets/guest_home_link_card.dart';
 import 'package:flixie_app/features/movies/presentation/trailers/trailer_player_sheet.dart';
-import 'package:flixie_app/features/home/presentation/widgets/pip_loading_strip.dart';
 import 'widgets/guest_signup_section.dart';
 import 'widgets/guest_cinema_list.dart';
+import 'package:flixie_app/features/home/presentation/widgets/cinema_list.dart'
+    show CinemaListSkeleton;
 import 'widgets/guest_home_welcome.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/features/home/presentation/widgets/trending_carousel_skeleton.dart';
@@ -28,6 +31,26 @@ class GuestHomeScreen extends StatefulWidget {
 }
 
 class _GuestHomeScreenState extends State<GuestHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    GuestWatchlistStore.instance.addListener(_picksChanged);
+    GuestWatchlistStore.instance
+        .read()
+        .then((_) => _picksChanged())
+        .catchError((Object _) {});
+  }
+
+  void _picksChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    GuestWatchlistStore.instance.removeListener(_picksChanged);
+    super.dispose();
+  }
+
   final _cinemasKey = GlobalKey<InCinemasSectionState>();
   late Future<(List<MovieShort>, Map<String, dynamic>)> _content = _load();
   Future<(List<MovieShort>, Map<String, dynamic>)> _load() async {
@@ -56,6 +79,10 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: context.colors.background,
         appBar: AppBar(title: const FlixieWordmark(), actions: [
+          IconButton(
+              tooltip: 'Your watchlist',
+              onPressed: () => context.push('/guest-watchlist'),
+              icon: const Icon(Icons.bookmarks_outlined)),
           IconButton(
               tooltip: 'Play with Pip',
               onPressed: () => context.push('/play'),
@@ -110,6 +137,8 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                                 const Text('Movies & shows'),
                                 const SizedBox(height: 14),
                                 GuestTrendingCarousel(
+                                  savedIds:
+                                      GuestWatchlistStore.instance.homeKeys,
                                   movies: movies,
                                   onDetails: (movie) => context.push(
                                       '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}'),
@@ -120,12 +149,16 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                                           'Create an account to keep your watchlist and come back when you’re ready.',
                                       path:
                                           '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}',
+                                      mediaTitle: movie.name,
+                                      mediaPoster: movie.poster,
                                       intent: 'watchlist'),
                                   onTrailer: (movie) => _openTrailer(movie),
                                 ),
                                 const SizedBox(height: 28),
                                 InCinemasSection(
                                     key: _cinemasKey,
+                                    loadingPlaceholder:
+                                        const CinemaListSkeleton(),
                                     region: WidgetsBinding
                                             .instance
                                             .platformDispatcher
@@ -141,16 +174,20 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                                             'Create an account to keep your watchlist and come back when you’re ready.',
                                         path:
                                             '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}',
+                                        mediaTitle: movie.name,
+                                        mediaPoster: movie.poster,
                                         intent: 'watchlist'),
                                     onTrailer: _openTrailer,
                                     mediaBuilder: (items) => GuestCinemaList(
+                                        savedIds: GuestWatchlistStore
+                                            .instance.homeKeys,
                                         movies: items,
                                         onDetails: _openTitle,
                                         onSave: _saveTitle,
                                         onTrailer: _openTrailer)),
                                 GuestSignupSection(
                                   onSignup: () {
-                                    GuestAccess.clear();
+                                    GuestAccess.beginGeneralSignup('home');
                                     context.push('/auth/signup');
                                   },
                                   onSignin: () {
@@ -187,6 +224,7 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                                     if (isVisibleGenre(group['name'] as String,
                                         id: group['id'] as int))
                                       FlixiePill.action(
+                                          colorKey: group['name'] as String,
                                           avatar: GenreIcon(
                                               group['name'] as String),
                                           label: Text(group['name'] as String),
@@ -196,7 +234,8 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                                               message:
                                                   'Create an account to explore conversations and share your favourites with this community.',
                                               path:
-                                                  '/genre-communities/${group['id']}'))
+                                                  '/genre-communities/${group['id']}',
+                                              intent: 'community'))
                                 ]),
                                 const SizedBox(height: 24),
                                 const SizedBox(height: 24),
@@ -216,6 +255,8 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
       message:
           'Create an account to keep your watchlist and come back when you’re ready.',
       path: '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}',
+      mediaTitle: movie.name,
+      mediaPoster: movie.poster,
       intent: 'watchlist');
 
   Future<void> _openTrailer(MovieShort movie) async {
@@ -297,7 +338,9 @@ class GuestWelcomeScreen extends StatelessWidget {
                                                     const SizedBox(height: 32),
                                                     FilledButton(
                                                         onPressed: () {
-                                                          GuestAccess.clear();
+                                                          GuestAccess
+                                                              .beginGeneralSignup(
+                                                                  'profile');
                                                           context.push(
                                                               '/auth/signup');
                                                         },
@@ -308,6 +351,8 @@ class GuestWelcomeScreen extends StatelessWidget {
                                                                         0, 55)),
                                                         child: const Text(
                                                             'Create account')),
+                                                    const SizedBox(height: 12),
+                                                    const WhyFlixieButton(),
                                                     const SizedBox(height: 12),
                                                     TextButton(
                                                         onPressed: () {
@@ -358,7 +403,7 @@ class GuestWelcomeScreen extends StatelessWidget {
                           Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text('Find your next\ngreat watch.',
+                                Text('Films are better\nwith your people.',
                                     style: Theme.of(context)
                                         .textTheme
                                         .headlineLarge
@@ -369,7 +414,7 @@ class GuestWelcomeScreen extends StatelessWidget {
                                             letterSpacing: -.8)),
                                 const SizedBox(height: 20),
                                 Text(
-                                    'Explore films and shows. Save your favourites when you’re ready.',
+                                    'See what friends love, find where it’s streaming, and plan your next watch together.',
                                     style: Theme.of(context)
                                         .textTheme
                                         .bodyLarge
@@ -391,13 +436,15 @@ class GuestWelcomeScreen extends StatelessWidget {
                                           Icon(Icons.arrow_forward_rounded,
                                               size: 19)
                                         ])),
+                                const SizedBox(height: 16),
+                                const WhyFlixieButton(),
                                 const SizedBox(height: 12),
-                                OutlinedButton(
+                                TextButton(
                                     onPressed: () {
-                                      GuestAccess.clear();
+                                      GuestAccess.beginGeneralSignup('home');
                                       context.push('/auth/signup');
                                     },
-                                    style: OutlinedButton.styleFrom(
+                                    style: TextButton.styleFrom(
                                         minimumSize: const Size(0, 53)),
                                     child: const Text('Create account')),
                                 const SizedBox(height: 12),
@@ -427,7 +474,6 @@ class GuestHomeLoadingSkeleton extends StatelessWidget {
         GuestHomeWelcome(),
         SizedBox(height: 24),
         Text('Trending now'),
-        PipLoadingStrip(),
         SizedBox(height: 14),
         TrendingCarouselSkeleton(),
         SizedBox(height: 28),

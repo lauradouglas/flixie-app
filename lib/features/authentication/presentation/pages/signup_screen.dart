@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/guest/presentation/widgets/bookmark_signup_context.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_invite_signup_context.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/features/authentication/data/setup_service.dart';
@@ -20,10 +21,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/auth_ui.dart';
-import 'package:flixie_app/features/profile/data/avatar_service.dart';
-import 'signup_avatar_step.dart';
 import 'social_auth_buttons.dart';
-import 'package:flixie_app/models/profile_avatar.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 
 String? validateSignupName(String? value, String label) {
@@ -65,14 +63,10 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _checkingUsername = false;
   bool? _usernameAvailable;
   String? _usernameCheckError;
-  bool _choosingAvatar = false;
-  bool _loadingAvatars = false;
-  String? _avatarError;
-  List<ProfileAvatar> _avatars = const [];
-  int? _selectedAvatarId;
   bool _signupStartedLogged = false;
   bool _signupCompletedLogged = false;
   bool _checkingReferral = false;
+  String? _resolvedReferralCode;
   bool? _referralCodeValid;
   String? _referrerUsername;
   String? _referralError;
@@ -161,7 +155,9 @@ class _SignupScreenState extends State<SignupScreen> {
   void _onReferralCodeChanged(String _) {
     _referralDebounce?.cancel();
     setState(() {
+      _checkingReferral = false;
       _referralCodeValid = null;
+      _resolvedReferralCode = null;
       _referrerUsername = null;
       _referralError = null;
     });
@@ -180,6 +176,7 @@ class _SignupScreenState extends State<SignupScreen> {
         setState(() {
           _checkingReferral = false;
           _referralCodeValid = null;
+          _resolvedReferralCode = null;
           _referrerUsername = null;
           _referralError = null;
         });
@@ -189,11 +186,12 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() {
       _checkingReferral = true;
       _referralCodeValid = null;
+      _resolvedReferralCode = null;
       _referrerUsername = null;
       _referralError = null;
     });
     try {
-      final username = await UserService.lookupReferralUsername(code);
+      final referral = await UserService.resolveReferral(code);
       if (!mounted ||
           code.toUpperCase() !=
               _referralCodeController.text.trim().toUpperCase()) {
@@ -202,23 +200,25 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() {
         _checkingReferral = false;
         _referralCodeValid = true;
-        _referrerUsername = username;
+        _referrerUsername = referral.username;
+        _resolvedReferralCode = referral.code;
       });
     } on ApiException catch (error) {
-      if (!mounted) return;
+      if (!mounted || code != _referralCodeController.text.trim()) return;
       setState(() {
         _checkingReferral = false;
         _referralCodeValid = false;
         _referralError = error.statusCode == 404
-            ? 'This referral code is not valid.'
-            : 'Unable to validate this referral code right now.';
+            ? 'We couldn’t find that code or username.'
+            : 'Couldn’t check your friend right now. Please try again.';
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || code != _referralCodeController.text.trim()) return;
       setState(() {
         _checkingReferral = false;
         _referralCodeValid = false;
-        _referralError = 'Unable to validate this referral code right now.';
+        _referralError =
+            'Couldn’t check your friend right now. Please try again.';
       });
     }
   }
@@ -260,7 +260,7 @@ class _SignupScreenState extends State<SignupScreen> {
         return;
       }
       try {
-        await widget.referralStore.save(_referralCodeController.text);
+        await widget.referralStore.save(_resolvedReferralCode!);
       } catch (_) {
         // The validated code still travels to the backend in this submission.
       }
@@ -278,17 +278,13 @@ class _SignupScreenState extends State<SignupScreen> {
       firstName: _displayNameController.text.trim(),
       lastName: '',
       username: _usernameController.text.trim(),
-      referralCode: _referralCodeController.text,
+      referralCode: _resolvedReferralCode,
     );
 
     if (!mounted) return;
     if (success) {
       TextInput.finishAutofillContext(shouldSave: true);
-      setState(() {
-        _choosingAvatar = true;
-        _loadingAvatars = true;
-      });
-      await _loadAvatars();
+      await _completeSignup();
       return;
     }
     if (auth.errorCode == 'USERNAME_NOT_AVAILABLE' ||
@@ -329,29 +325,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  Future<void> _loadAvatars() async {
-    try {
-      final avatars = await AvatarService.getAvatars();
-      if (!mounted) return;
-      setState(() {
-        _avatars = avatars;
-        _loadingAvatars = false;
-        _avatarError = avatars.isEmpty
-            ? 'No profile avatars are currently available.'
-            : null;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _loadingAvatars = false;
-        _avatarError = 'Unable to load profile avatars.';
-      });
-    }
-  }
-
-  Future<void> _completeAvatarSignup() async {
-    final avatarId = _selectedAvatarId;
-    if (avatarId == null) return;
+  Future<void> _completeSignup() async {
     final auth = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     if (_referrerUsername != null && auth.dbUser != null) {
@@ -359,7 +333,7 @@ class _SignupScreenState extends State<SignupScreen> {
         await SetupService.rememberInviter(auth.dbUser!.id, _referrerUsername!);
       } catch (_) {}
     }
-    final success = await auth.completeAvatarSignUp(avatarId);
+    final success = await auth.completeSignupWithDefaultAvatar();
     if (success && !_signupCompletedLogged) {
       _signupCompletedLogged = true;
       await analytics.signupCompleted();
@@ -380,7 +354,8 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!mounted || success) return;
     ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
       type: FlixieToastType.error,
-      content: Text(auth.errorMessage ?? 'Unable to assign avatar.'),
+      content: Text(
+          auth.errorMessage ?? 'Unable to finish signup. Please try again.'),
       backgroundColor: context.colors.danger,
     ));
   }
@@ -421,22 +396,6 @@ class _SignupScreenState extends State<SignupScreen> {
     final textTheme = Theme.of(context).textTheme;
     final isLoading = context.select<AuthProvider, bool>((p) => p.isLoading);
 
-    if (_choosingAvatar) {
-      return SignupAvatarStep(
-        avatars: _avatars,
-        selectedId: _selectedAvatarId,
-        loading: _loadingAvatars,
-        saving: isLoading,
-        error: _avatarError,
-        profileBadges:
-            context.watch<AuthProvider>().dbUser?.profileBadges ?? const [],
-        onRetry: _loadAvatars,
-        onSelected: (avatar) => setState(() => _selectedAvatarId = avatar.id),
-        onContinue: _completeAvatarSignup,
-        onBack: _leaveSignup,
-      );
-    }
-
     final socialProfile = context.watch<AuthProvider>().needsSocialProfile;
     return AuthScaffold(
       cinema: true,
@@ -474,6 +433,7 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const BookmarkSignupContext(),
               const WatchInviteSignupContext(),
               if (!socialProfile) ...[
                 SocialAuthButtons(onSignedIn: _socialSignedIn),
@@ -508,6 +468,7 @@ class _SignupScreenState extends State<SignupScreen> {
               AppTextField(
                 controller: _usernameController,
                 label: 'Username',
+                keyboardType: TextInputType.emailAddress,
                 prefixIcon: Icons.alternate_email_rounded,
                 textInputAction: TextInputAction.next,
                 onChanged: _onUsernameChanged,
@@ -561,62 +522,72 @@ class _SignupScreenState extends State<SignupScreen> {
                   },
                 ),
               const SizedBox(height: 14),
-              AppTextField(
-                controller: _referralCodeController,
-                label: 'Who referred you? (optional)',
-                prefixIcon: Icons.people_alt_outlined,
-                textCapitalization: TextCapitalization.characters,
-                textInputAction: TextInputAction.next,
-                onChanged: _onReferralCodeChanged,
-                suffixIcon: _checkingReferral
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : _referralCodeValid == true
-                        ? Icon(
-                            Icons.check_circle,
-                            color: context.colors.success,
+              ExpansionTile(
+                key: const ValueKey('signup-referral-toggle'),
+                initiallyExpanded:
+                    widget.referralCode?.trim().isNotEmpty ?? false,
+                maintainState: true,
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 12),
+                title: const Text('Referred by a friend?'),
+                subtitle: const Text('Optional'),
+                children: [
+                  AppTextField(
+                    controller: _referralCodeController,
+                    label: 'Referral code or username',
+                    prefixIcon: Icons.people_alt_outlined,
+                    textCapitalization: TextCapitalization.none,
+                    textInputAction: TextInputAction.next,
+                    onChanged: _onReferralCodeChanged,
+                    suffixIcon: _checkingReferral
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
                           )
-                        : _referralCodeValid == false
+                        : _referralCodeValid == true
                             ? Icon(
-                                Icons.cancel,
-                                color: context.colors.danger,
+                                Icons.check_circle,
+                                color: context.colors.success,
                               )
-                            : null,
-                validator: (value) {
-                  final code = value?.trim() ?? '';
-                  if (code.isNotEmpty &&
-                      (code.length < 4 || code.length > 32)) {
-                    return 'Enter the referral code from your friend.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 6),
-              Text(
-                _referrerUsername != null
-                    ? '@$_referrerUsername referred you'
-                    : _referralError ??
-                        'Enter the code from your invite. When you '
-                            'complete your profile, you’ll both unlock '
-                            'your Movie Match.',
-                style: TextStyle(
-                  color: _referrerUsername != null
-                      ? context.colors.success
-                      : _referralError != null
-                          ? context.colors.danger
-                          : context.colors.medium,
-                  fontSize: 12,
-                  height: 1.35,
-                  fontWeight: _referrerUsername != null
-                      ? FontWeight.w700
-                      : FontWeight.normal,
-                ),
+                            : _referralCodeValid == false
+                                ? Icon(
+                                    Icons.cancel,
+                                    color: context.colors.danger,
+                                  )
+                                : null,
+                    validator: (value) {
+                      final code = value?.trim() ?? '';
+                      if (code.isNotEmpty &&
+                          (code.length < 3 || code.length > 33)) {
+                        return 'Enter your friend’s referral code or username.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _referrerUsername != null
+                        ? '@$_referrerUsername referred you'
+                        : _referralError ??
+                            'Enter a referral code or your friend’s @username.',
+                    style: TextStyle(
+                      color: _referrerUsername != null
+                          ? context.colors.success
+                          : _referralError != null
+                              ? context.colors.danger
+                              : context.colors.medium,
+                      fontSize: 12,
+                      height: 1.35,
+                      fontWeight: _referrerUsername != null
+                          ? FontWeight.w700
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 14),
               if (!socialProfile) ...[
@@ -629,7 +600,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   validator: validateFirebasePassword,
                 ),
                 const SizedBox(height: 10),
-                PasswordStrengthBar(password: _passwordController.text),
+                if (_passwordController.text.isNotEmpty)
+                  PasswordStrengthBar(password: _passwordController.text),
                 const SizedBox(height: 14),
                 PasswordField(
                   controller: _confirmPasswordController,
@@ -755,7 +727,10 @@ class _CountryPickerSheetState extends State<SignupCountryPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final bottom = MediaQuery.viewInsetsOf(context)
+        .bottom
+        .clamp(0.0, double.infinity)
+        .toDouble();
     return Container(
       height: MediaQuery.sizeOf(context).height * 0.78,
       clipBehavior: Clip.antiAlias,

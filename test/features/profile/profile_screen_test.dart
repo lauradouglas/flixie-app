@@ -14,6 +14,8 @@ import 'package:flixie_app/features/profile/presentation/widgets/profile_library
 import 'profile_controller_test.dart' show ProfileAuth;
 
 class ProfileScreenFixture {
+  ProfileScreenFixture({this.diaryWatches = const []});
+  final List<Map<String, dynamic>> diaryWatches;
   final auth = ProfileAuth();
   final paths = <String>[];
   late final router = GoRouter(routes: [
@@ -28,6 +30,7 @@ class ProfileScreenFixture {
   late final client = MockClient((request) async {
     paths.add(request.url.path);
     Object value = [];
+    if (request.url.path.endsWith('/movie/watches')) value = diaryWatches;
     if (request.url.path.endsWith('/watch-providers')) {
       value = {'watchProviders': []};
     }
@@ -86,6 +89,48 @@ Future<void> openProfileTab(WidgetTester tester, String name) async {
 }
 
 void main() {
+  testWidgets('diary can scroll its final watch above the footer', (tester) async {
+    tester.view.physicalSize = const Size(390, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final f = ProfileScreenFixture(diaryWatches: [
+      for (var i = 0; i < 12; i++)
+        {
+          'id': 'watch-$i',
+          'userId': 'viewer',
+          'movieId': 348,
+          'watchedAt': DateTime.now().toIso8601String(),
+          'rating': 9,
+          'notes': 'Movie night $i',
+          'movie': {'id': 348, 'title': 'Alien'},
+        }
+    ]);
+    addTearDown(f.dispose);
+    await http.runWithClient(() async {
+      await tester.pumpWidget(f.app(1));
+      await tester.pumpAndSettle();
+      await openProfileTab(tester, 'Diary');
+      await tester.drag(
+          find.byType(CustomScrollView).first, const Offset(0, -1500));
+      await tester.pumpAndSettle();
+      expect(find.byType(SingleChildScrollView), findsNothing);
+      final diaryScroll = find.byType(CustomScrollView).first;
+      for (var i = 0; i < 10; i++) {
+        await tester.drag(diaryScroll, const Offset(0, -500));
+        await tester.pumpAndSettle();
+      }
+      final footer = find.text('This week');
+      expect(footer.hitTestable(), findsOneWidget);
+      final lastNote = find.text('Movie night 11');
+      expect(lastNote.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(lastNote).dy,
+          lessThan(tester.getTopLeft(footer).dy));
+      expect(tester.getBottomLeft(footer).dy, lessThanOrEqualTo(700));
+      expect(tester.takeException(), isNull);
+    }, () => f.client);
+  });
+
   testWidgets('logout replaces the mounted profile with account invitation',
       (tester) async {
     final f = ProfileScreenFixture();
@@ -101,7 +146,7 @@ void main() {
       expect(find.text('Already a member? Sign in'), findsOneWidget);
       expect(find.byType(ProfileHeader), findsNothing);
       expect(find.text('Guest User'), findsNothing);
-      expect(find.text('Friends & following'), findsNothing);
+      expect(find.text('Friends'), findsNothing);
       f.auth.select('viewer');
       await tester.pumpAndSettle();
       expect(find.byType(ProfileHeader), findsOneWidget);
@@ -140,16 +185,16 @@ void main() {
     await http.runWithClient(() async {
       await tester.pumpWidget(f.app(1));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Friends & following'));
+      await tester.ensureVisible(find.text('Friends'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Friends & following'));
+      await tester.tap(find.text('Friends'));
       await tester.pumpAndSettle();
       expect(find.text('Friends fixture'), findsOneWidget);
       expect(f.router.canPop(), true);
       await tester.dragFrom(const Offset(1, 250), const Offset(650, 0));
       await tester.pumpAndSettle();
       expect(find.text('Friends fixture'), findsNothing);
-      expect(find.text('Friends & following'), findsOneWidget);
+      expect(find.text('Friends'), findsOneWidget);
       expect(f.router.canPop(), false);
     }, () => f.client);
   });
@@ -180,7 +225,10 @@ void main() {
               find.byType(CustomScrollView).first, const Offset(0, -300));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await openProfileTab(tester, 'Library');
+          await openProfileTab(tester, 'Diary');
+          expect(find.text('Dear film diary,'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await openProfileTab(tester, 'Taste');
           expect(tester.takeException(), isNull);
           expect(f.paths.where((p) => p.contains('/wrapped/')), hasLength(1));
         }, () => f.client);

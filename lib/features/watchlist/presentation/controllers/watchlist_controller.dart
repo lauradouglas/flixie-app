@@ -40,6 +40,60 @@ class WatchlistController extends ChangeNotifier {
   bool _disposed = false;
   int _changeDepth = 0;
   WatchlistSelection? _selectionCache;
+  String? _availabilityDate, _availabilityOwner;
+  String? get availabilityDate => _availabilityDate;
+  Set<int> _availableMovieIds = {};
+  bool loadingAvailability = false;
+  String? availabilityError;
+  int _availabilityGeneration = 0;
+  bool get newlyAvailableOnly => _filters.availableMovieIds != null;
+
+  Future<void> setAvailabilityDate(String? date) async {
+    _availabilityDate = date;
+    _availabilityOwner = _auth.dbUser?.id;
+    final generation = ++_availabilityGeneration;
+    final owner = _availabilityOwner;
+    final parsed = date == null ? null : DateTime.tryParse(date);
+    final valid = date != null &&
+        RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date) &&
+        parsed != null &&
+        parsed.toIso8601String().startsWith(date);
+    _change(() {
+      _availableMovieIds = {};
+      _filters.availableMovieIds = date == null ? null : <int>{};
+      loadingAvailability = valid && owner != null;
+      availabilityError =
+          date != null && !valid ? 'This availability date is invalid.' : null;
+    });
+    if (!valid || owner == null) return;
+    try {
+      final ids = await _service.getNewlyAvailableMovies(date);
+      if (_disposed ||
+          generation != _availabilityGeneration ||
+          owner != _auth.dbUser?.id) {
+        return;
+      }
+      _change(() {
+        _availableMovieIds = ids;
+        if (newlyAvailableOnly) _filters.availableMovieIds = Set.of(ids);
+        loadingAvailability = false;
+      });
+    } catch (_) {
+      if (_disposed ||
+          generation != _availabilityGeneration ||
+          owner != _auth.dbUser?.id) {
+        return;
+      }
+      _change(() {
+        loadingAvailability = false;
+        availabilityError = 'Couldn’t load the newly available films.';
+      });
+    }
+  }
+
+  void setNewlyAvailableOnly(bool enabled) => updateFilters((filters) {
+        filters.availableMovieIds = enabled ? Set.of(_availableMovieIds) : null;
+      });
 
   void _change(VoidCallback action) {
     if (_disposed) return;
@@ -418,6 +472,9 @@ class WatchlistController extends ChangeNotifier {
   }
 
   void loadWatchlist() {
+    if (_availabilityDate != null && _availabilityOwner != _auth.dbUser?.id) {
+      unawaited(setAvailabilityDate(_availabilityDate));
+    }
     final detailsRequest = ++_showDetailsRequest;
     resetEnrichment();
     final authProvider = _auth;
@@ -797,6 +854,7 @@ class WatchlistController extends ChangeNotifier {
   List<int> allYears() => _selection.allYears();
 
   bool get hasActiveFilters =>
+      newlyAvailableOnly ||
       usesExperience ||
       _filters.servicesOnly ||
       _filters.release != null ||
@@ -812,6 +870,7 @@ class WatchlistController extends ChangeNotifier {
     _searchQuery = '';
     _change(() {
       _filters.friendsOnly = false;
+      _filters.availableMovieIds = null;
       _filters.tab = 0;
       _filters.media = 0;
       _filters.release = null;

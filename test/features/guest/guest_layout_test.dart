@@ -85,7 +85,7 @@ void main() {
           title: 'Save Alien for later',
           message: 'Create a free account to keep your watchlist with you.',
           path: '/movies/348',
-          intent: 'watchlist');
+          intent: 'review');
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await capture('sheet');

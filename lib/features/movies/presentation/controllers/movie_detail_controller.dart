@@ -1,3 +1,4 @@
+import '../../../watchlist/data/guest_watchlist_store.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flixie_app/features/movies/presentation/controllers/movie_detail_sections_controller.dart';
 import 'package:flixie_app/models/movie.dart';
@@ -184,10 +185,18 @@ class MovieDetailController extends ChangeNotifier {
           userId != auth.dbUser?.id) {
         return;
       }
+      final guestPicks =
+          userId == null ? await GuestWatchlistStore.instance.read() : null;
+      if (_disposed ||
+          generation != _loadGeneration ||
+          userId != auth.dbUser?.id) {
+        return;
+      }
       change(() {
         this.movie = movie;
         final user = auth.dbUser;
-        inWatchlist = user?.isMovieInWatchlist(id) ?? false;
+        inWatchlist = user?.isMovieInWatchlist(id) ??
+            (guestPicks?.any((p) => p.key == 'movie:$id') ?? false);
         isWatched = watchHistoryLoaded
             ? movieWatchHistory.isNotEmpty
             : (user?.isMovieWatched(id) ?? false);
@@ -212,8 +221,11 @@ class MovieDetailController extends ChangeNotifier {
         userId == auth.dbUser?.id &&
         movie != null) {
       optional.addAll([
-        if (userId != null) _optional('reviews', () => service.getMovieReviews(id, userId: userId),
-            (value) => reviews = value),
+        if (userId != null)
+          _optional(
+              'reviews',
+              () => service.getMovieReviews(id, userId: userId),
+              (value) => reviews = value),
         _loadMovieImages(id),
       ]);
     }

@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flixie_app/features/watchlist/data/guest_watchlist_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +9,10 @@ import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import '../movies/movie_detail_action_flow_test.dart' show ActionAuth;
 
 void main() {
-  setUp(GuestAccess.clear);
+  setUp(() {
+    GuestAccess.clear();
+    SharedPreferences.setMockInitialValues({});
+  });
   test('only catalogue and guest shell paths are public', () {
     for (final path in [
       '/',
@@ -67,8 +72,7 @@ void main() {
     router.dispose();
     auth.dispose();
   });
-  testWidgets(
-      'dismiss does nothing; signup preserves the title and save intent',
+  testWidgets('guest bookmark saves locally without interrupting browsing',
       (tester) async {
     final auth = ActionAuth();
     final router = GoRouter(initialLocation: '/movies/348', routes: [
@@ -77,8 +81,13 @@ void main() {
           builder: (context, _) => Scaffold(
               body: TextButton(
                   onPressed: () => GuestAccess.require(context,
-                      title: 'Save Alien for later', intent: 'watchlist'),
+                      title: 'Save Alien for later',
+                      mediaTitle: 'Alien',
+                      intent: 'watchlist'),
                   child: const Text('Add to watchlist')))),
+      GoRoute(
+          path: '/guest-watchlist',
+          builder: (_, __) => const Scaffold(body: Text('Guest picks'))),
       GoRoute(
           path: '/auth/signup',
           builder: (_, __) => const Scaffold(body: Text('Registration'))),
@@ -87,17 +96,24 @@ void main() {
         value: auth, child: MaterialApp.router(routerConfig: router)));
     await tester.tap(find.text('Add to watchlist'));
     await tester.pumpAndSettle();
-    expect(find.text('Save Alien for later'), findsOneWidget);
-    await tester.tap(find.text('Keep exploring'));
+    expect(find.text('Registration'), findsNothing);
+    expect(GuestAccess.awaitingAccount, isFalse);
+    expect((await GuestWatchlistStore.instance.read()).single.name, 'Alien');
+    expect(find.text('Added to your watchlist'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    await tester.tap(find.text('View watchlist'));
+    await tester.pump();
+    // Navigation must wait until the confirmation has finished closing.
+    expect(find.text('Guest picks'), findsNothing);
     await tester.pumpAndSettle();
-    expect(GuestAccess.destination, isNull);
+    expect(find.text('Guest picks'), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
+    router.pop();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Add to watchlist'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Create account'));
-    await tester.pumpAndSettle();
-    expect(find.text('Registration'), findsOneWidget);
-    expect(GuestAccess.destination, '/movies/348');
-    expect(GuestAccess.action, 'watchlist');
+    expect(await GuestWatchlistStore.instance.read(), isEmpty);
+    expect(GuestAccess.destination, isNull);
     await tester.pumpWidget(const SizedBox());
     router.dispose();
     auth.dispose();

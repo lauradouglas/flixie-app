@@ -11,10 +11,12 @@ class ChatReadObserver extends StatefulWidget {
       {super.key,
       required this.conversationId,
       required this.child,
-      this.active = true});
+      this.active = true,
+      this.canMarkRead});
   final String conversationId;
   final Widget child;
   final bool active;
+  final bool Function()? canMarkRead;
   @override
   State<ChatReadObserver> createState() => _ChatReadObserverState();
 }
@@ -33,6 +35,7 @@ class _ChatReadObserverState extends State<ChatReadObserver> {
     if (!mounted ||
         _saving ||
         !widget.active ||
+        widget.canMarkRead?.call() == false ||
         WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
         ModalRoute.of(context)?.isCurrent != true) {
       return;

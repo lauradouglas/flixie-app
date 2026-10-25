@@ -1,7 +1,9 @@
+import '../../../taste/presentation/widgets/taste_home_card.dart';
+import '../widgets/home_startup_gate.dart';
+import 'package:flixie_app/features/movies/models/watch_log_details.dart';
 import '../widgets/cinema_list.dart';
 import 'package:flixie_app/features/movies/presentation/trailers/trailer_player_sheet.dart';
 import '../widgets/recommendations_loading_card.dart';
-import '../widgets/pip_loading_strip.dart';
 import '../models/home_watch_plan_layout.dart';
 import '../widgets/home_watch_plan_column.dart';
 import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
@@ -18,7 +20,6 @@ import 'package:flixie_app/core/storage/library_image_warmup.dart';
 import 'package:flixie_app/features/home/presentation/widgets/home_watchlist_action.dart';
 import 'package:flixie_app/core/widgets/flixie_section_header.dart';
 import 'package:flixie_app/features/home/presentation/widgets/find_tonights_film_section.dart';
-import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:flixie_app/core/auth/startup_trace.dart';
 import 'package:flixie_app/features/social/data/watch_request_cache.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -62,7 +63,6 @@ import 'package:flixie_app/features/movies/presentation/widgets/write_review_she
 import 'package:flixie_app/features/movies/presentation/widgets/watch_request_sheet.dart';
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_state.dart';
 import 'package:flixie_app/features/home/presentation/widgets/home_watch_plan_card.dart';
-import 'package:flixie_app/features/home/presentation/widgets/watch_plans_introduction_card.dart';
 import 'package:flixie_app/features/sharing/models/share_card_data.dart';
 import 'package:flixie_app/features/sharing/presentation/share_card_sheet.dart';
 
@@ -95,10 +95,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Set<int> get _watchlistUpdatesInFlight => _home.watchlist.value.data.pending;
   Set<int> get _watchlistMovieIds => _home.watchlist.value.data.ids;
   List<WatchRequest> get _watchPlansToShow => _home.watchPlans.plans;
+  bool _startupImagesReady = false;
+  final _initialHomeReveal = Completer<void>();
+  bool _initialHomeRevealed = false;
+  int _visibleTrendingPage = 0;
   bool get _isLoadingWatchPlans => _home.watchPlans.loading;
-  bool get _watchPlansLoadFailed => _home.watchPlans.failed;
-  bool get _watchPlansIntroDismissed => _home.watchPlans.introductionDismissed;
-  bool get _hasUsedWatchPlans => _home.watchPlans.hasUsedPlans;
   bool get _isLoading => _home.trending.value.loading;
   bool get _isLoadingRecommendations => _home.recommendations.value.loading;
   String? get _error => _home.trending.value.error;
@@ -130,9 +131,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _home = HomeController(
       auth: context.read<AuthProvider>(),
       watchPlans: HomeWatchPlansController(context.read<WatchRequestCache>()),
+      firstHomeReveal: _initialHomeReveal.future,
       onTrendingReady: (movies, user) {
         if (!mounted) return;
-        unawaited(_precacheInitialHomeImages(movies));
+        unawaited(_warmStartupImages(movies));
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           StartupTrace.mark('usable-home-frame');
@@ -140,6 +142,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       },
     );
+    if (_home.trending.value.data.isNotEmpty) {
+      unawaited(_warmStartupImages(_home.trending.value.data));
+    }
     _home.recommendations.addListener(_scheduleRecommendationVisibilityCheck);
   }
 
@@ -163,6 +168,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     TabRefreshController.watchPlans.removeListener(_refreshWatchPlanReminders);
     _home.recommendations
         .removeListener(_scheduleRecommendationVisibilityCheck);
+    if (!_initialHomeReveal.isCompleted) _initialHomeReveal.complete();
     _home.dispose();
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
     _forYouPageController.dispose();
@@ -237,6 +243,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               url, MediaQuery.devicePixelRatioOf(context)),
           context,
           onError: (_, __) {});
+    }
+  }
+
+  Future<void> _warmStartupImages(List<MovieShort> movies) async {
+    await _precacheInitialHomeImages(movies);
+    if (mounted && !_startupImagesReady) {
+      setState(() => _startupImagesReady = true);
     }
   }
 
@@ -575,41 +588,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _dismissWatchPlansIntroduction() async {
-    final userId = context.read<AuthProvider>().dbUser?.id;
-    if (userId == null) return;
-    await _home.watchPlans.dismissIntroduction(userId);
-  }
-
-  Future<void> _showWatchPlansExplanation() => showFlixiePromptSheet<void>(
-        context: context,
-        builder: (dialogContext) => FlixiePromptSheetContent(
-          title: const Text('Choose together'),
-          content: const Text(
-            'Add a few movie options, invite a friend or group, then choose the final movie and arrange when and where to watch.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Got it'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _openWatchPlanCreation();
-              },
-              child: const Text('Make a plan'),
-            ),
-          ],
-        ),
-      );
-
   @override
   Widget build(BuildContext context) {
     final userId =
         context.select<AuthProvider, String?>((auth) => auth.dbUser?.id);
     if (userId == null) return const GuestHomeScreen();
-    return FlixiePageScaffold(
+    final page = FlixiePageScaffold(
       adaptiveContent: true,
       backgroundColor: context.colors.background,
       appBar: AppBar(
@@ -643,6 +627,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     await context.read<AuthProvider>().retrySession();
                     if (mounted) await _refreshAll();
                   }),
+              const TasteHomeCard(),
               LayoutBuilder(builder: (context, constraints) {
                 final wide = constraints.maxWidth >= 900 &&
                     MediaQuery.textScalerOf(context).scale(1) <= 1.4;
@@ -665,16 +650,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ]);
               }),
-              _buildInCinemasSection(),
+              if (_initialHomeRevealed) _buildInCinemasSection(),
               FindTonightsFilmSection(onPick: () async {
                 await context.push('/pick-for-us');
                 if (mounted) await _refreshAll();
               }),
-              HomeCommunitySection(key: _communityKey, userId: userId),
+              if (_initialHomeRevealed)
+                HomeCommunitySection(key: _communityKey, userId: userId),
               const PipGamesHomeEntry(),
             ],
           ),
         ),
+      ),
+    );
+    return ListenableBuilder(
+      listenable: Listenable.merge([_home.trending, _home.watchPlans]),
+      child: page,
+      builder: (context, child) => HomeStartupGate(
+        key: ValueKey(userId),
+        onRevealed: () {
+          if (!_initialHomeReveal.isCompleted) _initialHomeReveal.complete();
+          if (!_initialHomeRevealed) {
+            setState(() => _initialHomeRevealed = true);
+          }
+          context.read<AuthProvider>().releaseStartupWarmup(userId);
+          unawaited(_home.showHeroPage(_visibleTrendingPage));
+        },
+        ready: (!_home.trending.value.loading ||
+                _home.trending.value.data.isNotEmpty) &&
+            !_home.watchPlans.loading &&
+            (_startupImagesReady || _home.trending.value.error != null),
+        child: child!,
       ),
     );
   }
@@ -688,6 +694,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: InCinemasSection(
                   key: _cinemasKey,
                   region: region,
+                  initialMovies:
+                      context.read<AuthProvider>().cachedNowPlaying ?? const [],
+                  loadingPlaceholder: const CinemaListSkeleton(),
                   mediaBuilder: (movies) => CinemaList(
                         movies: movies,
                         savedIds: _watchlistMovieIds,
@@ -722,11 +731,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             final attention = user == null
                 ? 0
                 : homeWatchPlanAttentionCount(_watchPlansToShow, user.id);
-            final showIntro = user != null &&
-                !_isLoadingWatchPlans &&
-                !_watchPlansLoadFailed &&
-                !_hasUsedWatchPlans &&
-                !_watchPlansIntroDismissed;
             return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -742,16 +746,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         onWatchlist: () => context.push('/watchlist'),
                         onInvite: () => context.go('/social'),
                         onRequests: () => context.push('/plans'),
-                        featureCard: showIntro
-                            ? WatchPlansIntroductionCard(
-                                onCreate: _openWatchPlanCreation,
-                                onLearnMore: _showWatchPlansExplanation,
-                                onDismiss: _dismissWatchPlansIntroduction)
-                            : null,
                       )),
                   if (showPlans)
                     _buildUpcomingWatchPlanSection(context, user,
-                        selectedState: selected, suppressEmptyState: showIntro),
+                        selectedState: selected, suppressEmptyState: false),
                 ]);
           },
         ),
@@ -799,7 +797,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         HomeSectionHeader(title: 'Trending now'),
-                        PipLoadingStrip(),
                         SizedBox(height: 4),
                         TrendingCarouselSkeleton()
                       ]),
@@ -878,7 +875,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               movies: movies,
               friendActivity:
                   _home.userId == null ? null : _home.friendActivity,
-              onPageChanged: (index) => unawaited(_home.showHeroPage(index)),
+              onPageChanged: (index) {
+                _visibleTrendingPage = index;
+                if (_initialHomeRevealed) unawaited(_home.showHeroPage(index));
+              },
               onFriendsRetry: (movie) =>
                   unawaited(_home.retryFriendActivity(movie)),
               savedIds: _watchlistMovieIds,
@@ -1288,6 +1288,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool current() => mounted && _home.ownsSession(session);
 
     if (_watchlistUpdatesInFlight.contains(movieId)) return;
+    _home.setWatchlistMembership(movieId, currentlyInWatchlist, pending: true);
+    final libraryLoaded = await auth.ensureLibraryLoaded();
+    if (!context.mounted || !current()) return;
+    if (!libraryLoaded) {
+      _home.finishWatchlistUpdate(movieId);
+      ScaffoldMessenger.of(context).showFlixieToast(FlixieToast(
+        type: FlixieToastType.error,
+        content: const Text('Couldn’t load your watchlist. Try again.'),
+      ));
+      return;
+    }
+    currentlyInWatchlist = auth.dbUser?.movieWatchlist
+            ?.any((item) => item.movieId == movieId && item.removed != true) ??
+        false;
     final existing = auth.dbUser?.movieWatchlist ?? [];
     final messenger = ScaffoldMessenger.of(context);
     _home.setWatchlistMembership(movieId, !currentlyInWatchlist, pending: true);
@@ -1393,18 +1407,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final messenger = ScaffoldMessenger.of(context);
     var writeReview = false;
     var watchSaved = false;
+    var details = const WatchLogDetails();
     String? reviewWatchEntryId, reviewWatchedAt;
     double? reviewRating;
     bool? reviewRecommended;
     String? shareNote;
 
-    await showModalBottomSheet<void>(
+    await showMovieWatchLogSheet<void>(
       context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      movieId: movieId,
+      movieTitle: movieTitle,
       builder: (_) => RewatchLogSheet(
+        onDetailsChanged: (value) => details = value,
         isRewatch: isRewatch,
         showReviewOption: true,
         onReviewSelected: (selected) => writeReview = selected,
@@ -1420,6 +1434,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           final savedWatch = await _watchlistActions.logMovieWatch(
             userId,
             LogMovieWatchRequest(
+              watchedAtCinema: details.watchedAtCinema,
               movieId: movieId,
               watchedAt: watchedAt,
               rating: rating,
