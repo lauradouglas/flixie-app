@@ -158,7 +158,14 @@ void main() {
         });
       }
       // All three games are genuinely reachable without a signup redirect.
-      await tester.tap(find.byTooltip('Play with Pip'));
+      await tester.scrollUntilVisible(
+          find.text('Take a break with Pip’s games'), 400,
+          scrollable: find
+              .descendant(
+                  of: find.byType(GuestHomeScreen),
+                  matching: find.byType(Scrollable))
+              .first);
+      await tester.tap(find.text('Take a break with Pip’s games'));
       await tester.pumpAndSettle();
       expect(find.byType(PipGamesScreen), findsOneWidget);
       for (final path in [
@@ -182,17 +189,7 @@ void main() {
       expect(find.text('Already a member? Sign in'), findsOneWidget);
       await tester.tap(find.text('Home'));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('Create account'), 500,
-          scrollable: find
-              .descendant(
-                  of: find.byType(GuestHomeScreen),
-                  matching: find.byType(Scrollable))
-              .first);
-      // Independent loading/decoration can animate after the scroll; only
-      // the button layout needs a frame before the navigation tap.
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('Create account').hitTestable(), findsOneWidget);
-      await tester.tap(find.text('Create account'));
+      await tester.tap(find.text('Sign up'));
       await tester.pumpAndSettle();
       expect(find.text('Already have an account?'), findsOneWidget);
       await tester.ensureVisible(find.text('Sign In'));

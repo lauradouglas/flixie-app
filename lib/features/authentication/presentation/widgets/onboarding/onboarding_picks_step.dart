@@ -20,7 +20,7 @@ class OnboardingPicksStep extends StatelessWidget {
   List<Widget> _results(BuildContext context) => [
         if (controller.referrer != null)
           Text(
-              'You joined through @$controller.referrer. Find them when you’re ready.'),
+              'You’re already friends with @${controller.referrer}. Find them in Social whenever you’re ready.'),
         Text(controller.taste.isEmpty
             ? 'Popular picks to get you started'
             : 'Inspired by the titles you chose'),

@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/settings/data/availability_alert_service.dart';
 import 'package:flixie_app/features/taste/data/taste_setup_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flixie_app/features/watchlist/data/guest_watchlist_store.dart';
@@ -119,6 +120,21 @@ class JourneyData extends SignupJourneyService {
 }
 
 class JourneySetup extends SetupService {
+  bool _publicSharing = true;
+  @override
+  Future<bool> sharing() async => _publicSharing;
+  @override
+  Future<void> setSharing(bool value) async {
+    _publicSharing = value;
+  }
+
+  @override
+  Future<AvailabilityAlertSettings> availabilityAlerts() async =>
+      const AvailabilityAlertSettings(enabled: false);
+  @override
+  Future<void> saveAvailabilityAlerts(bool enabled) async {}
+  @override
+  Future<bool> enableAvailabilityPush() async => true;
   @override
   Future<List<Country>> countries() async => const [
         Country(
@@ -158,9 +174,13 @@ class PosterSearchSetup extends JourneySetup {
 
 Future<GoRouter> pumpJourney(
     WidgetTester tester, String action, JourneyData data, JourneyAuth auth,
-    {bool show = false, GlobalKey? boundary, SetupService? setup}) async {
+    {bool show = false,
+    GlobalKey? boundary,
+    SetupService? setup,
+    String? diaryDraftId}) async {
   final request = SignupJourney(
       userId: 'fixture',
+      diaryDraftId: diaryDraftId,
       action: action,
       path: action == 'guest-watchlist'
           ? '/guest-watchlist'
@@ -541,7 +561,8 @@ void main() {
     await tester.ensureVisible(find.text('Copy invite'));
     await tester.tap(find.text('Copy invite'));
     await tester.pumpAndSettle();
-    expect(find.text('Invite copied'), findsOneWidget,
+    expect(
+        find.text('Invite copied. Nothing sent automatically.'), findsOneWidget,
         reason: tester
             .widgetList<Text>(find.byType(Text))
             .map((t) => t.data)

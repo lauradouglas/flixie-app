@@ -185,7 +185,7 @@ class WatchRequestChoiceFlow extends WatchRequestActionContext {
             type: FlixieToastType.success,
             content: Text(state.request.selectedCandidateId != null
                 ? '${candidate.title ?? 'Movie'} finalised'
-                : 'Suggested ${candidate.title ?? 'movie'} — waiting for your friend'),
+                : 'Suggested ${candidate.title ?? 'movie'} - waiting for your friend'),
             backgroundColor: context.colors.surfaceElevated,
           ),
         );

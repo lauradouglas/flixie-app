@@ -80,6 +80,7 @@ class TrendingService {
     final data = await ApiClient.get('/trending/movie/$timeWindow');
     final movies = (data as List<dynamic>)
         .map((e) => MovieShort.fromJson(e as Map<String, dynamic>))
+        .where((movie) => !movie.isShow)
         .toList();
     _cache.cacheTrendingMovies(timeWindow, movies);
     return movies;

@@ -205,7 +205,7 @@ HomeWatchPlanState? _stateFor(
         'With $names · $responded of ${plan.viewingPersonIds.length} responded',
         mine == null
             ? 'Log your watch'
-            : everyone
+            : everyone || mine.watched
                 ? 'View recap'
                 : 'View watch',
         mine == null);
@@ -439,8 +439,10 @@ HomeWatchPlanState? _stateFor(
         group
             ? '${plan.watchConfirmations.length} of ${plan.analyticsParticipantCount} watches logged'
             : 'Waiting for @$other',
-        'Your shared recap will appear when everyone has logged.',
-        'View plan',
+        group
+            ? 'Your shared recap will appear when everyone has logged.'
+            : 'See your recap so far. It updates as everyone logs.',
+        group ? 'View plan' : 'View recap',
         false);
   }
   if (anotherLogged && (plan.scheduledFor != null || plan.lightweight)) {

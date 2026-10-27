@@ -228,18 +228,19 @@ void main() {
           isTrue);
       await tester.tap(find.byIcon(Icons.calendar_month_outlined).first);
       await tester.pumpAndSettle();
-      expect(find.text('Find a week'), findsOneWidget);
+      expect(find.text('Find a memory'), findsOneWidget);
       await tester
           .ensureVisible(find.byKey(const ValueKey('diary-day-2026-10-23')));
       await tester.tap(find.byKey(const ValueKey('diary-day-2026-10-23')));
       await tester.pumpAndSettle();
+      expect(find.text('Interstellar'), findsOneWidget);
       await tester.tap(find.text('Show this week'));
       await tester.pumpAndSettle();
       expect(find.text('Interstellar'), findsOneWidget);
       await tester.tap(find.byTooltip('Previous week').first);
       await tester.pumpAndSettle();
       expect(find.text('Alien'), findsNWidgets(2));
-      await tester.tap(find.text('No date (1)'));
+      await tester.tap(find.text('Without a date (1)'));
       await tester.pumpAndSettle();
       expect(find.text('Watches without a date'), findsOneWidget);
       auth.select(null);

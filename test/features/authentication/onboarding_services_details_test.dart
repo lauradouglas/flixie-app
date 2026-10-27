@@ -83,11 +83,11 @@ void main() {
       (tester) async {
     await tester.pumpWidget(MaterialApp(
         theme: AppTheme.darkTheme,
-        home: MediaQuery(
-            data: const MediaQueryData(
+        home: const MediaQuery(
+            data: MediaQueryData(
                 size: Size(834, 1210),
                 viewInsets: EdgeInsets.only(bottom: -80)),
-            child: const Scaffold(
+            child: Scaffold(
                 body: SignupCountryPickerSheet(countries: [
               Country(
                   id: 1,

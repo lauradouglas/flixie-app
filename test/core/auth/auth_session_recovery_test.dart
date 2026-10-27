@@ -14,7 +14,7 @@ class _Identity implements fb.User {
   Future<String?> Function()? token;
   @override
   Future<String?> getIdToken([bool forceRefresh = false]) {
-    expect(forceRefresh, isFalse);
+    expectSync(forceRefresh, isFalse);
     tokens++;
     return token?.call() ?? Future.value('token-$uid');
   }
@@ -70,6 +70,59 @@ class _Fixture {
 
 void main() {
   tearDown(() => ApiClient.setToken(null));
+
+  for (final tokenFailure in [false, true]) {
+    testWidgets(
+        'resume quietly recovers from transient ${tokenFailure ? "token" : "profile"} failure',
+        (tester) async {
+      final f = _Fixture()..profile = _profile('one');
+      addTearDown(f.recovery.dispose);
+      if (tokenFailure) {
+        f.identity.token = () async => throw TimeoutException('offline');
+      } else {
+        f.load = (_) async => throw TimeoutException('offline');
+      }
+      Future<void>? retried;
+      f.retry = () => retried = f.recovery.resume(force: true);
+      await f.recovery.resume();
+      expect(f.recovery.error, isNull);
+      expect(f.changes, 0);
+      expect(f.profile?.id, 'one');
+      f.identity.token = null;
+      f.load = null;
+      await tester.pump(const Duration(seconds: 5));
+      expect(f.retries, 1);
+      await retried;
+      expect(f.resumed, 1);
+      expect(f.recovery.error, isNull);
+      await tester.pump(const Duration(minutes: 1));
+      expect(f.retries, 1);
+    });
+  }
+
+  testWidgets(
+      'resume surfaces saved-content status only after retries are exhausted',
+      (tester) async {
+    final f = _Fixture()..profile = _profile('one');
+    addTearDown(f.recovery.dispose);
+    f.load = (_) async => throw TimeoutException('offline');
+    f.retry = () => f.recovery.resume(force: true);
+    await f.recovery.resume();
+    for (final seconds in [5, 15]) {
+      await tester.pump(Duration(seconds: seconds));
+      expect(f.recovery.error, isNull);
+    }
+    await tester.pump(const Duration(seconds: 30));
+    expect(f.recovery.error, contains('Showing saved content'));
+    expect(f.retries, 3);
+    expect(f.profile?.id, 'one');
+    await tester.pump(const Duration(minutes: 1));
+    expect(f.retries, 3);
+    f.load = null;
+    await f.recovery.retry();
+    expect(f.recovery.error, isNull);
+    expect(f.resumed, 1);
+  });
 
   testWidgets('screen profile refresh and overlapping resumes share one read',
       (tester) async {

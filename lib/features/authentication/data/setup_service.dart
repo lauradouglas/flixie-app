@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/settings/data/availability_alert_service.dart';
+import 'package:flixie_app/core/auth/push_notification_service.dart';
 import 'package:flixie_app/features/social/data/community_service.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/features/social/data/genre_community_service.dart';
@@ -67,6 +69,14 @@ class SetupCommunitySuggestion {
 
 class SetupService {
   const SetupService();
+  Future<AvailabilityAlertSettings> availabilityAlerts() =>
+      const AvailabilityAlertService().load();
+  Future<void> saveAvailabilityAlerts(bool enabled) async {
+    await const AvailabilityAlertService().save(enabled);
+  }
+
+  Future<bool> enableAvailabilityPush() =>
+      PushNotificationService.enableNotifications();
   Future<bool> sharing() => const CommunityService().sharing();
   Future<void> setSharing(bool value) =>
       const CommunityService().setSharing(value);
@@ -163,11 +173,14 @@ class SetupService {
   }
 
   Future<String?> friendId(String username) async {
-    final users = await UserService.searchUsers(username);
-    return users
-        .where((u) => u.username.toLowerCase() == username.toLowerCase())
-        .firstOrNull
-        ?.id;
+    try {
+      final user = await UserService.getUserByUsername(
+          username.trim().replaceFirst(RegExp(r'^@'), ''));
+      return user.id;
+    } on ApiException catch (error) {
+      if (error.statusCode == 404) return null;
+      rethrow;
+    }
   }
 
   Future<List<Country>> countries() => ReferenceDataService.getCountries();

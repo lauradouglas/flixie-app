@@ -12,7 +12,7 @@ import 'trending_service.dart';
 class HomeDataService {
   const HomeDataService();
   Future<List<MovieShort>> trending({bool refresh = false}) =>
-      TrendingService.getTrendingMedia(refresh: refresh);
+      TrendingService.getTrendingMovies(refresh: refresh);
   Future<List<MovieShort>> recommendations(String userId,
           {bool refresh = false}) =>
       RecommendationService.getUserRecommendations(userId, refresh: refresh);

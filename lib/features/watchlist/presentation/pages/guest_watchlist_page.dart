@@ -1,3 +1,4 @@
+import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../authentication/data/setup_service.dart';
@@ -59,6 +60,7 @@ class _GuestWatchlistPageState extends State<GuestWatchlistPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+        backgroundColor: context.colors.background,
         appBar: AppBar(title: const Text('Your watchlist')),
         body: FutureBuilder<List<SetupTitle>>(
             future: _picks,
@@ -77,54 +79,87 @@ class _GuestWatchlistPageState extends State<GuestWatchlistPage> {
                 Text(
                     picks.isEmpty
                         ? 'What’s on your someday list?'
-                        : 'Good picks. Keep them together.',
+                        : 'Already feels like you.',
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 12),
-                const Text(
-                    'Your picks are saved on this device. Create an account to keep them in your Flixie watchlist. Clearing app data will remove device-only picks.'),
-                if (_error != null) Text(_error!),
-                for (final pick in picks)
-                  ListTile(
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                      leading: SizedBox(
-                          width: 44,
-                          height: 66,
-                          child: pick.poster == null
-                              ? const Icon(Icons.movie_outlined)
-                              : Image.network(
-                                  pick.poster!.startsWith('http')
-                                      ? pick.poster!
-                                      : 'https://image.tmdb.org/t/p/w185${pick.poster}',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.movie_outlined))),
-                      title: Text(pick.name),
-                      subtitle: Text(pick.isShow ? 'TV show' : 'Film'),
-                      onTap: () => context
-                              .push(
-                                  '/${pick.isShow ? 'shows' : 'movies'}/${pick.id}')
-                              .then((_) {
-                            if (mounted) {
-                              _reload();
-                            }
-                          }),
-                      trailing: IconButton(
-                          tooltip: 'Remove ${pick.name}',
-                          onPressed: () => _remove(pick),
-                          icon: const Icon(Icons.bookmark_remove_outlined))),
+                const Text('Keep adding films and shows. No account needed.'),
                 const SizedBox(height: 16),
+                if (_error != null) Text(_error!),
                 if (picks.isNotEmpty) ...[
-                  FilledButton(
+                  const SizedBox(height: 16),
+                  const Text(
+                      'Saved on this device. Want to keep them across devices?'),
+                  OutlinedButton(
                       onPressed: () => _keep('signup'),
                       child: const Text('Create account & keep my picks')),
                   TextButton(
                       onPressed: () => _keep('login'),
                       child: const Text('Already have an account? Sign in')),
                 ],
+                const Text('Clearing app data removes device-only picks.',
+                    style: TextStyle(fontSize: 13)),
+                const SizedBox(height: 16),
+                _posters(picks),
                 TextButton(
-                    onPressed: () => context.push('/search'),
+                    onPressed: () => context.go('/search'),
                     child: const Text('Find more to watch')),
               ]);
             }),
       );
+  Widget _posters(List<SetupTitle> picks) =>
+      LayoutBuilder(builder: (context, box) {
+        final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.5;
+        final columns = largeText
+            ? 1
+            : box.maxWidth >= 700
+                ? 4
+                : 2;
+        final width = (box.maxWidth - 16 * (columns - 1)) / columns;
+        return Wrap(spacing: 16, runSpacing: 20, children: [
+          for (final pick in picks)
+            SizedBox(
+                width: width,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                          onTap: () => _open(pick),
+                          child: Semantics(
+                              label: 'View ${pick.name}',
+                              button: true,
+                              child: SizedBox(
+                                  width: width,
+                                  height: largeText ? 180 : width * 1.5,
+                                  child: pick.poster == null
+                                      ? const Icon(Icons.movie_outlined)
+                                      : Image.network(
+                                          pick.poster!.startsWith('http')
+                                              ? pick.poster!
+                                              : 'https://image.tmdb.org/t/p/w342${pick.poster}',
+                                          fit: BoxFit.contain,
+                                          excludeFromSemantics: true,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                  Icons.movie_outlined))))),
+                      const SizedBox(height: 8),
+                      TextButton(
+                          onPressed: () => _open(pick),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              alignment: Alignment.centerLeft),
+                          child: Text(pick.name)),
+                      Row(children: [
+                        Expanded(child: Text(pick.isShow ? 'TV show' : 'Film')),
+                        IconButton(
+                            tooltip: 'Remove ${pick.name}',
+                            onPressed: () => _remove(pick),
+                            icon: const Icon(Icons.bookmark_remove_outlined)),
+                      ]),
+                    ])),
+        ]);
+      });
+  Future<void> _open(SetupTitle pick) async {
+    await context.push('/${pick.isShow ? 'shows' : 'movies'}/${pick.id}');
+    if (mounted) _reload();
+  }
 }

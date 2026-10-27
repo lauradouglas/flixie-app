@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/authentication/presentation/controllers/onboarding_controller.dart';
+import 'package:flixie_app/features/authentication/presentation/widgets/onboarding/onboarding_picks_step.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,10 +45,16 @@ class _Setup extends SetupFixture {
       : [const SetupTitle(2, 'Second account taste', null)];
 }
 
+class _ReferralSetup extends SetupFixture {
+  @override
+  Future<String?> referrer(String userId) async => 'Dougasaur';
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   Future<void> mount(WidgetTester t, _Auth auth, SetupFixture service) async {
     final router = GoRouter(initialLocation: '/setup', routes: [
+      GoRoute(path: '/friends/:id', builder: (_, state) => Scaffold(body: Text('Friend ${state.pathParameters['id']}'))),
       GoRoute(
           path: '/setup',
           builder: (_, __) =>
@@ -63,6 +71,24 @@ void main() {
             theme: AppTheme.lightTheme, routerConfig: router)));
   }
 
+  testWidgets('referral picks confirms existing friendship with the actual username', (t) async {
+    final controller = OnboardingController(service: _ReferralSetup(), userId: 'first', countryId: null, isCurrentUser: () => true);
+    addTearDown(controller.dispose);
+    controller.start();
+    await t.pump();
+    await t.pumpWidget(MaterialApp(home: Scaffold(body: OnboardingPicksStep(controller: controller, onFinish: (_) {}, onAdd: (_) {}))));
+    await t.pumpAndSettle();
+    expect(find.text('You’re already friends with @Dougasaur. Find them in Social whenever you’re ready.'), findsOneWidget);
+    expect(find.textContaining('Instance of'), findsNothing);
+  });
+  testWidgets('referral setup has no repeated find-friend shortcut', (t) async {
+    await mount(t, _Auth(), _ReferralSetup());
+    await t.pumpAndSettle();
+    expect(find.text('Find @Dougasaur first'), findsNothing);
+    expect(find.text('What stays with you?'), findsOneWidget);
+    expect(find.text('Go straight to your invitation'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
   testWidgets(
       'account switch replaces selections and ignores late old-account taste',
       (t) async {

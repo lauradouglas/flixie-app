@@ -184,6 +184,7 @@ class WatchRequestCompletionFlow extends WatchRequestActionContext {
                   );
                   await AppReviewService.recordCompletedWatchPlan(
                     userId,
+                    eventId: state.request.id,
                     hasCompletedSetup: hasCompletedSetup,
                   );
                 }

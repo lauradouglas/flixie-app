@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -39,12 +40,12 @@ void main() {
     await tester.pumpWidget(host(const AvailabilityAlertSetting(
         userId: 'fictional', showPushChoice: false)));
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+    expect(tester.widget<PreferenceSwitch>(find.byType(PreferenceSwitch)).value,
         isFalse);
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
     expect(enabled, isTrue);
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+    expect(tester.widget<PreferenceSwitch>(find.byType(PreferenceSwitch)).value,
         isTrue);
     await tester.pumpWidget(host(AvailabilityAlertSetting(
         userId: 'fictional',
@@ -52,7 +53,7 @@ void main() {
         save: (_) async => throw Exception('offline'))));
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+    expect(tester.widget<PreferenceSwitch>(find.byType(PreferenceSwitch)).value,
         isTrue);
     expect(find.textContaining('Alerts weren’t changed'), findsOneWidget);
   });
@@ -69,7 +70,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged,
+    expect(
+        tester
+            .widget<PreferenceSwitch>(find.byType(PreferenceSwitch))
+            .onChanged,
         isNull);
     expect(find.textContaining('Choose your country in Account details'),
         findsOneWidget);
@@ -84,7 +88,7 @@ void main() {
     pending.complete(const AvailabilityAlertSettings(
         enabled: true, countryName: 'France', services: ['Other']));
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+    expect(tester.widget<PreferenceSwitch>(find.byType(PreferenceSwitch)).value,
         isFalse);
     expect(find.textContaining('France'), findsNothing);
   });

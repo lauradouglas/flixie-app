@@ -6,7 +6,7 @@
 part of '../firebase_app_check.dart';
 
 class FirebaseAppCheck extends FirebasePluginPlatform {
-  static Map<String, FirebaseAppCheck> _firebaseAppCheckInstances = {};
+  static final Map<String, FirebaseAppCheck> _firebaseAppCheckInstances = {};
 
   FirebaseAppCheck._({required this.app})
       : super(app.name, 'plugins.flutter.io/firebase_app_check');

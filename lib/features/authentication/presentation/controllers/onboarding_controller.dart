@@ -157,10 +157,35 @@ class OnboardingController extends ChangeNotifier {
             : _selectedCommunities.remove(id);
       });
   void clearCommunities() => _update(_selectedCommunities.clear);
+  bool? availabilityAlertsChoice;
+  void chooseAvailabilityAlerts(bool enabled) => _update(() {
+        availabilityAlertsChoice = enabled;
+      });
+  Future<void> persistWatching() async {
+    if (!active || _country == null) return;
+    if (availabilityAlertsChoice == true && _selectedProviders.isEmpty) {
+      throw StateError(
+          'Choose at least one service for watchlist alerts, or turn alerts off.');
+    }
+    await service.saveWatching(userId, _country!, Set.of(_selectedProviders));
+    if (!active) return;
+    final choice = availabilityAlertsChoice;
+    if (choice != null) {
+      await service.saveAvailabilityAlerts(choice);
+      if (!active) return;
+      if (choice) {
+        // Choosing alerts is explicit consent; OS permission failure must not undo saved services.
+        try {
+          await service.enableAvailabilityPush();
+        } catch (_) {}
+      }
+      if (active) availabilityAlertsChoice = null;
+    }
+  }
+
   Future<void> saveWatching() => run(() async {
         if (_country == null) return;
-        await service.saveWatching(
-            userId, _country!, Set.of(_selectedProviders));
+        await persistWatching();
         if (active) move(2);
       });
   Future<bool> add(SetupTitle title) async {
@@ -257,7 +282,9 @@ class OnboardingController extends ChangeNotifier {
     } catch (_) {/* Genres are optional; title search remains available. */}
   }
 
-  Future<void> run(Future<void> Function() action) async {
+  Future<void> run(Future<void> Function() action,
+      {String errorMessage =
+          'Couldn’t save this step. Your choices are still here. Please try again.'}) async {
     if (!active || _busy) return;
     _update(() {
       _busy = true;
@@ -267,8 +294,7 @@ class OnboardingController extends ChangeNotifier {
       await action();
     } catch (_) {
       if (active) {
-        _update(() => _error =
-            'Couldn’t save this step. Your choices are still here. Please try again.');
+        _update(() => _error = errorMessage);
       }
     } finally {
       if (active) _update(() => _busy = false);

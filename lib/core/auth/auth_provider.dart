@@ -1167,6 +1167,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<bool> beginAvatarSignUp({
     required bool termsAccepted,
+    bool communitySharing = true,
     required String email,
     required String password,
     required String firstName,
@@ -1200,6 +1201,7 @@ class AuthProvider extends ChangeNotifier with WidgetsBindingObserver {
         'email': normalizedEmail,
         'bio': '',
         'termsAccepted': termsAccepted,
+        'communitySharing': communitySharing,
         'countryId': countryId,
         'languageId': languageId,
         if (referralCode?.trim().isNotEmpty == true)

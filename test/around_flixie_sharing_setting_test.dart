@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -8,6 +9,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/features/settings/presentation/widgets/around_flixie_sharing_setting.dart';
 
 void main() {
+  testWidgets('loading sharing preference never renders a false switch', (tester) async {
+    final pending=Completer<bool>();
+    await tester.pumpWidget(MaterialApp(home:Scaffold(body:SingleChildScrollView(child:AroundFlixieSharingSetting(load:()=>pending.future)))));
+    await tester.pump();
+    expect(find.byType(Switch),findsNothing);
+    expect(tester.widget<PreferenceSwitch>(find.byType(PreferenceSwitch)).value,isNull);
+    pending.complete(true);await tester.pumpAndSettle();
+    expect(tester.widget<Switch>(find.byType(Switch)).value,true);
+  });
+
   testWidgets(
       'default Settings control persists the shared account preference across visits',
       (tester) async {
@@ -32,16 +43,16 @@ void main() {
     expect(writes, isEmpty);
     expect(find.textContaining('Turning this off does not delete them'),
         findsOneWidget);
-    await tester.tap(find.byType(SwitchListTile));
+    await tester.tap(find.byType(PreferenceSwitch));
     await tester.pumpAndSettle();
     expect(writes, [
       {'communitySharing': true}
     ]);
     await tester.pumpWidget(screen('second'));
     await tester.pumpAndSettle();
-    expect(
-        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value, true);
-    await tester.tap(find.byType(SwitchListTile));
+    expect(tester.widget<PreferenceSwitch>(find.byType(PreferenceSwitch)).value,
+        true);
+    await tester.tap(find.byType(PreferenceSwitch));
     await tester.pumpAndSettle();
     expect(writes.last, {'communitySharing': false});
   });
@@ -64,26 +75,26 @@ void main() {
           }),
     ))));
     await tester.pumpAndSettle();
-    final toggle = find.byType(SwitchListTile);
-    expect(tester.widget<SwitchListTile>(toggle).value, true);
+    final toggle = find.byType(PreferenceSwitch);
+    expect(tester.widget<PreferenceSwitch>(toggle).value, true);
     expect(writes, isEmpty);
     await tester.tap(toggle);
     await tester.pumpAndSettle();
     expect(writes, [false]);
-    expect(tester.widget<SwitchListTile>(toggle).value, false);
+    expect(tester.widget<PreferenceSwitch>(toggle).value, false);
     fail = true;
     await tester.tap(toggle);
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(toggle).value, false);
+    expect(tester.widget<PreferenceSwitch>(toggle).value, false);
     expect(find.text('Sharing wasn’t changed. Try again.'), findsOneWidget);
     fail = false;
     pending = Completer<void>();
     await tester.tap(toggle);
     await tester.pump();
-    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+    expect(tester.widget<PreferenceSwitch>(toggle).onChanged, isNull);
     pending.complete();
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(toggle).value, true);
+    expect(tester.widget<PreferenceSwitch>(toggle).value, true);
     expect(writes, [false, true, true]);
   });
 
@@ -112,12 +123,15 @@ void main() {
       ))),
     )));
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged,
+    expect(
+        tester
+            .widget<PreferenceSwitch>(find.byType(PreferenceSwitch))
+            .onChanged,
         isNull);
     await tester.ensureVisible(find.text('Retry'));
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();
-    expect(tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+    expect(tester.widget<PreferenceSwitch>(find.byType(PreferenceSwitch)).value,
         false);
     expect(writes, 0);
     expect(tester.takeException(), isNull);

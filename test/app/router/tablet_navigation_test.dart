@@ -1,3 +1,7 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flixie_app/core/widgets/flixie_wordmark.dart';
+import 'package:flixie_app/features/pip/presentation/controllers/pip_collection_controller.dart';
+import '../../features/pip/pip_collection_test.dart' show FakePips;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -71,5 +75,38 @@ void main() {
     await t.tap(find.text('Watchlist'));
     expect(watchlist, true);
     expect(t.takeException(), isNull);
+  });
+  testWidgets(
+      'narrow sidebar keeps Pip beside the wordmark and opens collection',
+      (t) async {
+    SharedPreferences.setMockInitialValues({});
+    final pip = PipCollectionController(service: FakePips());
+    pip.syncUser('fixture', 0);
+    await t.pumpAndSettle();
+    await t.pumpWidget(ChangeNotifierProvider.value(
+        value: pip,
+        child: MaterialApp(
+            home: Scaffold(
+                body: FlixieTabletNavigation(
+                    selectedIndex: 0,
+                    onSelected: (_) {},
+                    onWatchlist: () {})))));
+    await t.pumpAndSettle();
+    expect(t.getSize(find.byType(FlixieTabletNavigation)).width, 156);
+    expect(t.getTopLeft(find.byTooltip('My Pip')).dx,
+        greaterThan(t.getTopLeft(find.byType(FlixieWordmark)).dx));
+    expect(
+        (t.getCenter(find.byTooltip('My Pip')).dy -
+                t.getCenter(find.byType(FlixieWordmark)).dy)
+            .abs(),
+        lessThan(12));
+    expect(
+        t.getSize(find.byTooltip('My Pip')).height, greaterThanOrEqualTo(48));
+    await t.tap(find.byTooltip('My Pip'));
+    await t.pumpAndSettle();
+    expect(find.text('Make Flixie yours.'), findsOneWidget);
+    expect(t.takeException(), isNull);
+    await t.pumpWidget(const SizedBox.shrink());
+    pip.dispose();
   });
 }

@@ -135,7 +135,7 @@ class _ConceptScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context;
     final content = <Widget>[];
-    if (screen == 'create-plan')
+    if (screen == 'create-plan') {
       content.addAll([
         heading(c, 'Create watch plan'),
         const SizedBox(height: 6),
@@ -161,7 +161,8 @@ class _ConceptScreen extends StatelessWidget {
         body(c,
             'Saved straight away. Sophie can see the plan without needing to accept.'),
       ]);
-    if (screen == 'saved-plan')
+    }
+    if (screen == 'saved-plan') {
       content.addAll([
         heading(c, 'Watch Plans'),
         const SizedBox(height: 16),
@@ -175,7 +176,8 @@ class _ConceptScreen extends StatelessWidget {
         const SizedBox(height: 20),
         film(c),
         const SizedBox(height: 16),
-        person(c, 'Sophie', 'Watching with you · Added by you', selected: false),
+        person(c, 'Sophie', 'Watching with you · Added by you',
+            selected: false),
         const SizedBox(height: 20),
         heading(c, 'Date to decide'),
         const SizedBox(height: 8),
@@ -188,7 +190,8 @@ class _ConceptScreen extends StatelessWidget {
         body(c,
             'No invitation to accept. You each log your own watch afterwards.'),
       ]);
-    if (screen == 'companion-prompt')
+    }
+    if (screen == 'companion-prompt') {
       content.addAll([
         heading(c, 'Notifications'),
         const SizedBox(height: 20),
@@ -232,7 +235,8 @@ class _ConceptScreen extends StatelessWidget {
         const SizedBox(height: 20),
         body(c, 'Sophie’s view · After Laura logs a watch'),
       ]);
-    if (screen == 'rating-prompt')
+    }
+    if (screen == 'rating-prompt') {
       content.addAll([
         heading(c, 'Your watch plan'),
         const SizedBox(height: 18),
@@ -267,6 +271,7 @@ class _ConceptScreen extends StatelessWidget {
         const SizedBox(height: 10),
         secondary('Haven’t watched it yet'),
       ]);
+    }
     return SingleChildScrollView(
         child: Container(
             margin: const EdgeInsets.only(top: 8),

@@ -64,20 +64,20 @@ class FlixieColors {
   static const Color lightTextSecondary = Color(0xFF51495F);
   static const Color controlOutline = Color(0xFF8C7AAE);
 
-  // Background / navigation
-  static const Color background = Color(0xFF120A24);
-  static const Color surface = Color(0xFF1A1033);
-  static const Color surfaceElevated = Color(0xFF27194A);
-  static const Color navy = Color(0xFF0A0616);
+  // Dark blue-purple surfaces; saturated purple stays in brand accents.
+  static const Color background = Color(0xFF151522);
+  static const Color surface = Color(0xFF1E1F30);
+  static const Color surfaceElevated = Color(0xFF292B3E);
+  static const Color navy = Color(0xFF10111B);
   static const Color white = Color(0xFFFFFFFF);
-  static const Color tabBarBackground = Color(0xFF140C29);
+  static const Color tabBarBackground = Color(0xFF191A27);
   static const Color tabBarBackgroundFocused = surface;
-  static const Color tabBarBorder = Color(0xFF35245B);
+  static const Color tabBarBorder = Color(0xFF3E4058);
 
   // Watchlist card gradient colours
-  static const Color cardGradientTop = Color(0xF227194A); // rgba(39,25,74,0.95)
+  static const Color cardGradientTop = Color(0xF2292B3E); // rgba(41,43,62,0.95)
   static const Color cardGradientBottom =
-      Color(0xFA0A0616); // rgba(10,6,22,0.98)
+      Color(0xFA10111B); // rgba(16,17,27,0.98)
 }
 
 /// Builds the app-wide [ThemeData] using the Flixie color palette.

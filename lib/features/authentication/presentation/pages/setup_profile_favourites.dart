@@ -70,7 +70,7 @@ class _SetupProfileFavouritesState extends State<SetupProfileFavourites> {
         subtitle: const Text('Add favourites people can see · optional'),
         children: [
           const Text(
-              'Use your taste picks below—no need to search again. Adding favourites puts them on your profile and helps personalise your recommendations. You can skip this.'),
+              'Use your taste picks below-no need to search again. Adding favourites puts them on your profile and helps personalise your recommendations. You can skip this.'),
           if (widget.titles.any((t) => !t.isShow && !_saved.contains(t.key)))
             Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),

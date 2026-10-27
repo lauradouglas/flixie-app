@@ -1,3 +1,4 @@
+import 'home_tablet_layout.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -39,6 +40,7 @@ class GreetingHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = HomeTabletLayout.active(context);
     final label = name != null
         ? '${greeting()}, $name \u{1F44B}'
         : '${greeting()} \u{1F44B}';
@@ -57,7 +59,7 @@ class GreetingHeader extends StatelessWidget {
                 avatar: avatar,
                 fallbackText: initial,
                 fallbackColor: context.colors.surfaceElevated,
-                size: 30,
+                size: compact ? 28 : 30,
                 profileBadges: profileBadges,
               ),
               const SizedBox(width: 9),
@@ -66,7 +68,7 @@ class GreetingHeader extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: context.colors.white,
-                    fontSize: 16,
+                    fontSize: compact ? 14 : 16,
                     fontWeight: FontWeight.w800,
                     height: 1.1,
                   ),
@@ -78,7 +80,7 @@ class GreetingHeader extends StatelessWidget {
             const SizedBox(height: 12),
             featureCard!,
           ],
-          const SizedBox(height: 10),
+          SizedBox(height: compact ? 4 : 10),
           if (showShortcuts)
             LayoutBuilder(builder: (context, constraints) {
               final largeText = MediaQuery.textScalerOf(context).scale(12) > 15;

@@ -1,3 +1,7 @@
+import 'package:flixie_app/models/watch_request.dart';
+import 'package:flixie_app/features/guest/data/guest_diary_store.dart';
+import 'package:flixie_app/features/guest/presentation/guest_diary_page.dart';
+import 'package:flixie_app/core/reviews/app_review_idle_gate.dart';
 import 'package:flixie_app/features/taste/presentation/pages/build_taste_page.dart';
 import 'package:flixie_app/features/watchlist/presentation/pages/guest_watchlist_page.dart';
 import 'package:flixie_app/features/authentication/presentation/pages/signup_journey_page.dart';
@@ -341,13 +345,8 @@ GoRouter buildRouter(
         initialEntryResolved = true;
         // Direct links retain their destination; the welcome never interrupts them.
         try {
-          final showWelcome =
-              await (firstWelcome ??= FirstOpenStore().consumeWelcome());
-          if (showWelcome &&
-              (isSplash || state.uri.path == '/') &&
-              initialGuestPath == null) {
-            return '/welcome';
-          }
+          // A fresh guest can browse immediately; the introduction remains optional.
+          await (firstWelcome ??= FirstOpenStore().consumeWelcome());
         } catch (_) {
           // A preference failure must not block catalogue browsing.
         }
@@ -387,6 +386,29 @@ GoRouter buildRouter(
                           : {'next': pendingSetupDestination!})
                   .toString();
         }
+        // A persisted draft survives OAuth/restarts and binds to one account.
+        final diaryUserId = authProvider.dbUser!.id;
+        final diary = await GuestDiaryStore.instance
+            .claim(diaryUserId)
+            .catchError((Object _) => null);
+        if (authProvider.dbUser?.id != diaryUserId) return '/';
+        if (diary != null && diary.owner == authProvider.dbUser?.id) {
+          if (diary.watchInviteToken != null) {
+            final invitePath = '/watch-invites/${diary.watchInviteToken}';
+            return state.uri.path == invitePath ? null : invitePath;
+          }
+
+          if (GuestAccess.journey?.diaryDraftId != diary.id) {
+            GuestAccess.journey = null;
+          }
+          GuestAccess.diaryDraftId = diary.id;
+          GuestAccess.destination = '/movies/${diary.movieId}';
+          GuestAccess.action = diary.logWatch ? 'log' : 'rate';
+          GuestAccess.bookmarkTitle = diary.title;
+          GuestAccess.awaitingAccount = true;
+          GuestAccess.claimJourney(authProvider.dbUser!.id);
+          return state.uri.path == '/signup-journey' ? null : '/signup-journey';
+        }
         // Referral codes apply only to new account creation. Never carry one
         // into an existing authenticated account or a later sign-up.
         unawaited(referralStore.clear().catchError((_) {}));
@@ -397,6 +419,7 @@ GoRouter buildRouter(
           return state.uri.path == '/signup-journey' ? null : '/signup-journey';
         }
         if (!hasCompletedSetup) {
+          if (state.uri.path == '/guest-diary') return null;
           final pendingLog =
               await PendingWatchInviteStore.readLog(authProvider.dbUser?.id);
           final invitePath = RegExp(r'^/watch-invites/[A-Za-z0-9_-]{43}$')
@@ -449,6 +472,10 @@ GoRouter buildRouter(
       return null;
     },
     routes: [
+      GoRoute(
+          path: '/guest-diary',
+          builder: (_, state) =>
+              GuestDiaryPage(draftId: state.uri.queryParameters['draft'])),
       GoRoute(
           path: '/signup-journey',
           builder: (_, __) => const SignupJourneyPage()),
@@ -968,7 +995,8 @@ GoRouter buildRouter(
             return WatchInviteSavedScreen(
                 requestId: state.pathParameters['requestId']!,
                 movieTitle: details['movieTitle'] as String?,
-                rating: details['rating'] as int?);
+                rating: details['rating'] as int?,
+                watchState: details['watchState'] as WatchRequestState?);
           }),
       GoRoute(
           path: '/watch-invites/:token',
@@ -1041,7 +1069,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       }
     }
 
-    return LayoutBuilder(builder: (context, constraints) {
+    return AppReviewIdleGate(
+        child: LayoutBuilder(builder: (context, constraints) {
       final tablet = constraints.maxWidth >= flixieTabletNavigationBreakpoint;
       final content =
           NavigationRetapRegion(key: _retapKey, child: navigationShell);
@@ -1078,15 +1107,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ),
           bottomNavigationBar: tablet
               ? null
-              : _FlixieNavBar(
-                  guest: guest,
-                  selectedIndex: branches.indexOf(selectedIndex),
-                  onDestinationSelected: (visibleIndex) =>
-                      selectBranch(branches[visibleIndex]),
-                ),
+              : Column(mainAxisSize: MainAxisSize.min, children: [
+                  _FlixieNavBar(
+                    guest: guest,
+                    selectedIndex: branches.indexOf(selectedIndex),
+                    onDestinationSelected: (visibleIndex) =>
+                        selectBranch(branches[visibleIndex]),
+                  ),
+                ]),
         ),
       );
-    });
+    }));
   }
 }
 

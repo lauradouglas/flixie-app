@@ -1,3 +1,4 @@
+import 'friend_plan_saved_actions.dart';
 import 'friend_plan_stage_view.dart';
 import 'friend_plan_button.dart';
 import 'friend_plan_styles.dart';
@@ -133,6 +134,11 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
       r.candidates.length > 1 && r.selectedCandidateId == null;
   String get stage {
     if (complete) return 'Your recap';
+    if (!r.isTerminal &&
+        r.watchConfirmations
+            .any((c) => c.userId == widget.myUserId && c.watched)) {
+      return 'Recap so far';
+    }
     if (r.isSharedViewing) return 'Shared viewing';
     if (r.isDeclined || r.isCancelled || r.isExpired) return 'Plan closed';
     if (r.isPending) {
@@ -182,7 +188,11 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               Divider(color: context.colors.tabBarBorder),
               const SizedBox(height: 16),
             ],
-            if (complete || (r.isSharedViewing && !r.isTerminal))
+            if (complete ||
+                (r.isSharedViewing && !r.isTerminal) ||
+                (!r.isTerminal &&
+                    r.watchConfirmations
+                        .any((c) => c.userId == widget.myUserId && c.watched)))
               _recap()
             else if (r.isDeclined || r.isCancelled || r.isExpired) ...[
               const SizedBox(height: 16),
@@ -204,19 +214,35 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
               _stage(FriendPlanStage.scheduled)
             else
               _stage(FriendPlanStage.schedule),
-            if (!complete && !r.isSharedViewing) _message(),
+            if (!complete && !r.isSharedViewing && !_usesSavedActions)
+              _message(),
             if (!complete &&
                 (!r.isSharedViewing || _isCreator) &&
                 !r.isPending &&
                 !r.isDeclined &&
                 !r.isCancelled &&
                 !r.isExpired)
-              TextButton(
-                  onPressed: widget.busy ? null : widget.onCancelPlan,
-                  child: const Text('Cancel plan')),
+              Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextButton(
+                      style: TextButton.styleFrom(
+                          foregroundColor: context.colors.danger),
+                      onPressed: widget.busy ? null : widget.onCancelPlan,
+                      child: const Text('Cancel plan'))),
           ])),
     ]);
   }
+
+  bool get _usesSavedActions =>
+      r.lightweight &&
+      !complete &&
+      !r.isSharedViewing &&
+      !r.isTerminal &&
+      !r.isPending &&
+      !needsMovie &&
+      r.latestPendingProposal == null &&
+      !due &&
+      !(r.scheduledFor != null && r.normalizedScheduleStatus == 'AGREED');
 
   Widget _card() => InkWell(
         onTap: widget.onOpen,
@@ -357,6 +383,18 @@ class _FriendWatchPlanFlowState extends State<FriendWatchPlanFlow> {
 
   Widget _stage(FriendPlanStage stage) => FriendPlanStageView(
       stage: stage,
+      savedPlanActions: _usesSavedActions
+          ? FriendPlanSavedActions(
+              friend: friend,
+              busy: widget.busy,
+              onAddDate: widget.onSuggestSchedule,
+              onWatched: widget.onConfirmWatched,
+              onChangeMovie: widget.onChangeMovie,
+              onMessage: other?.id == null
+                  ? null
+                  : () => context.push('/chat/${other!.id}'),
+            )
+          : null,
       request: r,
       myUserId: widget.myUserId,
       title: title,

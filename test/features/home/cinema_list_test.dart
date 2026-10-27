@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/home/presentation/widgets/home_tablet_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -33,6 +34,38 @@ void main() {
     final button = tester.widget<IconButton>(find.byType(IconButton).first);
     expect(button.onPressed, isNull);
     expect(find.textContaining('friends'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+      'tablet cinema swipes to later titles and keeps save/details actions',
+      (tester) async {
+    final opened = <int>[], saved = <int>[];
+    final movies =
+        List.generate(8, (i) => MovieShort(id: i, name: 'Cinema $i'));
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+            body: HomeTabletScope(
+                child: SizedBox(
+                    width: 650,
+                    child: CinemaList(
+                        movies: movies,
+                        savedIds: const {7},
+                        onDetails: (m) => opened.add(m.id),
+                        onSave: (m) => saved.add(m.id),
+                        onTrailer: (_) {}))))));
+    final rail = find.byKey(const ValueKey('tablet-cinema-rail'));
+    expect(find.text('Cinema 7').hitTestable(), findsNothing);
+    for (var i = 0; i < 4; i++) {
+      await tester.drag(rail, const Offset(-600, 0));
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('Cinema 7').hitTestable(), findsOneWidget);
+    await tester.tap(find.text('Cinema 7'));
+    await tester.tap(find.byTooltip('Remove from watchlist'));
+    expect(opened, [7]);
+    expect(saved, [7]);
+    expect(find.text('Show more cinema releases'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

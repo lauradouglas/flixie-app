@@ -73,10 +73,21 @@ class FriendPlanRecap extends StatelessWidget {
           Icon(Icons.bar_chart_rounded, color: context.colors.primaryText),
           const SizedBox(width: 12),
           Expanded(
-              child: Text(r.isSharedViewing ? 'Shared viewing' : 'Your recap',
+              child: Text(
+                  r.isSharedViewing
+                      ? 'Shared viewing'
+                      : allResponded
+                          ? 'Your recap'
+                          : 'Recap so far',
                   style: friendPlanTitle.copyWith(
                       color: context.colors.textPrimary)))
         ]),
+        if (!allResponded) ...[
+          const SizedBox(height: 12),
+          Text(
+              'Waiting for everyone to log. This recap will update as they do.',
+              style: friendPlanBody.copyWith(color: context.colors.light)),
+        ],
         const SizedBox(height: 20),
         LayoutBuilder(builder: (context, constraints) {
           final people = metric(
@@ -169,7 +180,7 @@ class FriendPlanRecap extends StatelessWidget {
         WatchPlanSurface(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Your watch comment',
+          Text('Your diary note',
               style:
                   friendPlanTitle.copyWith(color: context.colors.textPrimary)),
           const SizedBox(height: 8),

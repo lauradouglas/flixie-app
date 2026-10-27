@@ -26,9 +26,11 @@ class FriendPlanStageView extends StatelessWidget {
       required this.onConfirmWatched,
       required this.onNotThisTime,
       required this.onChangeMovie,
+      this.savedPlanActions,
       this.myAvatar,
       this.myProfileBadges = const [],
       this.busy = false});
+  final Widget? savedPlanActions;
   final FriendPlanStage stage;
   final WatchRequest request;
   final String myUserId, title;
@@ -111,6 +113,9 @@ class FriendPlanStageView extends StatelessWidget {
 
   Widget _schedule(BuildContext context) {
     final proposal = r.latestPendingProposal;
+    if (proposal == null && r.lightweight && savedPlanActions != null) {
+      return savedPlanActions!;
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: 20),
       if (proposal == null) ...[

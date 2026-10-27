@@ -1,4 +1,5 @@
-import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:flixie_app/features/profile/data/user_service.dart';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -56,6 +57,11 @@ class ShareCardExportService {
       bytes,
       name: data.fileName.replaceFirst(RegExp(r'\.png$'), ''),
     );
+  }
+
+  Future<void> copyReferralLink() async {
+    final referral = await UserService.getMyReferral();
+    await Clipboard.setData(ClipboardData(text: referral.inviteUrl));
   }
 
   Future<void> shareReferralInvite({

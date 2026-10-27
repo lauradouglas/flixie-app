@@ -1,3 +1,6 @@
+import '../widgets/home_cinema_country_action.dart';
+import 'package:flixie_app/features/pip/presentation/widgets/pip_companion.dart';
+import 'package:flixie_app/core/reviews/app_review_service.dart';
 import '../../../taste/presentation/widgets/taste_home_card.dart';
 import '../widgets/home_startup_gate.dart';
 import 'package:flixie_app/features/movies/models/watch_log_details.dart';
@@ -6,7 +9,7 @@ import 'package:flixie_app/features/movies/presentation/trailers/trailer_player_
 import '../widgets/recommendations_loading_card.dart';
 import '../models/home_watch_plan_layout.dart';
 import '../widgets/home_watch_plan_column.dart';
-import 'package:flixie_app/core/widgets/flixie_adaptive_content.dart';
+import '../widgets/home_tablet_layout.dart';
 import 'package:flixie_app/features/guest/presentation/guest_home_screen.dart';
 import '../widgets/trending_carousel_skeleton.dart';
 import '../widgets/in_cinemas_section.dart';
@@ -108,6 +111,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final PageController _forYouPageController = PageController(
     viewportFraction: 0.88,
   );
+  final PageController _tabletForYouPageController =
+      PageController(viewportFraction: .56);
   final ScrollController _watchPlansScrollController = ScrollController();
   final ScrollController _homeScrollController = ScrollController();
   final GlobalKey _forYouSectionKey = GlobalKey();
@@ -172,6 +177,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _home.dispose();
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
     _forYouPageController.dispose();
+    _tabletForYouPageController.dispose();
     _watchPlansScrollController.dispose();
     _homeScrollController.dispose();
     _forYouPage.dispose();
@@ -458,6 +464,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           await ShowService.removeFromWatchlist(user.id, movie.id);
         } else {
           await ShowService.addToWatchlist(user.id, movie.id);
+          if (current()) {
+            await AppReviewService.recordMovieInteraction(user.id,
+                hasCompletedSetup: user.completedSetup,
+                eventId: 'watchlist:show:${movie.id}');
+          }
         }
         if (!current()) return;
         final entries = [...?user.showWatchlist]
@@ -502,6 +513,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       } else {
         final added = await _watchlistActions.addToWatchlist(user.id, movieId);
         if (!current()) return;
+        await AppReviewService.recordMovieInteraction(user.id,
+            hasCompletedSetup: user.completedSetup,
+            eventId: 'watchlist:movie:$movieId');
         await analytics.watchlistAdded(
           contentType: 'movie',
           contentId: movieId,
@@ -594,17 +608,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         context.select<AuthProvider, String?>((auth) => auth.dbUser?.id);
     if (userId == null) return const GuestHomeScreen();
     final page = FlixiePageScaffold(
-      adaptiveContent: true,
+      // Home owns its tablet gutters; avoid adding the shared page gutters twice.
+      adaptiveContent: false,
       backgroundColor: context.colors.background,
       appBar: AppBar(
+        toolbarHeight: MediaQuery.sizeOf(context).shortestSide >= 600 &&
+                MediaQuery.sizeOf(context).width >= 1140 &&
+                MediaQuery.textScalerOf(context).scale(1) <= 1.4
+            ? 44
+            : null,
         backgroundColor: context.colors.background,
         foregroundColor: context.colors.light,
         surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: context.colors.light),
         actionsIconTheme: IconThemeData(color: context.colors.light),
-        title: MediaQuery.sizeOf(context).width >= 1000
-            ? const Text('Home')
-            : const FlixieWordmark(),
+        title: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
+              child: MediaQuery.sizeOf(context).width >= 1000
+                  ? const Text('Home')
+                  : const FlixieWordmark()),
+          if (MediaQuery.sizeOf(context).width < 1000)
+            const PipHeaderCompanion(),
+        ]),
         actions: [
           HomeWatchlistAction(onPressed: () => context.push('/watchlist')),
           const HomeNotificationAction(),
@@ -628,36 +653,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     if (mounted) await _refreshAll();
                   }),
               const TasteHomeCard(),
-              LayoutBuilder(builder: (context, constraints) {
-                final wide = constraints.maxWidth >= 900 &&
-                    MediaQuery.textScalerOf(context).scale(1) <= 1.4;
-                if (!wide) {
-                  return Column(children: [
-                    _buildGreetingAndPlans(),
-                    _buildTrendingSection(),
-                  ]);
-                }
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildGreetingAndPlans(showPlans: false),
-                      const SizedBox(height: 12),
-                      FlixieAdaptiveColumns(
-                        primaryFlex: 7,
-                        secondaryFlex: 3,
-                        primary: _buildTrendingSection(),
-                        secondary: _buildTabletPlans(),
-                      ),
-                    ]);
-              }),
-              if (_initialHomeRevealed) _buildInCinemasSection(),
-              FindTonightsFilmSection(onPick: () async {
-                await context.push('/pick-for-us');
-                if (mounted) await _refreshAll();
-              }),
-              if (_initialHomeRevealed)
-                HomeCommunitySection(key: _communityKey, userId: userId),
-              const PipGamesHomeEntry(),
+              HomeTabletLayout(
+                greeting: Builder(
+                    builder: (context) => _buildGreetingAndPlans(
+                        showPlans: !HomeTabletLayout.active(context))),
+                discovery: _buildTrendingSection(),
+                cinemas: _initialHomeRevealed
+                    ? _buildInCinemasSection()
+                    : const SizedBox.shrink(),
+                plans: _buildTabletPlans(),
+                picker: FindTonightsFilmSection(onPick: () async {
+                  await context.push('/pick-for-us');
+                  if (mounted) await _refreshAll();
+                }),
+                community: _initialHomeRevealed
+                    ? Builder(
+                        builder: (context) => HomeCommunitySection(
+                            key: _communityKey,
+                            userId: userId,
+                            previewLimit:
+                                HomeTabletLayout.active(context) ? 5 : 3))
+                    : const SizedBox.shrink(),
+                games: Builder(
+                    builder: (context) => PipGamesHomeEntry(
+                        compact: HomeTabletLayout.active(context),
+                        padding: HomeTabletLayout.active(context)
+                            ? EdgeInsets.zero
+                            : const EdgeInsets.fromLTRB(20, 12, 20, 24))),
+              ),
             ],
           ),
         ),
@@ -690,9 +713,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       builder: (context, region, _) => ListenableBuilder(
           listenable: _home.watchlist,
           builder: (context, _) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: HomeTabletLayout.active(context)
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.symmetric(horizontal: 20),
               child: InCinemasSection(
                   key: _cinemasKey,
+                  watchlistChanges: _home.watchlist,
+                  onChangeCountry: () => changeHomeCinemaCountry(context),
                   region: region,
                   initialMovies:
                       context.read<AuthProvider>().cachedNowPlaying ?? const [],
@@ -735,7 +762,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: EdgeInsets.only(
+                          top: HomeTabletLayout.active(context) ? 0 : 8),
                       child: GreetingHeader(
                         showShortcuts: false,
                         name: greetingName,
@@ -768,8 +796,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       : selectHomeWatchPlanState(_watchPlansToShow, user.id),
                   suppressEmptyState: false),
               Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          textStyle: const TextStyle(fontSize: 13)),
                       onPressed: _openWatchPlanCreation,
                       icon: const Icon(Icons.group_add_outlined),
                       label: const Text('Make a Watch Plan'))),
@@ -779,16 +810,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget _buildTrendingSection() => ListenableBuilder(
         listenable: _home.trending,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ListenableBuilder(
-              listenable:
-                  Listenable.merge([_home.recommendations, _home.watchlist]),
-              builder: (context, _) => _buildBecauseYouRatedSection(context)),
-          ListenableBuilder(
-              listenable: _home.continueWatching,
-              builder: (context, _) => _buildContinueWatchingSection(context)),
+          Builder(builder: (context) {
+            final recommendations = ListenableBuilder(
+                listenable:
+                    Listenable.merge([_home.recommendations, _home.watchlist]),
+                builder: (context, _) => _buildBecauseYouRatedSection(context));
+            final watching = ListenableBuilder(
+                listenable: _home.continueWatching,
+                builder: (context, _) =>
+                    _buildContinueWatchingSection(context));
+            return Column(
+                children: HomeTabletLayout.active(context)
+                    ? [watching, recommendations]
+                    : [recommendations, watching]);
+          }),
         ]),
         builder: (context, secondarySections) {
           final movies = _heroMovies;
+          final compact = HomeTabletLayout.trendingActive(context);
+          final feature =
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            HomeSectionHeader(
+                title: 'Trending now',
+                compact: compact,
+                onSeeAll: compact ? () => context.go('/search') : null),
+            const SizedBox(height: 4),
+            _buildHeroCarousel(context, movies),
+          ]);
           return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -803,10 +851,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 if (_error != null)
                   ErrorRetryWidget(message: _error!, onRetry: _loadAll),
                 if (movies.isNotEmpty) ...[
-                  const HomeSectionHeader(title: 'Trending now'),
-                  const SizedBox(height: 4),
-                  _buildHeroCarousel(context, movies),
-                  const SizedBox(height: 20),
+                  if (compact)
+                    Material(
+                        color: context.colors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                            padding: const EdgeInsets.only(top: 10, bottom: 10),
+                            child: feature))
+                  else
+                    feature,
+                  SizedBox(height: compact ? 12 : 20),
                   secondarySections!,
                 ],
               ]);
@@ -823,14 +877,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const HomeSectionHeader(title: 'Continue Watching'),
-        const SizedBox(height: 12),
+        const HomeSectionHeader(
+          title: 'Continue Watching',
+          tabletPadding: EdgeInsets.zero,
+        ),
+        SizedBox(height: HomeTabletLayout.active(context) ? 6 : 12),
         ContinueWatchingCarousel(
+          contentPadding: HomeTabletLayout.active(context)
+              ? EdgeInsets.zero
+              : const EdgeInsets.symmetric(horizontal: 16),
           shows: _continueWatchingShows,
           onTap: (show) => context.push(showDetailPath(show.showId)),
           onRemove: _removeContinueWatchingShow,
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: HomeTabletLayout.active(context) ? 12 : 20),
       ],
     );
   }
@@ -905,10 +965,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
+          padding: EdgeInsets.fromLTRB(
+              HomeTabletLayout.active(context) ? 0 : 16, 0, 12, 0),
           child: Row(
             children: [
-              const Expanded(child: FlixieSectionHeader(title: 'Just for you')),
+              Expanded(
+                  child: HomeTabletLayout.active(context)
+                      ? const Text('Just for you',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w800))
+                      : const FlixieSectionHeader(title: 'Just for you')),
               IconButton(
                 tooltip: 'Reload recommendations',
                 onPressed:
@@ -931,30 +997,36 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: Text(
-              'Picked from your taste',
-              key: ValueKey(_isLoadingRecommendations),
-              style: TextStyle(
-                color: context.colors.medium,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+        if (!HomeTabletLayout.active(context))
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Text(
+                'Picked from your taste',
+                key: ValueKey(_isLoadingRecommendations),
+                style: TextStyle(
+                  color: context.colors.medium,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),
-        ),
         if (_isLoadingRecommendations)
           const RecommendationsLoadingCard()
         else
           SizedBox(
-            height: PersonalizedRecommendationCard.height,
+            height: HomeTabletLayout.active(context)
+                ? 208
+                : PersonalizedRecommendationCard.height,
             child: Padding(
-              padding: const EdgeInsets.only(left: 16),
+              padding: EdgeInsets.only(
+                  left: HomeTabletLayout.active(context) ? 0 : 16),
               child: PageView.builder(
-                controller: _forYouPageController,
+                controller: HomeTabletLayout.active(context)
+                    ? _tabletForYouPageController
+                    : _forYouPageController,
                 padEnds: false,
                 itemCount: movies.length,
                 onPageChanged: (index) {

@@ -5,12 +5,13 @@ class SignupJourney {
       required this.action,
       required this.path,
       this.title,
+      this.diaryDraftId,
       this.episodeId,
       this.seasonNumber,
       this.episodeNumber,
       this.episodeTitle});
   final String userId, action, path;
-  final String? title;
+  final String? title, diaryDraftId;
   final int? episodeId, seasonNumber, episodeNumber;
   final String? episodeTitle;
   bool get isShow => path.startsWith('/shows/');

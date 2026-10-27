@@ -20,7 +20,7 @@ class OnboardingFooter extends StatelessWidget {
       1 =>
         controller.country == null ? 'Choose country' : 'Show my first picks',
       2 => 'Continue to favourites',
-      3 => 'Continue to sharing',
+      3 => 'Continue to preferences',
       4 => 'Find my kind of people',
       _ => controller.selectedCommunities.isEmpty
           ? 'Explore Flixie'
@@ -34,7 +34,10 @@ class OnboardingFooter extends StatelessWidget {
       _ => 'I’ll explore on my own',
     };
     final VoidCallback? advance = controller.busy ||
-            (controller.step == 1 && controller.loading) ||
+            (controller.step == 1 &&
+                (controller.loading ||
+                    (controller.availabilityAlertsChoice == true &&
+                        controller.selectedProviders.isEmpty))) ||
             (controller.step == 5 &&
                 controller.loadingCommunities &&
                 controller.selectedCommunities.isNotEmpty)

@@ -8,7 +8,7 @@ import 'support/api_fixture.dart';
 
 void main() {
   testWidgets(
-      'all seven screenshot destinations load through isolated fixtures',
+      'all store screenshot destinations load through isolated fixtures',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(440, 956);
@@ -25,6 +25,7 @@ void main() {
     for (final (route, label) in [
       ('/', 'Pick for me'),
       ('/profile', 'alexriver'),
+      ('/profile/diary', 'Dear film diary,'),
       ('/watchlist', 'Interstellar'),
       ('/watch-requests/store-movie-night', 'Alien'),
       ('/community/spaces/18', 'The shows that stay with you'),
@@ -52,6 +53,11 @@ void main() {
               .color,
           FlixieColors.background,
           reason: 'Transparent routes must use the production backdrop');
+      if (route == '/profile/diary') {
+        expect(find.text('Still thinking about that ending.'), findsOneWidget);
+        expect(find.textContaining('Interstellar'), findsWidgets);
+        expect(find.textContaining('Alien'), findsWidgets);
+      }
       if (route == '/watchlist') {
         expect(find.text('2 friends watched'), findsWidgets);
         expect(find.textContaining('8.5'), findsWidgets);
@@ -69,7 +75,7 @@ void main() {
         expect(hero.movie.backdropPath, '/sSIzzVhhLfgLKVBcAUv0X6cLYz9.jpg');
       }
       if (route == '/movies/157336') {
-        expect(find.text('8.7  FlixScore'), findsOneWidget);
+        expect(find.text('8.7/10'), findsOneWidget);
         expect(find.text('No ratings yet'), findsNothing);
         await Scrollable.ensureVisible(tester.element(find.text('Friends')),
             alignment: 0.08);

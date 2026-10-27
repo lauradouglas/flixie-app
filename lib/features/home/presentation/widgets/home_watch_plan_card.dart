@@ -1,3 +1,4 @@
+import 'home_tablet_layout.dart';
 import 'package:flixie_app/features/watch_plans/presentation/widgets/shared/watch_plan_components.dart';
 import 'package:flutter/material.dart';
 
@@ -5,6 +6,18 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/app/theme/flixie_typography.dart';
 import 'package:flixie_app/features/home/presentation/models/home_watch_plan_state.dart';
 import 'package:flixie_app/features/watch_plans/presentation/utils/watch_plan_display_state.dart';
+
+// Keep the chosen teal surface for waiting/logged cards; other statuses retain their original tint.
+Color _watchTogetherSurface(BuildContext context, WatchPlanColorRole role) {
+  if (role == WatchPlanColorRole.waiting) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF153034)
+        : const Color(0xFFEDF5F4);
+  }
+  return Color.alphaBlend(
+      context.colors.adapt(role.color).withValues(alpha: .08),
+      context.colors.surface);
+}
 
 class HomeWatchPlanCard extends StatelessWidget {
   const HomeWatchPlanCard({
@@ -18,6 +31,8 @@ class HomeWatchPlanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = HomeTabletLayout.active(context);
+    final posterWidth = compact ? 50.0 : 68.0;
     final plan = state.plan;
     final selected = plan.candidates
         .where((candidate) => candidate.id == plan.selectedCandidateId)
@@ -44,15 +59,12 @@ class HomeWatchPlanCard extends StatelessWidget {
               child: Ink(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Color.alphaBlend(
-                    tone.withValues(alpha: .08),
-                    context.colors.surface,
-                  ),
+                  color: _watchTogetherSurface(context, state.colorRole),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: tone.withValues(alpha: .25)),
                 ),
                 child: LayoutBuilder(builder: (context, constraints) {
-                  final narrow = constraints.maxWidth < 300 ||
+                  final narrow = (!compact && constraints.maxWidth < 300) ||
                       MediaQuery.textScalerOf(context).scale(1) > 1.15;
                   final status = state.eyebrow.isEmpty
                       ? ''
@@ -112,7 +124,10 @@ class HomeWatchPlanCard extends StatelessWidget {
                           : context.colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
-                      textStyle: FlixieTypography.button,
+                      textStyle: compact
+                          ? const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700)
+                          : FlixieTypography.button,
                       minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
@@ -122,10 +137,11 @@ class HomeWatchPlanCard extends StatelessWidget {
                       ? WatchPlanPoster(
                           path: plan.movie?.posterPath,
                           title: state.title,
-                          width: 68)
+                          width: posterWidth)
                       : SizedBox(
-                          width: 68 + (suggestions.length - 1) * 6.0,
-                          height: 102 + (suggestions.length - 1) * 6.0,
+                          width: posterWidth + (suggestions.length - 1) * 6.0,
+                          height: posterWidth * 1.5 +
+                              (suggestions.length - 1) * 6.0,
                           child: Stack(children: [
                             for (var i = suggestions.length - 1; i >= 0; i--)
                               Positioned(
@@ -134,7 +150,7 @@ class HomeWatchPlanCard extends StatelessWidget {
                                   child: WatchPlanPoster(
                                       path: suggestions[i].posterPath,
                                       title: suggestions[i].title,
-                                      width: 68)),
+                                      width: posterWidth)),
                           ]),
                         );
                   if (narrow) {

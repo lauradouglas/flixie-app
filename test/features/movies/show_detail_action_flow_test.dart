@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -16,6 +17,7 @@ import 'show_detail_controller_test.dart';
 import 'movie_detail_action_flow_test.dart' show ActionAnalytics;
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   late ShowAuth auth;
   late ShowData service;
   late ShowDetailController data;

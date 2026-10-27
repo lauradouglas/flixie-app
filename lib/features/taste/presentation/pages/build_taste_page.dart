@@ -107,7 +107,7 @@ class _BuildTastePageState extends State<BuildTastePage> {
                 ? 'Seen it? Give us your take.'
                 : 'Which films are your favourites?',
             rating
-                ? 'Choose a film you’ve watched. Rate honestly — low scores help shape your taste too.'
+                ? 'Choose a film you’ve watched. Rate honestly - low scores help shape your taste too.'
                 : 'Tap a heart for an all-time favourite. One is a good start; add more whenever you like.'),
         TextField(
             controller: _search,
@@ -186,7 +186,7 @@ class _BuildTastePageState extends State<BuildTastePage> {
         _heading(
             hasTaste ? 'A little more you.' : 'Good films are still waiting.',
             hasTaste
-                ? 'Your film ratings and favourites give Flixie more to go on. Keep rating as you watch — your taste can change with you.'
+                ? 'Your film ratings and favourites give Flixie more to go on. Keep rating as you watch - your taste can change with you.'
                 : 'Browse first. You can build your taste any time from your profile.'),
         if (hasTaste)
           Text(

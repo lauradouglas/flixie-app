@@ -32,7 +32,7 @@ class SharedPreferencesReferralAttributionStore
 
   static String? _normalize(String? value) {
     final normalized = value?.trim().toUpperCase();
-    if (normalized == null || normalized.length < 4 || normalized.length > 32) {
+    if (normalized == null || normalized.length < 4 || normalized.length > 39) {
       return null;
     }
     return normalized;

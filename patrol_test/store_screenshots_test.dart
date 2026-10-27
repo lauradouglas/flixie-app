@@ -12,7 +12,7 @@ import 'support/store_screenshot_fixture.dart';
 
 const storeScreenshotScenes = [
   ('01-home', '/', 'Trending now'),
-  ('02-profile', '/profile', 'alexriver'),
+  ('02-diary', '/profile/diary', 'Dear film diary,'),
   ('03-watchlist', '/watchlist', 'Interstellar'),
   ('04-watch-plan', '/watch-requests/store-movie-night', 'Alien'),
   ('05-community', '/community/spaces/18', 'The shows that stay with you'),
@@ -117,6 +117,16 @@ void main() {
           reason: 'Episode tracking is missing on $name');
       expect(fixture.unexpectedRequests, isEmpty);
       expect($.tester.takeException(), isNull);
+
+      // Clearing LiveTest's label does not invalidate its retained overlay.
+      // Repaint the native views so no clipped test text reaches store PNGs.
+      final binding = $.tester.binding as LiveTestWidgetsFlutterBinding;
+      // ignore: invalid_use_of_protected_member
+      binding.setLabel('');
+      for (final view in binding.renderViews) {
+        view.markNeedsPaint();
+      }
+      await $.pump();
 
       // Host response arrives only after the native PNG has been saved.
       // This avoids arbitrary pauses and works on both iOS and Android.

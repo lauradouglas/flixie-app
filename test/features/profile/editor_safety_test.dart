@@ -83,8 +83,9 @@ void main() {
     useApiFixture(MockClient((request) async {
       final body = jsonDecode(request.body) as Map;
       writes.add(body.keys.single as String);
-      if (body.containsKey('bio') && fail)
+      if (body.containsKey('bio') && fail) {
         return http.Response('{"message":"offline"}', 503);
+      }
       return http.Response(jsonEncode({'id': 'viewer', ...body}), 200);
     }));
     await open(

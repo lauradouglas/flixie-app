@@ -8,9 +8,11 @@ import 'diary_calendar_sheet.dart';
 import 'diary_selection.dart';
 
 class DiaryWatchEntry extends StatelessWidget {
-  const DiaryWatchEntry({super.key, required this.entry, this.rewatch = false});
+  const DiaryWatchEntry(
+      {super.key, required this.entry, this.rewatch = false, this.onEdit});
   final MovieWatchEntry entry;
   final bool rewatch;
+  final VoidCallback? onEdit;
   @override
   Widget build(BuildContext context) {
     final date = diaryWatchDay(entry), path = entry.movie?.posterPath;
@@ -27,11 +29,19 @@ class DiaryWatchEntry extends StatelessWidget {
                 color: color, fontSize: size, fontWeight: weight, height: 1.4));
     final details =
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      InkWell(
-          onTap: () => context.push('/movies/${entry.movieId}'),
-          child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              child: text(title, 19, weight: FontWeight.w800))),
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+            child: InkWell(
+                onTap: () => context.push('/movies/${entry.movieId}'),
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    child: text(title, 19, weight: FontWeight.w800)))),
+        if (onEdit != null)
+          IconButton(
+              tooltip: 'Edit memory',
+              onPressed: onEdit,
+              icon: const Icon(Icons.more_horiz, color: diaryMuted)),
+      ]),
       Wrap(
           spacing: 10,
           runSpacing: 6,

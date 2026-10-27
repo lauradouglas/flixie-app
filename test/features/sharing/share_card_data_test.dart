@@ -107,7 +107,7 @@ void main() {
       ),
     );
 
-    expect(find.text('8.0'), findsOneWidget);
+    expect(find.text('8'), findsOneWidget);
     expect(find.text('Recommends'), findsNothing);
     expect(find.text("Doesn't recommend"), findsNothing);
   });
@@ -174,7 +174,7 @@ void main() {
     expect(
         find.textContaining('@dougasaur-and-the-movie-club',
             findRichText: true),
-        findsOneWidget);
+        findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 
@@ -196,7 +196,7 @@ void main() {
       MaterialApp(home: Scaffold(body: FlixieShareCard(data: data))),
     );
 
-    expect(find.text('8.0'), findsOneWidget);
+    expect(find.text('8'), findsOneWidget);
     expect(find.text('A lasting favourite'), findsOneWidget);
     expect(
       find.text('The ending stayed with me long after the credits.'),

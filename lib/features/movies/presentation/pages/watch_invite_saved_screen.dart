@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/pip/presentation/widgets/pip_companion.dart';
+import 'package:flixie_app/models/watch_request.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,10 +10,15 @@ import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 
 class WatchInviteSavedScreen extends StatelessWidget {
   const WatchInviteSavedScreen(
-      {super.key, required this.requestId, this.movieTitle, this.rating});
+      {super.key,
+      required this.requestId,
+      this.movieTitle,
+      this.rating,
+      this.watchState});
   final String requestId;
   final String? movieTitle;
   final int? rating;
+  final WatchRequestState? watchState;
   Future<void> _continue(BuildContext context) async {
     final completed =
         context.read<AuthProvider>().dbUser?.completedSetup == true;
@@ -31,11 +38,12 @@ class WatchInviteSavedScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(24),
                   shrinkWrap: true,
                   children: [
+                    const PipCompanion(celebrate: true),
                     const Align(
                         alignment: Alignment.centerLeft,
                         child: Icon(Icons.check_circle_outline, size: 48)),
                     const SizedBox(height: 24),
-                    Text('That one’s in your diary.',
+                    Text('One movie night. Your own take.',
                         style: Theme.of(context).textTheme.headlineMedium),
                     const SizedBox(height: 16),
                     Text(movieTitle == null
@@ -48,11 +56,30 @@ class WatchInviteSavedScreen extends StatelessWidget {
                               style:
                                   Theme.of(context).textTheme.headlineLarge)),
                     const SizedBox(height: 16),
+                    if (watchState != null) ...[
+                      Text('Your movie night',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      for (final confirmation in watchState!
+                          .request.watchConfirmations
+                          .where((c) => c.watched))
+                        ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.movie_outlined),
+                            title: Text(watchState!.request.viewingPeople
+                                    .where((p) => p.id == confirmation.userId)
+                                    .firstOrNull
+                                    ?.displayName ??
+                                'Film friend'),
+                            subtitle: Text(confirmation.rating == null
+                                ? 'Watch saved · no score'
+                                : '${confirmation.rating}/10 · watch saved')),
+                      const SizedBox(height: 16),
+                    ],
                     const Text('Your date, rating and review stay your own.'),
                     const SizedBox(height: 28),
                     FilledButton(
                         onPressed: () =>
-                            context.go('/watch-requests/$requestId?log=true'),
+                            context.go('/watch-requests/$requestId'),
                         child: const Text('View my watch')),
                     TextButton(
                         onPressed: () => _continue(context),

@@ -230,20 +230,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           owner.busy ? null : () => _finish(widget.returnTo!),
                       icon: const Icon(Icons.arrow_forward),
                       label: const Text('Go straight to your invitation')),
-                if (owner.referrer != null)
-                  TextButton(
-                      onPressed: owner.busy
-                          ? null
-                          : () => owner.run(() async {
-                                final id = await owner.service
-                                    .friendId(owner.referrer!);
-                                if (!owner.active) return;
-                                owner.setBusy(false);
-                                await _finish(id == null
-                                    ? '/social?tab=people'
-                                    : '/friends/$id');
-                              }),
-                      child: Text('Find @${owner.referrer} first')),
+
               ],
               child: switch (owner.step) {
                 0 => OnboardingTasteStep(

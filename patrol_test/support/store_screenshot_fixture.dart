@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/profile/presentation/pages/profile_diary_screen.dart';
 import 'package:flixie_app/app/router/flixie_tablet_navigation.dart';
 import 'package:flixie_app/features/social/presentation/pages/social_screen.dart';
 import 'dart:convert';
@@ -34,6 +35,8 @@ const screenshotMovies = <Map<String, dynamic>>[
     'title': 'Interstellar',
     'voteAverage': 8.7,
     'voteCount': 3,
+    'tmdbVoteAverage': 8.7,
+    'tmdbVoteCount': 1000,
     'posterPath': '/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
     'releaseDate': '2014-11-05',
     'runtime': 169,
@@ -389,6 +392,9 @@ Map<String, dynamic> get screenshotPlan => {
 
 class StoreScreenshotAuth extends TestAuth {
   @override
+  Future<bool> ensureLibraryLoaded() async => true;
+
+  @override
   User get dbUser => User.fromJson({
         ...screenshotPerson,
         'email': '',
@@ -494,6 +500,29 @@ class StoreScreenshotFixture {
       };
     }
     if (request.method != 'GET') return unexpected(request);
+    if (path == '/users/store-viewer/movie/watches') {
+      return [
+        for (final (index, movie) in screenshotMovies.indexed)
+          {
+            'id': 'store-diary-$index',
+            'userId': 'store-viewer',
+            'movieId': movie['id'],
+            'watchedAt': '2026-10-${19 + index}T19:30:00Z',
+            'rating': [9, 9, 8, 10][index],
+            'recommended': true,
+            'notes': [
+              'Still thinking about that ending.',
+              'Lights off. Volume up. Perfect October viewing.',
+              'A big-screen adventure worth the wait.',
+              'A little magic for a quiet evening.'
+            ][index],
+            'watchedAtCinema': index == 2,
+            'removed': false,
+            'movie': movie,
+          }
+      ];
+    }
+
     if (path == '/movies/now_playing' ||
         path == '/trending/movie/day' ||
         path == '/users/store-viewer/recommendations') {
@@ -711,6 +740,10 @@ GoRouter storeScreenshotRouter({bool tabletReview = false}) =>
         ],
       ),
       GoRoute(
+          path: '/profile/diary',
+          builder: (_, __) =>
+              ProfileDiaryScreen(today: DateTime(2026, 10, 22))),
+      GoRoute(
           path: '/watchlist',
           builder: (_, __) => tabletReview
               ? const FlixieTabletRouteFrame(
@@ -761,7 +794,8 @@ Widget storeScreenshotApp(StoreScreenshotAuth auth, GoRouter router) =>
                 // Store captures are stills: use the app's reduced-motion
                 // treatment so decorative loops can reach a settled frame.
                 child: MediaQuery(
-                  data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                  data:
+                      MediaQuery.of(context).copyWith(disableAnimations: true),
                   child: child ?? const SizedBox.shrink(),
                 ),
               ),

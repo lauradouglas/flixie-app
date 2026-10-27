@@ -8,6 +8,7 @@ class EpisodeSpoilerPreference extends ChangeNotifier {
   bool hide = true;
   bool saving = false;
   bool loaded = false;
+  bool loadFailed = false;
   Future<void>? _loading;
 
   Future<void> load() => _loading ??= _load();
@@ -16,9 +17,12 @@ class EpisodeSpoilerPreference extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       hide = prefs.getBool(storageKey) ?? true;
       loaded = true;
+      loadFailed = false;
       notifyListeners();
     } catch (_) {
       _loading = null;
+      loadFailed = true;
+      notifyListeners();
       rethrow;
     }
   }

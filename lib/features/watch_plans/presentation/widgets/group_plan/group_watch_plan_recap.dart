@@ -144,7 +144,7 @@ class _GroupWatchPlanRecapState extends State<GroupWatchPlanRecap> {
                   Text(
                       scoresHidden
                           ? 'Rate to see'
-                          : average?.toStringAsFixed(1) ?? '—',
+                          : average?.toStringAsFixed(1) ?? '-',
                       semanticsLabel: scoresHidden
                           ? 'Rate the movie to see group scores'
                           : average == null

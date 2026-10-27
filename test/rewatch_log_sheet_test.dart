@@ -28,14 +28,14 @@ void main() {
                 }))));
     expect(find.text('Would you recommend it?'), findsOneWidget);
     expect(find.text('Recommend'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Watch comment (optional)'),
+    expect(find.widgetWithText(TextField, 'Diary note (optional)'),
         findsOneWidget);
     expect(
         find.widgetWithText(TextField, 'Your review (optional)'), findsNothing);
     await tester.tap(find.text('Recommend'));
     await tester.pump();
     await tester.enterText(
-        find.widgetWithText(TextField, 'Watch comment (optional)'),
+        find.widgetWithText(TextField, 'Diary note (optional)'),
         'Cinema night with Sophie');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Save watch'));

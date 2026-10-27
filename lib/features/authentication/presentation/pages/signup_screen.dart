@@ -1,3 +1,4 @@
+import '../widgets/signup_sharing_choice.dart';
 import 'package:flixie_app/features/guest/presentation/widgets/bookmark_signup_context.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_invite_signup_context.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
@@ -50,6 +51,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   final _formKey = GlobalKey<FormState>();
   bool _termsAccepted = false;
+  bool _communitySharing = true;
 
   final _displayNameController = TextEditingController();
   final _usernameController = TextEditingController();
@@ -273,6 +275,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     final success = await auth.beginAvatarSignUp(
       termsAccepted: _termsAccepted,
+      communitySharing: _communitySharing,
       email: _emailController.text.trim(),
       password: _passwordController.text,
       firstName: _displayNameController.text.trim(),
@@ -621,6 +624,12 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ],
               const SizedBox(height: 22),
+              SignupSharingChoice(
+                  value: _communitySharing,
+                  onChanged: isLoading
+                      ? null
+                      : (value) => setState(() => _communitySharing = value)),
+              const SizedBox(height: 16),
               TermsAgreementField(onChanged: (value) => _termsAccepted = value),
               const SizedBox(height: 16),
               if (!context.read<AuthProvider>().needsSocialProfile)

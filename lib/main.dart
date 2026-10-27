@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/pip/presentation/controllers/pip_collection_controller.dart';
 import 'package:flixie_app/core/auth/firebase_environment.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flixie_app/core/app_icon/app_icon_service.dart';
@@ -168,6 +169,12 @@ Future<void> main() async {
             AuthService(),
             context.read<MovieService>(),
           ),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, PipCollectionController>(
+          lazy: false,
+          create: (_) => PipCollectionController(),
+          update: (_, auth, controller) =>
+              controller!..syncUser(auth.dbUser?.id, auth.activityVersion),
         ),
         ChangeNotifierProxyProvider<AuthProvider, LibraryImportSession>(
           lazy: false,

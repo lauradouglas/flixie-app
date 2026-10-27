@@ -137,11 +137,11 @@ class AuthSessionRecovery {
     if (revision == ApiClient.tokenRevision) ApiClient.setToken(token);
   }
 
-  Future<bool> refreshProfile() async {
+  Future<bool> refreshProfile({bool reportFailure = true}) async {
     if (_disposed) return false;
     final existing = _profileFuture;
     if (existing != null) return existing;
-    final future = _refreshProfile();
+    final future = _refreshProfile(reportFailure: reportFailure);
     _profileFuture = future;
     try {
       return await future;
@@ -150,7 +150,7 @@ class AuthSessionRecovery {
     }
   }
 
-  Future<bool> _refreshProfile() async {
+  Future<bool> _refreshProfile({required bool reportFailure}) async {
     final user = _user();
     if (user == null) return false;
     final generation = _generation;
@@ -169,8 +169,10 @@ class AuthSessionRecovery {
         await _onExpired();
         return false;
       }
-      _error = 'Couldn’t refresh. Your saved content is still available.';
-      _onChanged();
+      if (reportFailure) {
+        _error = 'Couldn’t refresh. Your saved content is still available.';
+        _onChanged();
+      }
       return false;
     }
   }
@@ -201,7 +203,9 @@ class AuthSessionRecovery {
     try {
       await refreshToken(user, isCurrent: current);
       if (!current()) return;
-      if (!await refreshProfile()) throw StateError('Profile refresh failed');
+      if (!await refreshProfile(reportFailure: false)) {
+        throw StateError('Profile refresh failed');
+      }
       if (!current()) return;
       _lastResumeAt = DateTime.now();
       succeeded();
@@ -212,8 +216,12 @@ class AuthSessionRecovery {
         await _onExpired();
         return;
       }
-      _error = 'Couldn’t refresh. Check your connection and retry.';
-      _onChanged();
+      // Returning to a usable session is background maintenance. Give the
+      // bounded retry sequence time to recover before interrupting Home.
+      if (_foreground && _attempts >= 3) {
+        _error = 'Showing saved content. Pull to refresh or try again later.';
+        _onChanged();
+      }
       scheduleRetry();
     }
   }

@@ -60,7 +60,7 @@ void main() {
       await tester.ensureVisible(find.text('Write a review next'));
       await tester.tap(find.text('Write a review next'));
       await tester.pumpAndSettle();
-      final review = find.widgetWithText(TextField, 'Watch comment (optional)');
+      final review = find.widgetWithText(TextField, 'Diary note (optional)');
       await tester.ensureVisible(review);
       await tester.tap(review);
       tester.view.viewInsets = FakeViewPadding(bottom: keyboard);

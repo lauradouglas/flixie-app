@@ -29,7 +29,7 @@ def manifest_directory(platform, screenshot_type='phoneScreenshots'):
     base = ROOT / 'fastlane/screenshot-manifests' / platform
     return base if screenshot_type == 'phoneScreenshots' else base / screenshot_type
 
-SCENES = ('01-home', '02-profile', '03-watchlist', '04-watch-plan',
+SCENES = ('01-home', '02-diary', '03-watchlist', '04-watch-plan',
           '05-community', '06-interstellar', '07-the-newsroom', '08-rating')
 
 
@@ -232,9 +232,15 @@ def capture_set(platform, device, label, locale, staging, scenes=SCENES):
         # Run output goes to a local log (the Dart defines include a transient
         # handshake token). Print its tail only when capture fails.
         log_path = staging / 'patrol.log'
+        environment = dict(os.environ)
+        if platform == 'android':
+            # Capture only the Dart screenshot journey; standalone widget/auth
+            # instrumentation tests have their own runners and prerequisites.
+            environment['ORG_GRADLE_PROJECT_android.testInstrumentationRunnerArguments.class'] = 'com.flixie.app.MainActivityTest'
         with log_path.open('w') as log:
             process = subprocess.Popen(command, cwd=ROOT, stdout=log,
-                                       stderr=subprocess.STDOUT, start_new_session=True)
+                                       stderr=subprocess.STDOUT, start_new_session=True,
+                                       env=environment)
             try:
                 deadline = time.monotonic() + 1800
                 while process.poll() is None:

@@ -25,8 +25,9 @@ class _PipPreviewState extends State<PipPreview> {
   Future<void> open() async {
     final result = await showActivityReactionBubble(context, context,
         current: selected?.emoji, canReply: true);
-    if (mounted && result is ActivityReaction)
+    if (mounted && result is ActivityReaction) {
       setState(() => selected = result);
+    }
   }
 
   @override

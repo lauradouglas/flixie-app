@@ -63,4 +63,22 @@ void main() {
     await service.select('default');
     expect(selected, 'default');
   });
+  test('Cinema Club requires a verified entitlement for the current account',
+      () async {
+    final service = AppIconService(channel: channel);
+    service.updateUser(member('cinema', []));
+    await expectLater(service.select('pipPeeksIn'), throwsStateError);
+    service.updateCinemaEntitlement('someone-else', true);
+    await expectLater(service.select('pipPeeksIn'), throwsStateError);
+    service.updateCinemaEntitlement('cinema', true);
+    await service.select('pipPeeksIn');
+    expect(selected, 'pipPeeksIn');
+    service.updateUser(member('cinema', []));
+    await service.select('pipPeeksIn');
+    service.updateUser(member('other', []));
+    await expectLater(service.select('pipPeeksIn'), throwsStateError);
+    service.updateCinemaEntitlement('other', false);
+    await service.select('default');
+    expect(selected, 'default');
+  });
 }

@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
+import 'package:flixie_app/features/pip/presentation/widgets/my_pip_sheet.dart';
 import '../widgets/availability_alert_setting.dart';
 import '../widgets/blocked_users_sheet.dart';
 import '../widgets/settings_edit_profile_sheet.dart';
@@ -52,15 +54,17 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          if (!context.select<AuthProvider, bool>(
-              (auth) => auth.hasConnectedSocialProvider)) ...[
-            _sectionLabel(context, 'Sign-in methods'),
-            Text(
-                'Connect ${SocialAuthProvider.available.map((provider) => provider.label).join(' or ')} to sign in to this same Flixie account.'),
-            const SizedBox(height: 12),
-            const SocialAuthButtons(connect: true),
-            const SizedBox(height: 24),
-          ],
+          _sectionLabel(context, 'Personalisation'),
+          _SettingsGroup(children: [
+            SettingsTile(
+              icon: Icons.auto_awesome_outlined,
+              label: 'My Pip',
+              description: 'Choose your Pip and app icon',
+              onTap: () => showMyPipSheet(context),
+            ),
+            const AppearanceSetting(),
+          ]),
+          const SizedBox(height: 24),
           _sectionLabel(context, 'Account'),
           _SettingsGroup(
             children: [
@@ -191,8 +195,10 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () => analytics.isEnabled
                       ? analytics.decline()
                       : analytics.allow(),
-                  trailing: Switch.adaptive(
-                    value: analytics.consent == AnalyticsConsent.accepted,
+                  trailing: PreferenceSwitch(
+                    value: analytics.consent == AnalyticsConsent.unknown
+                        ? null
+                        : analytics.consent == AnalyticsConsent.accepted,
                     onChanged: (enabled) =>
                         enabled ? analytics.allow() : analytics.decline(),
                   ),
@@ -206,7 +212,6 @@ class SettingsScreen extends StatelessWidget {
                     userId: userId,
                     isCurrentUser: () => auth.dbUser?.id == userId);
               }),
-              const AppearanceSetting(),
               SettingsTile(
                 icon: Icons.live_tv_outlined,
                 label: 'Watch Providers',
@@ -221,6 +226,15 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
+          if (!context.select<AuthProvider, bool>(
+              (auth) => auth.hasConnectedSocialProvider)) ...[
+            _sectionLabel(context, 'Sign-in methods'),
+            Text(
+                'Connect ${SocialAuthProvider.available.map((provider) => provider.label).join(' or ')} to sign in to this same Flixie account.'),
+            const SizedBox(height: 12),
+            const SocialAuthButtons(connect: true),
+            const SizedBox(height: 24),
+          ],
           _sectionLabel(context, 'Support'),
           _SettingsGroup(
             children: [

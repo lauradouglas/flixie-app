@@ -1,7 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart';
 import 'package:flixie_app/features/authentication/models/signup_journey.dart';
 import 'package:flixie_app/features/authentication/data/setup_service.dart';
 import 'dart:convert';

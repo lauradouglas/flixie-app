@@ -168,7 +168,7 @@ class WatchlistFriendsViewing extends StatelessWidget {
                                                 ownerId: friend.userId)
                                             ? 'Hidden'
                                             : friend.rating == null
-                                                ? '—'
+                                                ? '-'
                                                 : '${friend.rating! == friend.rating!.roundToDouble() ? friend.rating!.toInt() : friend.rating}/10',
                                         style: TextStyle(
                                             color: friend.rating == null

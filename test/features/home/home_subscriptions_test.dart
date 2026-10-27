@@ -90,7 +90,7 @@ void main() {
         headers: {'content-type': 'application/json'});
     final client = MockClient((request) async {
       final path = request.url.path;
-      if (path == '/trending/all/day') {
+      if (path == '/trending/movie/day') {
         return response([
           {'id': 13, 'title': 'Alien', 'mediaType': 'MOVIE'},
           {'id': 14, 'title': 'The Odyssey', 'mediaType': 'MOVIE'},

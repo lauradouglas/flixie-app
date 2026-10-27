@@ -1,10 +1,10 @@
+import 'package:flixie_app/features/referrals/presentation/social_invite_empty_state.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import '../../data/starred_people.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/activity_tile.dart';
 import 'package:flixie_app/core/analytics/detail_source.dart';
@@ -123,16 +123,8 @@ class _FriendsActivityFeedState extends State<FriendsActivityFeed> {
               : _items.isEmpty
                   ? ListView(
                       padding: const EdgeInsets.all(24),
-                      children: [
-                        const SizedBox(height: 160),
-                        Icon(Icons.people_outline_rounded,
-                            size: 52, color: context.colors.medium),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No friend activity in the last two weeks.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: context.colors.medium),
-                        ),
+                      children: const [
+                        SocialInviteEmptyState(activity: true),
                       ],
                     )
                   : ListView.separated(

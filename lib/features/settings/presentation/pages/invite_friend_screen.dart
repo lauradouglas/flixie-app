@@ -1,10 +1,10 @@
-import 'package:flixie_app/core/widgets/flixie_toast.dart';
+import 'package:flixie_app/features/pip/presentation/widgets/my_pip_sheet.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/analytics/flixie_analytics.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
@@ -13,478 +13,281 @@ import 'package:flixie_app/models/referral_summary.dart';
 
 class InviteFriendScreen extends StatefulWidget {
   const InviteFriendScreen({super.key});
-
   @override
   State<InviteFriendScreen> createState() => _InviteFriendScreenState();
 }
 
 class _InviteFriendScreenState extends State<InviteFriendScreen> {
-  late Future<ReferralSummary> _summary;
-
-  @override
-  void initState() {
-    super.initState();
-    _summary = UserService.getMyReferral();
-  }
-
+  late Future<ReferralSummary> _summary = UserService.getMyReferral();
+  bool _sharing = false;
+  String? _shareError;
   Future<void> _share(ReferralSummary summary) async {
-    const reason =
-        'We can build joint watchlists, see what each other watched and unlock a Film Friend badge.';
-    final box = context.findRenderObject() as RenderBox?;
-    await Share.share(
-      'I invited you to Flixie! $reason\n\n'
-      'Join me here: ${summary.inviteUrl}\n'
-      'Your referral code: ${summary.code}',
-      subject: 'Join me on Flixie',
-      sharePositionOrigin:
-          box == null ? null : box.localToGlobal(Offset.zero) & box.size,
-    );
-    if (mounted) {
-      final entryPoint = GoRouterState.of(context).uri.queryParameters['from'];
-      final source = entryPoint == 'settings' ? 'settings' : 'social';
-      await context.read<AnalyticsController>().friendInviteSent(
-            inviteMethod: 'referral_link',
-            source: source,
-          );
+    if (_sharing) return;
+    setState(() {
+      _sharing = true;
+      _shareError = null;
+    });
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      final result = await Share.share(
+          'Come join me on Flixie - we can save our next-watch ideas and compare what we thought of our movie nights.\n\n${summary.inviteUrl}\n\nJoin through my invite and we’ll be connected as friends.',
+          subject: 'Your film person is on Flixie',
+          sharePositionOrigin:
+              box == null ? null : box.localToGlobal(Offset.zero) & box.size);
+      if (mounted && result.status == ShareResultStatus.success) {
+        unawaited(context
+            .read<AnalyticsController>()
+            .friendInviteSent(
+                inviteMethod: 'referral_link',
+                source: GoRouterState.of(context).uri.queryParameters['from'] ==
+                        'settings'
+                    ? 'settings'
+                    : 'social')
+            .catchError((Object _) {}));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _shareError =
+            'Couldn’t open sharing. Try again, or copy your code.');
+      }
+    } finally {
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
-  Future<void> _copyCode(String code) async {
-    await Clipboard.setData(ClipboardData(text: code));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showFlixieToast(
-      FlixieToast(
-          type: FlixieToastType.success,
-          content: const Text('Referral code copied')),
-    );
+  Future<void> _copy(String code) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: code));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Referral code copied')));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+            () => _shareError = 'Couldn’t copy your code. Please try again.');
+      }
+    }
   }
 
+  Future<void> _sheet(String title, Widget content) =>
+      showModalBottomSheet<void>(
+          context: context,
+          useRootNavigator: true,
+          useSafeArea: true,
+          isScrollControlled: true,
+          builder: (sheet) => SizedBox(
+              height: MediaQuery.sizeOf(sheet).height * .8,
+              child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(children: [
+                          Expanded(
+                              child: Text(title,
+                                  style:
+                                      Theme.of(sheet).textTheme.headlineSmall)),
+                          IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(sheet),
+                              icon: const Icon(Icons.close))
+                        ]),
+                        const SizedBox(height: 16),
+                        content,
+                        TextButton(
+                            onPressed: () => Navigator.pop(sheet),
+                            child: const Text('Done'))
+                      ]))));
+  void _rules() => _sheet(
+      'Your Film Friend badge',
+      const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.people_alt_outlined),
+            title: Text('A profile badge for both of you')),
+        SizedBox(height: 16),
+        Text(
+            '1. Share your personal invite.\n\n2. Your friend creates a new account using your link or code.\n\n3. When they finish setting up, you both receive Film Friend.'),
+        SizedBox(height: 20),
+        Text(
+            'Already on Flixie? You can still enjoy films together, but joining again doesn’t count as a new referral.')
+      ]));
+  void _progress(ReferralSummary summary) => _sheet(
+      'Your film people',
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(
+            '${summary.referralCount} joined · ${summary.qualifiedReferralCount} earned Film Friend'),
+        const SizedBox(height: 16),
+        if (summary.referrals.isEmpty)
+          Text(summary.referralCount == 0
+              ? 'No one has joined through your invite yet. Start with someone whose film opinions you want.'
+              : 'Your totals are up to date. Individual invitation details aren’t available right now.'),
+        for (final person in summary.referrals)
+          ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(person.displayName),
+              subtitle: Text(person.qualified
+                  ? 'Joined · Film Friend earned'
+                  : 'Joined · reward not earned yet'),
+              leading: Icon(person.qualified
+                  ? Icons.verified_outlined
+                  : Icons.person_outline)),
+        if (summary.referralCount > summary.referrals.length &&
+            summary.referrals.isNotEmpty)
+          const Text('Showing your most recent invitations.'),
+        const SizedBox(height: 20),
+        const Text(
+            'Sharing a link doesn’t mean someone has joined. Your friend earns Film Friend after finishing setup.')
+      ]));
   @override
-  Widget build(BuildContext context) {
-    return FlixiePageScaffold(
+  Widget build(BuildContext context) => FlixiePageScaffold(
       appBar: const FlixieTitleAppBar(title: Text('Invite a friend')),
       body: FutureBuilder<ReferralSummary>(
-        future: _summary,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError || !snapshot.hasData) {
+          future: _summary,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return Center(
+                  child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Text('Couldn’t load your invitations.'),
+                        FilledButton(
+                            onPressed: () => setState(
+                                () => _summary = UserService.getMyReferral()),
+                            child: const Text('Try again'))
+                      ])));
+            }
+            final summary = snapshot.data!;
             return Center(
-              child: FilledButton(
-                onPressed: () => setState(
-                  () => _summary = UserService.getMyReferral(),
-                ),
-                child: const Text('Try again'),
-              ),
-            );
-          }
-          final summary = snapshot.data!;
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Icon(
-                Icons.people_alt_outlined,
-                size: 58,
-                color: FlixieColors.primary,
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Flixie is better with friends',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: context.colors.textPrimary,
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Send a personal invite to unlock the best bits of Flixie '
-                'together. When they join with your code, you’ll be connected '
-                'automatically.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: context.colors.medium, height: 1.45),
-              ),
-              const SizedBox(height: 24),
-              const _TogetherBenefits(),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: context.colors.surface,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: context.colors.tabBarBorder),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'YOUR REFERRAL CODE',
-                      style: TextStyle(
-                        color: context.colors.medium,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      summary.code,
-                      style: TextStyle(
-                        color: context.colors.textPrimary,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _copyCode(summary.code),
-                      icon: const Icon(Icons.copy_outlined),
-                      label: const Text('Copy code'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () => _share(summary),
-                icon: const Icon(Icons.ios_share),
-                label: const Text('Share invite'),
-              ),
-              const SizedBox(height: 22),
-              Text(
-                '${summary.referralCount} ${summary.referralCount == 1 ? 'friend has' : 'friends have'} joined with your code',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: context.colors.medium,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _TogetherBenefits extends StatelessWidget {
-  const _TogetherBenefits();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'WHAT YOU CAN DO TOGETHER',
-          style: TextStyle(
-            color: context.colors.medium,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1,
-          ),
-        ),
-        const SizedBox(height: 10),
-        const _BenefitCard(
-          icon: Icons.playlist_add_check_circle_rounded,
-          title: 'Build a joint list',
-          description:
-              'Create a shared watchlist where you can both add films and shows.',
-          preview: _JointListPreview(),
-        ),
-        const SizedBox(height: 12),
-        const _BenefitCard(
-          icon: Icons.people_alt_rounded,
-          title: 'Unlock your Film Friend badge',
-          description:
-              'Your profile earns this badge when a friend joins with your code and completes their taste profile.',
-          preview: _ProfileBadgePreview(),
-        ),
-        const SizedBox(height: 12),
-        const _BenefitCard(
-          icon: Icons.local_movies_rounded,
-          title: 'See what friends think',
-          description:
-              'Open any movie or show to see who watched, rated, saved or recommended it.',
-          preview: _FriendsBadgePreview(),
-        ),
-      ],
-    );
-  }
-}
-
-class _ProfileBadgePreview extends StatelessWidget {
-  const _ProfileBadgePreview();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(13),
-        border:
-            Border.all(color: context.colors.secondary.withValues(alpha: .45)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: context.colors.secondary.withValues(alpha: .14),
-              shape: BoxShape.circle,
-              border: Border.all(color: context.colors.secondary),
-            ),
-            child: Icon(
-              Icons.people_alt_rounded,
-              color: context.colors.secondary,
-              size: 21,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Film Friend',
-                  style: TextStyle(
-                    color: context.colors.light,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Displayed proudly on your profile',
-                  style: TextStyle(color: context.colors.medium, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.lock_open_rounded,
-              color: context.colors.secondary, size: 19),
-        ],
-      ),
-    );
-  }
-}
-
-class _BenefitCard extends StatelessWidget {
-  const _BenefitCard({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.preview,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final Widget preview;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.colors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.colors.tabBarBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: FlixieColors.primary.withValues(alpha: .16),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: FlixieColors.primary, size: 22),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: context.colors.medium,
-                        fontSize: 12.5,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          preview,
-        ],
-      ),
-    );
-  }
-}
-
-class _JointListPreview extends StatelessWidget {
-  const _JointListPreview();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: Colors.white.withValues(alpha: .07)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [FlixieColors.primary, context.colors.secondary],
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.movie_filter_rounded,
-                color: Theme.of(context).colorScheme.onPrimary),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Friday night picks',
-                  style: TextStyle(
-                    color: context.colors.light,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '12 titles · Shared list',
-                  style: TextStyle(color: context.colors.medium, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const _ExampleAvatar(label: 'Y', color: FlixieColors.primary),
-          Transform.translate(
-            offset: const Offset(-6, 0),
-            child: _ExampleAvatar(
-              label: 'F',
-              color: context.colors.secondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FriendsBadgePreview extends StatelessWidget {
-  const _FriendsBadgePreview();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceElevated,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: Colors.white.withValues(alpha: .07)),
-      ),
-      child: Row(
-        children: [
-          const _ExampleAvatar(label: 'L', color: FlixieColors.primary),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Laura watched this',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: context.colors.light,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Friends · Watched',
-                  style:
-                      TextStyle(color: context.colors.medium, fontSize: 10.5),
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.thumb_up_rounded, color: context.colors.success, size: 18),
-          const SizedBox(width: 10),
-          Icon(Icons.star_rounded, color: context.colors.warning, size: 19),
-          Text(
-            ' 8/10',
-            style: TextStyle(
-              color: context.colors.light,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExampleAvatar extends StatelessWidget {
-  const _ExampleAvatar({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 30,
-      height: 30,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: context.colors.surfaceElevated, width: 2),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.black,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
+                child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 620),
+                    child:
+                        ListView(padding: const EdgeInsets.all(24), children: [
+                      Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                                child: Text('Bring your film person.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineLarge)),
+                            if (MediaQuery.textScalerOf(context).scale(1) <=
+                                1.5)
+                              Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Image.asset(
+                                      'assets/icon/community_pips/pip-flixie-hoodie.png',
+                                      width: 64,
+                                      excludeFromSemantics: true))
+                          ]),
+                      const SizedBox(height: 16),
+                      const Text(
+                          'Swap opinions. Build a watchlist together. Make your next film night an easier choice.'),
+                      const SizedBox(height: 20),
+                      FilledButton.icon(
+                          onPressed: _sharing ? null : () => _share(summary),
+                          icon: const Icon(Icons.ios_share),
+                          label: Text(_sharing
+                              ? 'Opening sharing…'
+                              : 'Share your invite')),
+                      const SizedBox(height: 12),
+                      const Text(
+                          'Your link connects your friend to you when they join.'),
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                          onPressed: () => showMyPipSheet(context),
+                          icon: Image.asset(
+                              'assets/icon/pip_cosmetics/cinema_club.png',
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.contain,
+                              excludeFromSemantics: true),
+                          label: const Text(
+                              'Cinema Club Pip · rewards for your first shared film')),
+                      if (_shareError != null)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Text(_shareError!,
+                                style: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.error))),
+                      const SizedBox(height: 24),
+                      Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                              color: context.colors.surface,
+                              borderRadius: BorderRadius.circular(14)),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: Icon(Icons.people_alt_outlined),
+                                    title: Text('Film Friend'),
+                                    subtitle: Text(
+                                        'A profile badge for both of you.')),
+                                const Text(
+                                    'You both get the badge when your friend joins through your invite and finishes setting up.'),
+                                TextButton(
+                                    onPressed: _rules,
+                                    child: const Text('How it works'))
+                              ])),
+                      const SizedBox(height: 24),
+                      Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 16,
+                          children: [
+                            Text('Your invitations',
+                                style: Theme.of(context).textTheme.titleLarge),
+                            TextButton(
+                                onPressed: () => _progress(summary),
+                                child: const Text('View progress'))
+                          ]),
+                      const SizedBox(height: 12),
+                      Wrap(spacing: 28, runSpacing: 16, children: [
+                        _count('${summary.referralCount}', 'friends joined'),
+                        _count('${summary.qualifiedReferralCount}',
+                            'friends earned Film Friend')
+                      ]),
+                      const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Divider()),
+                      Text('Start with a film you shared',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 12),
+                      const Text(
+                          'Just watched something together? Log it and invite them to add their take.'),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                          onPressed: () => context.push('/search?focus=1'),
+                          icon: const Icon(Icons.movie_outlined),
+                          label: const Text('Find a film to log together')),
+                      const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Divider()),
+                      const Text('Prefer a code?'),
+                      const SizedBox(height: 8),
+                      Wrap(
+                          spacing: 16,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            SelectableText(summary.code,
+                                style: Theme.of(context).textTheme.titleLarge),
+                            TextButton.icon(
+                                onPressed: () => _copy(summary.code),
+                                icon: const Icon(Icons.copy),
+                                label: const Text('Copy code'))
+                          ])
+                    ])));
+          }));
+  Widget _count(String number, String label) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(number, style: Theme.of(context).textTheme.headlineMedium),
+        Text(label)
+      ]);
 }

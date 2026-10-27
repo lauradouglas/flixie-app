@@ -706,3 +706,40 @@ guards. The page reuses the signup poster grid and existing rating editor. Home
 hosts an invitation only after a saved action/library evidence; Profile always
 links back. Signup and title action flows only mark eligibility after successful
 activity; taste setup never intercepts or delays the original action.
+
+
+### Pip collection
+
+`features/pip` owns collection API access, account-scoped cached state, refresh on activity/resume, and the shared My Pip sheet. The navigation shell, Settings, diary and shared-watch success screen consume its widgets. Auth changes reset collection state synchronously and reject late responses. Backend entitlements are authoritative; cached data only preserves the last look. `core/app_icon/AppIconService` serialises native changes, combines founder and Cinema Club eligibility, and reports success only after the native callback. See docs/pip-collection.md.
+
+## Referral visibility
+
+`features/referrals/data/referral_prompt_store.dart` owns the account/device frequency cap. `presentation/saved_film_invite_prompt.dart` coordinates an optional post-save companion action through the existing movie-watch API and sharing sheet; `social_invite_empty_state.dart` supplies the Social entry point. It does not duplicate referral award logic. Signup availability drafts live with `OnboardingController` and persist after country/providers; the existing settings/availability services remain the API owners. `core/widgets/preference_switch.dart` represents unknown state without asserting a false saved choice.
+
+Resume refresh presentation: automatic token/profile failures keep saved content
+and allow the existing 5/15/30-second recovery attempts to finish quietly. The
+persistent saved-content retry status appears only after that sequence fails in
+the foreground. Explicit profile refresh, bootstrap and expired-session handling
+retain their existing feedback. This does not classify every backend/SDK failure
+as a user connectivity problem.
+
+## Tablet Home composition
+
+`features/home/presentation/widgets/home_tablet_layout.dart` owns signed-in
+Home's continuous discovery/companion columns. It uses available width (900+
+logical pixels), a 600+ shortest-side viewport and text scaling up to 1.4 to
+activate the tablet composition; narrow windows and larger text keep the existing
+single-column order. Its feature-local inherited scope selects compact trending,
+recommendation and cinema treatments without changing shared phone or guest UI.
+All sections share Home's existing vertical scroll and refresh lifecycle.
+`home_community_preview.dart` is a spoiler-safe projection of existing public
+activity, preserving per-user avatar badges and rating privacy. It navigates to
+existing posts/profiles rather than duplicating reaction, moderation or discussion
+state. Responsive and action regressions live under `test/features/home/`.
+
+Tablet Home refinement: Home owns its 16px outer gutters directly rather than
+stacking the shared adaptive-page gutters. Wide Home uses a 65/35 split, a unified
+trending feature/poster surface and a single highest-priority watch-plan preview;
+See all opens the existing plans screen. Companion sections and poster/card sizes
+adapt within the feature-local tablet scope; phone and other page gutters retain
+their existing layout.

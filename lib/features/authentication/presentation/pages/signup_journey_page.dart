@@ -1,3 +1,6 @@
+import '../../../guest/data/guest_diary_store.dart';
+import '../../../guest/models/guest_diary_draft.dart';
+import '../../../guest/presentation/widgets/guest_diary_editor.dart';
 import '../../../taste/data/taste_setup_store.dart';
 import '../../../watchlist/data/guest_watchlist_store.dart';
 import '../widgets/signup_title_context.dart';
@@ -72,6 +75,7 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
   MovieWatchEntry? _watch;
   Review? _review;
   WatchLogDetails _details = const WatchLogDetails();
+  GuestDiaryDraft? _guestDraft;
   final _draftId = const Uuid().v4();
   OnboardingController? _watching;
   void _providerChanged() {
@@ -200,6 +204,13 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
         unawaited(_loadSuggestions());
         return;
       }
+      if (journey.diaryDraftId != null) {
+        _guestDraft = await GuestDiaryStore.instance
+            .read(journey.diaryDraftId!, journey.userId);
+        if (_guestDraft == null || _guestDraft!.owner != journey.userId) {
+          throw StateError('This draft belongs to a different session');
+        }
+      }
       final title = await widget.service.title(journey);
       if (!mounted || !_active) return;
       setState(() => _title = title);
@@ -242,8 +253,8 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
     } catch (_) {
       if (_active) {
         setState(() => _error = journey.action == 'guest-watchlist'
-            ? 'Your account is ready. Some picks still need saving. They’re safe on this device — retry to finish.'
-            : 'Couldn’t open your ${journey.action == 'watchlist' ? 'save' : 'title'}. Try again — your account is ready.');
+            ? 'Your account is ready. Some picks still need saving. They’re safe on this device - retry to finish.'
+            : 'Couldn’t open your ${journey.action == 'watchlist' ? 'save' : 'title'}. Try again - your account is ready.');
       }
     } finally {
       if (_active) setState(() => _loading = false);
@@ -335,7 +346,7 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
         journey.userId,
         LogMovieWatchRequest(
             movieId: journey.mediaId,
-            draftId: _draftId,
+            draftId: journey.diaryDraftId ?? _draftId,
             watchedAt: watchedAt,
             rating: rating,
             recommended: recommended,
@@ -375,7 +386,7 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
     } catch (_) {
       if (_active) {
         setState(() => _error =
-            'Your review is posted. Couldn’t open the diary yet — please try again.');
+            'Your review is posted. Couldn’t open the diary yet - please try again.');
       }
     } finally {
       if (_active) setState(() => _busy = false);
@@ -434,8 +445,7 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
     _watching?.setBusy(true);
     try {
       if (saveProviders) {
-        await widget.setup.saveWatching(journey.userId, _watching!.country!,
-            Set.of(_watching!.selectedProviders));
+        await _watching!.persistWatching();
       }
       if (!mounted || !_active) return;
       final auth = context.read<AuthProvider>();
@@ -449,6 +459,10 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
           (journey.action == 'watchlist' || _homeChoice == 'watchlist'
               ? '/watchlist'
               : journey.path);
+      if (journey.diaryDraftId != null) {
+        await GuestDiaryStore.instance.pause(journey.diaryDraftId!);
+      }
+      if (!mounted || !_active) return;
       GuestAccess.clear();
       if (resumeAction &&
           !const {'community', 'discussion'}.contains(journey.action)) {
@@ -461,7 +475,7 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
     } catch (_) {
       if (_active) {
         setState(() => _error =
-            'Your account is ready. Couldn’t finish setup — please try again.');
+            'Your account is ready. Couldn’t finish setup - please try again.');
       }
     } finally {
       if (_active) {
@@ -572,6 +586,8 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
           onPressed: _busy ||
                   owner.loading ||
                   owner.country == null ||
+                  (owner.availabilityAlertsChoice == true &&
+                      owner.selectedProviders.isEmpty) ||
                   owner.error != null
               ? null
               : () => _finish(saveProviders: true),
@@ -658,7 +674,7 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
       body = _scroll(
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _heading('What brings you to Flixie?',
-            'Your account is ready. Pick somewhere to start — you can explore the rest whenever you like.'),
+            'Your account is ready. Pick somewhere to start - you can explore the rest whenever you like.'),
         FilledButton.icon(
             onPressed: () {
               setState(() {
@@ -733,6 +749,66 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
             }),
         TextButton(onPressed: _finish, child: const Text('Skip for now')),
       ]));
+    } else if (_step == SignupJourneyStep.action && _guestDraft != null) {
+      body = _scroll(GuestDiaryEditor(
+          draft: _guestDraft!,
+          signedIn: true,
+          onBusyChanged: (busy) {
+            if (mounted) setState(() => _editorBusy = busy);
+          },
+          onContinue: (draft) async {
+            if (!_active || draft.owner != journey.userId) {
+              throw StateError('Account changed');
+            }
+            MovieWatchEntry? saved;
+            if (draft.logWatch) {
+              saved = await widget.service.log(
+                  journey.userId,
+                  LogMovieWatchRequest(
+                      movieId: draft.movieId,
+                      draftId: draft.id,
+                      watchedAt: draft.date.isEmpty
+                          ? null
+                          : DateTime.parse(draft.date)
+                              .toUtc()
+                              .toIso8601String(),
+                      rating: draft.rating?.toDouble(),
+                      recommended: draft.recommended,
+                      notes: draft.note.isEmpty ? null : draft.note));
+            } else {
+              await widget.service.rate(
+                  journey,
+                  draft.rating!,
+                  draft.recommended == null
+                      ? null
+                      : draft.recommended!
+                          ? 'recommend'
+                          : 'not-recommend');
+            }
+            if (!_active) throw StateError('Account changed');
+            await GuestDiaryStore.instance.finish(draft.id, journey.userId);
+            if (!_active) return;
+            _changed();
+            if (draft.logWatch) {
+              _analytics((a) => a.watchLogged(
+                  contentType: 'movie',
+                  contentId: draft.movieId,
+                  source: 'guest_diary'));
+            } else {
+              _analytics((a) => a.ratingAdded(
+                  contentType: 'movie',
+                  contentId: draft.movieId,
+                  source: 'guest_diary'));
+            }
+            setState(() {
+              _editorBusy = false;
+              _watch = saved;
+              _step = draft.logWatch
+                  ? SignupJourneyStep.saved
+                  : SignupJourneyStep.suggestions;
+            });
+            if (!draft.logWatch) unawaited(_loadSuggestions());
+          }));
     } else if (_step == SignupJourneyStep.action &&
         journey.action == 'review') {
       body = WriteReviewSheet(

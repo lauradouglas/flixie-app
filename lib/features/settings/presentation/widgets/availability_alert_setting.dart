@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/settings/data/availability_alert_service.dart';
@@ -93,18 +94,20 @@ class _AvailabilityAlertSettingState extends State<AvailabilityAlertSetting> {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SwitchListTile.adaptive(
+          ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Now on your services'),
             subtitle: Text(_settings == null
                 ? 'Watchlist availability alerts'
                 : 'Films and shows on your watchlist · ${_settings!.countryName ?? 'Choose your country'}'),
-            value: _settings?.enabled ?? false,
-            onChanged: _busy ||
-                    _settings == null ||
-                    (!_settings!.ready && !_settings!.enabled)
-                ? null
-                : _save,
+            trailing: PreferenceSwitch(
+                loading: _busy,
+                value: _settings?.enabled,
+                onChanged: _busy ||
+                        _settings == null ||
+                        (!_settings!.ready && !_settings!.enabled)
+                    ? null
+                    : _save),
           ),
           if (_busy) const LinearProgressIndicator(),
           const SizedBox(height: 8),

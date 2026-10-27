@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/referrals/presentation/saved_film_invite_prompt.dart';
 import 'dart:async';
 import '../../taste/data/taste_setup_store.dart';
 import '../../watchlist/data/guest_watchlist_store.dart';
@@ -119,6 +120,7 @@ class MovieDetailActionFlow {
         await AppReviewService.recordMovieInteraction(
           user.id,
           hasCompletedSetup: user.completedSetup,
+          eventId: 'watchlist:movie:$movieId',
         );
       }
 
@@ -489,6 +491,7 @@ class MovieDetailActionFlow {
     String? shareNote;
     final draftId = const Uuid().v4();
     var details = const WatchLogDetails();
+    MovieWatchEntry? newlySavedWatch;
     ExternalWatchInvite? invite = entry?.externalInvite;
     await showMovieWatchLogSheet<void>(
       movieId: movieId,
@@ -550,6 +553,7 @@ class MovieDetailActionFlow {
                     notes: notes,
                   ),
                 );
+                newlySavedWatch = savedWatch;
                 reviewWatchEntryId = savedWatch.id;
                 invite = savedWatch.externalInvite;
               }
@@ -728,10 +732,39 @@ class MovieDetailActionFlow {
         await AppReviewService.recordMovieInteraction(
           user.id,
           hasCompletedSetup: user.completedSetup,
+          eventId: 'watch:movie:$movieId',
         );
       }
     }
-    if (context.mounted && didSubmit && reviewRating != null && isCurrent) {
+    var offeredInvite = false;
+    if (didSubmit &&
+        entry == null &&
+        selectedPlan == null &&
+        !writeReview &&
+        details.companion == null &&
+        details.companions.isEmpty &&
+        details.externalCompanionName == null &&
+        newlySavedWatch != null &&
+        context.mounted &&
+        isCurrent) {
+      offeredInvite = await maybeOfferSavedFilmInvite(context,
+          entry: newlySavedWatch!,
+          title: data.movie?.title ?? 'this film',
+          isCurrent: () => context.mounted && isCurrent);
+      if (context.mounted && isCurrent && offeredInvite) {
+        authProvider.markActivityChanged();
+        try {
+          await data.loadWatchHistory(userId, movieId);
+        } catch (error) {
+          logger.w('Companion saved; watch history refresh will retry: $error');
+        }
+      }
+    }
+    if (!offeredInvite &&
+        context.mounted &&
+        didSubmit &&
+        reviewRating != null &&
+        isCurrent) {
       final user = authProvider.dbUser;
       final movie = data.movie;
       if (user != null && movie != null) {

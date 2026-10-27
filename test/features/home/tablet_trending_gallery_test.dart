@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/home/presentation/widgets/home_tablet_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -68,6 +69,48 @@ void main() {
     expect(find.byType(TabletTrendingGallery), findsNothing);
     await t.ensureVisible(find.byTooltip('Watchlist'));
     expect(find.byTooltip('Watchlist').hitTestable(), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+  testWidgets(
+      'tablet synopsis preview follows selection and opens full film details',
+      (t) async {
+    MovieShort? opened;
+    const alien = MovieShort(
+        id: 348,
+        name: 'Alien',
+        releaseDate: '1979-05-25',
+        overview:
+            'A crew answers a distress signal. Something follows them aboard.',
+        voteAverage: 8.2);
+    const odyssey = MovieShort(
+        id: 634,
+        name: 'The Odyssey',
+        overview: 'A long journey home. The full story continues in details.');
+    await t.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: HomeTabletScope(
+                    child: SizedBox(
+                        width: 680,
+                        child: TabletTrendingGallery(
+                            movies: const [alien, odyssey],
+                            savedIds: const {},
+                            pendingIds: const {},
+                            onDetails: (m) => opened = m,
+                            onSave: (_) {},
+                            onTrailer: (_) {})))))));
+    expect(find.text('A crew answers a distress signal.'), findsOneWidget);
+    expect(find.text(alien.overview!), findsNothing);
+    await t.tap(find.descendant(
+        of: find.byKey(const ValueKey('trending-poster-634')),
+        matching: find.byType(InkWell)));
+    await t.pumpAndSettle();
+    expect(find.text('A long journey home.'), findsOneWidget);
+    expect(find.text('A crew answers a distress signal.'), findsNothing);
+    await t.tap(find.widgetWithText(TextButton, 'The Odyssey'));
+    expect(opened, same(odyssey));
+    expect(opened!.overview, contains('The full story continues in details.'));
     expect(t.takeException(), isNull);
   });
 }

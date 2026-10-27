@@ -132,6 +132,7 @@ class UserService {
   static Future<User> createUser(Map<String, dynamic> body) async {
     final profileBody = <String, dynamic>{
       'termsAccepted': body['termsAccepted'],
+      'communitySharing': body['communitySharing'] ?? true,
       'firstName': body['firstName'],
       'lastName': body['lastName'],
       'username': body['username'],

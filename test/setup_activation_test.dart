@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
@@ -154,7 +155,7 @@ void main() {
     expect(find.text('1 saved for later').hitTestable(), findsOneWidget);
     expect(find.text('Waiting for you in Watchlist.'), findsOneWidget);
     await tap(t, 'Continue to favourites');
-    await tap(t, 'Continue to sharing');
+    await tap(t, 'Continue to preferences');
     await tap(t, 'Find my kind of people');
     expect(find.text('Which Alien would you watch again?'), findsOneWidget);
     await tap(t, 'Read the conversation');
@@ -181,7 +182,7 @@ void main() {
     expect(find.text('Added to your profile'), findsOneWidget);
   });
   testWidgets(
-      'quick add preserves sharing and the final signup toggle allows opt-out',
+      'quick add preserves sharing and the provider-step toggle allows opt-out',
       (t) async {
     final service = ActivationFixture();
     await mount(t, service);
@@ -196,30 +197,33 @@ void main() {
     expect(service.favourites, ['movie:1']);
     expect(service.sharingWrites, isEmpty);
     expect(service.favouriteRefreshes, 1);
-    await tap(t, 'Continue to sharing');
-    final toggle =
-        find.widgetWithText(SwitchListTile, 'Share on Around Flixie');
+    await t.tap(find.byTooltip('Back'));
+    await t.pumpAndSettle();
+    await t.tap(find.byTooltip('Back'));
+    await t.pumpAndSettle();
+    final toggle = find.descendant(
+        of: find.widgetWithText(ListTile, 'Share on Around Flixie'),
+        matching: find.byType(PreferenceSwitch));
     await t.ensureVisible(toggle);
     await t.pumpAndSettle();
     await captureActivation(t, 'signup-sharing');
-    expect(t.widget<SwitchListTile>(toggle).value, true);
+    expect(t.widget<PreferenceSwitch>(toggle).value, true);
     await t.tap(toggle);
     await t.pumpAndSettle();
     expect(service.sharingWrites, [false]);
-    expect(t.widget<SwitchListTile>(toggle).value, false);
+    expect(t.widget<PreferenceSwitch>(toggle).value, false);
   });
   testWidgets('resumed signup retains a previously saved sharing opt-out',
       (t) async {
     final service = ActivationFixture()..sharingEnabled = false;
     await mount(t, service);
-    await picks(t);
-    await tap(t, 'Continue to favourites');
-    await tap(t, 'Continue to sharing');
-    final toggle =
-        find.widgetWithText(SwitchListTile, 'Share on Around Flixie');
+    await tap(t, 'Skip taste picks');
+    final toggle = find.descendant(
+        of: find.widgetWithText(ListTile, 'Share on Around Flixie'),
+        matching: find.byType(PreferenceSwitch));
     await t.ensureVisible(toggle);
     await t.pumpAndSettle();
-    expect(t.widget<SwitchListTile>(toggle).value, false);
+    expect(t.widget<PreferenceSwitch>(toggle).value, false);
     expect(service.sharingWrites, isEmpty);
   });
   testWidgets('joining is explicit; skipping setup can reach Home', (t) async {
@@ -227,7 +231,7 @@ void main() {
     await mount(t, service);
     await picks(t);
     await tap(t, 'Continue to favourites');
-    await tap(t, 'Continue to sharing');
+    await tap(t, 'Continue to preferences');
     await tap(t, 'Find my kind of people');
     await tap(t, 'Horror');
     expect(service.joins, isEmpty);
@@ -293,7 +297,7 @@ void main() {
       await tap(t, 'Continue to favourites');
       expect(find.text('Add your favourites'), findsOneWidget);
       expect(t.takeException(), isNull);
-      await tap(t, 'Continue to sharing');
+      await tap(t, 'Continue to preferences');
       await tap(t, 'Find my kind of people');
       expect(t.takeException(), isNull);
     });

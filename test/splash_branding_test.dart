@@ -32,10 +32,10 @@ void main() {
     final auth = _SplashAuth()..error = 'Could not restore your session.';
     await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
         value: auth,
-        child: MaterialApp(
+        child: const MaterialApp(
             home: MediaQuery(
-                data: const MediaQueryData(disableAnimations: true),
-                child: const SplashScreen()))));
+                data: MediaQueryData(disableAnimations: true),
+                child: SplashScreen()))));
     expect(find.text(auth.error!), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     await tester.tap(find.text('Retry'));

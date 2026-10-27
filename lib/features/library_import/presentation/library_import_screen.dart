@@ -242,7 +242,7 @@ class _LibraryImportScreenState extends State<LibraryImportScreen> {
                           _ExportHelp(
                               title: 'Letterboxd',
                               text:
-                                  'Open Export your data and download the ZIP. Bring that ZIP straight here — no unzipping needed. You can also choose ratings.csv and watchlist.csv.',
+                                  'Open Export your data and download the ZIP. Bring that ZIP straight here - no unzipping needed. You can also choose ratings.csv and watchlist.csv.',
                               action: 'Open Letterboxd export',
                               onTap: () => _open(letterboxdExportUrl)),
                           const Divider(height: 32),

@@ -50,10 +50,10 @@ void main() {
           size: Size(320, 700), textScaler: TextScaler.linear(2)),
       child: Scaffold(
           body: SingleChildScrollView(
-              child: CommunityPollPreview(poll: {
+              child: CommunityPollPreview(poll: const {
         'totalVotes': 0,
         'closedAt': 'closed',
-        'options': [
+        'options': const [
           {'id': 'a', 'title': 'Nausicaä of the Valley of the Wind', 'votes': 0}
         ]
       }, onOpen: () {}))),

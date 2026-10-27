@@ -1,75 +1,82 @@
+import 'package:flutter/foundation.dart';
+import 'app_review_policy.dart';
 import 'dart:io';
 
 import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Requests a native Store review after an onboarding-complete user reaches a
-/// positive Watch Plan or movie-engagement milestone. Store quotas remain the
-/// final authority.
+/// Records meaningful completed actions; an idle Home gate requests reviews
+/// only after sustained use. Film scores/sentiment never affect eligibility.
 class AppReviewService {
   AppReviewService._();
 
-  static const _completedPlansPrefix = 'app_review.completed_plans.';
-  static const _movieInteractionsPrefix = 'app_review.movie_interactions.';
-  static const _lastPromptPrefix = 'app_review.last_prompt.';
-  static const _minimumCompletedPlans = 1;
-  static const _minimumMovieInteractions = 3;
-  static const _cooldown = Duration(days: 120);
   static const _appStoreId =
       String.fromEnvironment('FLIXIE_APP_STORE_ID', defaultValue: '6779375028');
+  static final changes = ValueNotifier<int>(0);
+  static String? _pendingUser;
+  static bool _requesting = false;
+  static Future<void>? _writes;
 
   static Future<void> recordCompletedWatchPlan(
     String userId, {
     required bool hasCompletedSetup,
-  }) async {
-    if (userId.isEmpty || !hasCompletedSetup) return;
-    final preferences = await SharedPreferences.getInstance();
-    final completedKey = '$_completedPlansPrefix$userId';
-    final completedPlans = (preferences.getInt(completedKey) ?? 0) + 1;
-    await preferences.setInt(completedKey, completedPlans);
-
-    if (completedPlans < _minimumCompletedPlans) return;
-    await _tryRequestReview(preferences, userId);
-  }
+    required String eventId,
+  }) =>
+      _record(userId, hasCompletedSetup, 'plan:$eventId');
 
   static Future<void> recordMovieInteraction(
     String userId, {
     required bool hasCompletedSetup,
-  }) async {
-    if (userId.isEmpty || !hasCompletedSetup) return;
-    final preferences = await SharedPreferences.getInstance();
-    final interactionKey = '$_movieInteractionsPrefix$userId';
-    final interactions = (preferences.getInt(interactionKey) ?? 0) + 1;
-    await preferences.setInt(interactionKey, interactions);
-    if (interactions < _minimumMovieInteractions) return;
-    await _tryRequestReview(preferences, userId);
+    required String eventId,
+  }) =>
+      _record(userId, hasCompletedSetup, eventId);
+
+  static Future<void> _record(String user, bool complete, String event) {
+    if (user.isEmpty || !complete) return Future.value();
+    final previous = _writes;
+    late final Future<void> task;
+    task = () async {
+      if (previous != null) await previous;
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        await AppReviewPolicy.record(preferences, user, event, DateTime.now());
+        _pendingUser = user;
+        changes.value++;
+      } catch (_) {
+        /* Optional feedback must never fail the saved action. */
+      } finally {
+        if (identical(_writes, task)) _writes = null;
+      }
+    }();
+    _writes = task;
+    return task;
   }
 
-  static Future<void> _tryRequestReview(
-    SharedPreferences preferences,
-    String userId,
-  ) async {
-    final lastPromptMs = preferences.getInt('$_lastPromptPrefix$userId');
-    if (lastPromptMs != null &&
-        DateTime.now().difference(
-              DateTime.fromMillisecondsSinceEpoch(lastPromptMs),
-            ) <
-            _cooldown) {
-      return;
-    }
-
+  /// Called only after an idle pause on Home, following a successful action in
+  /// this session. A cold launch, guest browse or signup never creates a request.
+  static Future<void> requestIfEligible(String user,
+      {required bool Function() canPrompt}) async {
+    if (_requesting || _pendingUser != user || !canPrompt()) return;
+    _requesting = true;
     try {
+      final preferences = await SharedPreferences.getInstance();
+      if (!AppReviewPolicy.eligible(preferences, user, DateTime.now()) ||
+          !canPrompt()) {
+        return;
+      }
       final review = InAppReview.instance;
-      if (!await review.isAvailable()) return;
-      // Record the attempt as platform quotas may decide not to show a prompt.
-      await preferences.setInt(
-        '$_lastPromptPrefix$userId',
-        DateTime.now().millisecondsSinceEpoch,
-      );
+      if (!await review.isAvailable() || !canPrompt()) return;
+      // Store quotas decide whether the native prompt is actually displayed.
+      await preferences.setInt(AppReviewPolicy.globalAttemptKey,
+          DateTime.now().millisecondsSinceEpoch);
+      if (!canPrompt()) return;
+      _pendingUser = null;
       await review.requestReview();
     } catch (_) {
-      // A review prompt is always optional and must never disrupt the watch.
+      /* A review request must never interrupt app recovery. */
+    } finally {
+      _requesting = false;
     }
   }
 

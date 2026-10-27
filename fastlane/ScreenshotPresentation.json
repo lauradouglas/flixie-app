@@ -1,6 +1,6 @@
 {
   "locale": "en-GB",
-  "background": "0A1424",
+  "background": "151522",
   "accent": "B9A0FF",
   "font": "assets/fonts/Manrope-VariableFont_wght.ttf",
   "screens": [
@@ -10,6 +10,13 @@
       "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-perched-looking-down.png",
       "pip_position": "bottom-left",
       "supporting_text": "Discover, plan and share your ratings.\nFind your next favourite through friends."
+    },
+    {
+      "scene": "02-diary",
+      "headline": "Your films.\nYour story.",
+      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
+      "pip_position": "bottom-left",
+      "supporting_text": "Keep a diary of the films you watch.\nSave your ratings and little memories."
     },
     {
       "scene": "06-interstellar",
@@ -52,13 +59,6 @@
       "pip": "design/merch/pip/future-variants/pip-flixie-hoodie-perched-looking-down.png",
       "pip_position": "top-right",
       "supporting_text": "Track episodes, seasons and your progress.\nRemember where you left off."
-    },
-    {
-      "scene": "02-profile",
-      "headline": "Your favourites.\nYour film identity.",
-      "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png",
-      "pip_position": "bottom-left",
-      "supporting_text": "Build your lists and revisit your watches.\nGive friends a feel for your taste."
     }
   ],
   "pip": "design/merch/pip/future-variants/pip-flixie-hoodie.png"

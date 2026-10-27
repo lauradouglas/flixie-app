@@ -109,6 +109,29 @@ void main() {
 
   for (final spec in [(320.0, 1.6), (844.0, 1.0), (1024.0, 1.0)]) {
     testWidgets(
+        'my logged watch opens a recap so far while the other person is pending',
+        (tester) async {
+      final request = fixture({
+        'movieId': 348,
+        'movie': {'id': 348, 'title': 'Alien'},
+        'candidates': [],
+        'scheduledFor': '2026-10-20T19:00:00.000Z',
+        'scheduleStatus': 'AGREED',
+        'watchConfirmations': [
+          {'id': 'mine', 'userId': 'me', 'watched': true, 'rating': 8}
+        ]
+      });
+      await show(tester, request);
+      expect(find.text('Recap so far'), findsOneWidget);
+      expect(
+          find.text(
+              'Waiting for everyone to log. This recap will update as they do.'),
+          findsOneWidget);
+      expect(find.text('1 watched'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
         'shared viewing shows all people and logs only this viewer at $spec',
         (tester) async {
       var logs = 0;

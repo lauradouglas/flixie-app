@@ -413,7 +413,7 @@ class _PopcornCatchScreenState extends State<PopcornCatchScreen>
                                 '${c.engine.version >= 3 ? 'Round' : 'Level'} ${c.engine.level} · ${c.engine.caught} caught · best streak ${c.engine.bestCombo}',
                                 textAlign: TextAlign.center),
                             if (c.engine.lives == 0)
-                              const Text('Out of lives—give Pip another go!',
+                              const Text('Out of lives-give Pip another go!',
                                   textAlign: TextAlign.center),
                             const SizedBox(height: 16),
                             if (!c.practice &&

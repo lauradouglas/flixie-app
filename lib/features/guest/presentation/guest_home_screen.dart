@@ -1,3 +1,5 @@
+import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
+import 'widgets/guest_diary_teaser.dart';
 import '../../watchlist/data/guest_watchlist_store.dart';
 import 'widgets/why_flixie_button.dart';
 import 'widgets/guest_home_link_card.dart';
@@ -52,109 +54,138 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
   }
 
   final _cinemasKey = GlobalKey<InCinemasSectionState>();
-  late Future<(List<MovieShort>, Map<String, dynamic>)> _content = _load();
-  Future<(List<MovieShort>, Map<String, dynamic>)> _load() async {
-    final results = await Future.wait<dynamic>([
-      TrendingService.getTrendingMedia(),
-      ApiClient.get('/guest/home'),
-    ]);
-    return (results[0] as List<MovieShort>, results[1] as Map<String, dynamic>);
+  Future<Map<String, dynamic>> _loadCommunity() {
+    final result = ApiClient.get('/guest/home')
+        .then((data) => Map<String, dynamic>.from(data as Map));
+    // The section may be below the viewport before its FutureBuilder mounts.
+    result.ignore();
+    return result;
   }
 
+  Future<List<MovieShort>> _loadMovies() {
+    final result = TrendingService.getTrendingMovies();
+    result.ignore();
+    return result;
+  }
+
+  late Future<List<MovieShort>> _movies = _loadMovies();
+  late Future<Map<String, dynamic>> _community = _loadCommunity();
+
   Future<void> _refresh() async {
-    final content = _load();
     setState(() {
-      _content = content;
+      _movies = _loadMovies();
+      _community = _loadCommunity();
     });
-    try {
-      await Future.wait([
-        _content,
-        if (_cinemasKey.currentState != null)
-          _cinemasKey.currentState!.refresh()
-      ]);
-    } catch (_) {/* FutureBuilder presents retry. */}
+    await Future.wait([
+      _movies.then<void>((_) {}, onError: (Object _) {}),
+      _community.then<void>((_) {}, onError: (Object _) {}),
+      if (_cinemasKey.currentState != null) _cinemasKey.currentState!.refresh(),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: context.colors.background,
-        appBar: AppBar(title: const FlixieWordmark(), actions: [
-          IconButton(
-              tooltip: 'Your watchlist',
-              onPressed: () => context.push('/guest-watchlist'),
-              icon: const Icon(Icons.bookmarks_outlined)),
-          IconButton(
-              tooltip: 'Play with Pip',
-              onPressed: () => context.push('/play'),
-              icon: const Icon(Icons.sports_esports_outlined)),
-          TextButton(
-              onPressed: () {
-                GuestAccess.clear();
-                context.push('/auth/login');
-              },
-              child: const Text('Sign in')),
-        ]),
+        appBar: AppBar(
+          toolbarHeight: MediaQuery.textScalerOf(context).scale(16) > 22 ||
+                  MediaQuery.sizeOf(context).width < 360
+              ? 132
+              : 64,
+          title: LayoutBuilder(builder: (context, constraints) {
+            final actions = Wrap(spacing: 8, children: [
+              FilledButton(
+                onPressed: _signup,
+                style: FilledButton.styleFrom(
+                  backgroundColor: FlixieColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 48),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: const StadiumBorder(),
+                  textStyle: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                child: const Text('Sign up'),
+              ),
+              TextButton(
+                  onPressed: () {
+                    GuestAccess.clear();
+                    context.push('/auth/login');
+                  },
+                  child: const Text('Sign in')),
+            ]);
+            if (MediaQuery.textScalerOf(context).scale(16) > 22 ||
+                constraints.maxWidth < 328) {
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const FlixieWordmark(),
+                    const SizedBox(height: 8),
+                    actions
+                  ]);
+            }
+            return Row(
+                children: [const FlixieWordmark(), const Spacer(), actions]);
+          }),
+        ),
         body: RefreshIndicator(
             onRefresh: _refresh,
-            child: FutureBuilder(
-                future: _content,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return ListView(children: [
-                      const Padding(
-                          padding: EdgeInsets.all(20),
-                          child: GuestHomeWelcome()),
-                      Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _searchButton()),
-                      const SizedBox(height: 24),
-                      const Center(
-                          child: Text('Couldn’t load Home. Please try again.')),
-                      Center(
-                          child: TextButton(
-                              onPressed: _refresh, child: const Text('Retry')))
-                    ]);
-                  }
-                  if (!snapshot.hasData) {
-                    return const GuestHomeLoadingSkeleton();
-                  }
-                  final (movies, community) = snapshot.data!;
-                  return LayoutBuilder(
-                      builder: (context, box) => ListView(
-                              padding: EdgeInsets.symmetric(
-                                  vertical: 20,
-                                  horizontal: box.maxWidth > 920
-                                      ? (box.maxWidth - 880) / 2
-                                      : 20),
+            child: LayoutBuilder(
+                builder: (context, box) => ListView(
+                      padding: EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: box.maxWidth > 920
+                              ? (box.maxWidth - 880) / 2
+                              : 20),
+                      children: [
+                        const GuestHomeWelcome(),
+                        _searchButton(),
+                        const Padding(
+                            padding: EdgeInsets.only(top: 8, bottom: 8),
+                            child: Text(
+                                'Search titles and people, or browse below.')),
+                        if (GuestWatchlistStore.instance.homeKeys.isNotEmpty)
+                          ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.bookmarks_outlined),
+                              title: Text(
+                                  'Your watchlist · ${GuestWatchlistStore.instance.homeKeys.length} ${GuestWatchlistStore.instance.homeKeys.length == 1 ? 'pick' : 'picks'}'),
+                              subtitle: const Text('Saved on this device'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.push('/guest-watchlist')),
+                        const SizedBox(height: 20),
+                        LayoutBuilder(builder: (context, section) {
+                          final discovery = Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const GuestHomeWelcome(),
-                                _searchButton(),
-                                const SizedBox(height: 24),
                                 Text('Trending now',
                                     style:
                                         Theme.of(context).textTheme.titleLarge),
-                                const SizedBox(height: 4),
-                                const Text('Movies & shows'),
+                                const Text('Films'),
                                 const SizedBox(height: 14),
-                                GuestTrendingCarousel(
-                                  savedIds:
-                                      GuestWatchlistStore.instance.homeKeys,
-                                  movies: movies,
-                                  onDetails: (movie) => context.push(
-                                      '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}'),
-                                  onSave: (movie) => GuestAccess.require(
-                                      context,
-                                      title: 'Save ${movie.name} for later',
-                                      message:
-                                          'Create an account to keep your watchlist and come back when you’re ready.',
-                                      path:
-                                          '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}',
-                                      mediaTitle: movie.name,
-                                      mediaPoster: movie.poster,
-                                      intent: 'watchlist'),
-                                  onTrailer: (movie) => _openTrailer(movie),
-                                ),
-                                const SizedBox(height: 28),
+                                FutureBuilder<List<MovieShort>>(
+                                    future: _movies,
+                                    builder: (context, snapshot) {
+                                      if (snapshot.hasError) {
+                                        return TextButton(
+                                            onPressed: () => setState(() {
+                                                  _movies = _loadMovies();
+                                                }),
+                                            child: const Text(
+                                                'Couldn’t load trending titles. Retry'));
+                                      }
+                                      if (!snapshot.hasData) {
+                                        return const TrendingCarouselSkeleton();
+                                      }
+                                      return GuestTrendingCarousel(
+                                          movies: snapshot.data!,
+                                          savedIds: GuestWatchlistStore
+                                              .instance.homeKeys,
+                                          onDetails: _openTitle,
+                                          onSave: _saveTitle,
+                                          onTrailer: _openTrailer);
+                                    }),
+                                const SizedBox(height: 24),
                                 InCinemasSection(
                                     key: _cinemasKey,
                                     loadingPlaceholder:
@@ -165,87 +196,152 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> {
                                             .locale
                                             .countryCode ??
                                         'GB',
-                                    onDetails: (movie) => context.push(
-                                        '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}'),
-                                    onSave: (movie) => GuestAccess.require(
-                                        context,
-                                        title: 'Save ${movie.name} for later',
-                                        message:
-                                            'Create an account to keep your watchlist and come back when you’re ready.',
-                                        path:
-                                            '/${movie.isShow ? 'shows' : 'movies'}/${movie.id}',
-                                        mediaTitle: movie.name,
-                                        mediaPoster: movie.poster,
-                                        intent: 'watchlist'),
+                                    onDetails: _openTitle,
+                                    onSave: _saveTitle,
                                     onTrailer: _openTrailer,
                                     mediaBuilder: (items) => GuestCinemaList(
+                                        movies: items,
                                         savedIds: GuestWatchlistStore
                                             .instance.homeKeys,
-                                        movies: items,
                                         onDetails: _openTitle,
                                         onSave: _saveTitle,
                                         onTrailer: _openTrailer)),
-                                GuestSignupSection(
-                                  onSignup: () {
-                                    GuestAccess.beginGeneralSignup('home');
-                                    context.push('/auth/signup');
-                                  },
-                                  onSignin: () {
-                                    GuestAccess.clear();
-                                    context.push('/auth/login');
-                                  },
-                                ),
-                                const SizedBox(height: 10),
-                                GuestHomeLinkCard(
-                                  icon: Icons.article_outlined,
-                                  title: 'Around Flixie',
-                                  subtitle:
-                                      'Explore public ratings, reviews and lists',
-                                  actionLabel: 'Take a look',
-                                  onTap: () => context.push('/around-flixie'),
-                                ),
-                                const SizedBox(height: 8),
-                                GuestHomeLinkCard(
-                                  icon: Icons.sports_esports,
-                                  title: 'Take a break with Pip’s games',
-                                  onTap: () => context.push('/play'),
-                                ),
+                              ]);
+                          final personal = Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const SizedBox(height: 20),
+                                const GuestDiaryTeaser(),
                                 const SizedBox(height: 28),
-                                Text('Find your film people',
+                                Text('Find where to watch.',
                                     style:
                                         Theme.of(context).textTheme.titleLarge),
                                 const SizedBox(height: 8),
                                 const Text(
-                                    'Explore Flixie communities. Join when you’re ready to take part.'),
-                                const SizedBox(height: 16),
-                                Wrap(spacing: 8, runSpacing: 8, children: [
-                                  for (final group
-                                      in community['communities'] as List)
-                                    if (isVisibleGenre(group['name'] as String,
-                                        id: group['id'] as int))
-                                      FlixiePill.action(
-                                          colorKey: group['name'] as String,
-                                          avatar: GenreIcon(
-                                              group['name'] as String),
-                                          label: Text(group['name'] as String),
-                                          onPressed: () => GuestAccess.require(
-                                              context,
-                                              title: 'Join ${group['name']}',
-                                              message:
-                                                  'Create an account to explore conversations and share your favourites with this community.',
-                                              path:
-                                                  '/genre-communities/${group['id']}',
-                                              intent: 'community'))
-                                ]),
-                                const SizedBox(height: 24),
-                                const SizedBox(height: 24),
-                              ]));
-                })),
+                                    'See streaming, rental and purchase options on a title’s page.'),
+                                const SizedBox(height: 8),
+                                const Text(
+                                    'Flixie helps you find it. You watch on the provider’s service, not inside Flixie.'),
+                                const SizedBox(height: 28),
+                                GuestSignupSection(onSignup: () {
+                                  _signup();
+                                }, onSignin: () {
+                                  GuestAccess.clear();
+                                  context.push('/auth/login');
+                                }),
+                              ]);
+                          if (section.maxWidth >= 760 &&
+                              MediaQuery.textScalerOf(context).scale(16) <=
+                                  24) {
+                            return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: discovery),
+                                  const SizedBox(width: 32),
+                                  Expanded(child: personal)
+                                ]);
+                          }
+                          return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [discovery, personal]);
+                        }),
+                        const SizedBox(height: 28),
+                        Text('Better together, whenever you’re ready.',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 8),
+                        const Text(
+                            'Friends can share the film nights later. Your watchlist and diary start with you.'),
+                        const SizedBox(height: 24),
+                        Text('A little more Flixie',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        GuestHomeLinkCard(
+                            icon: Icons.article_outlined,
+                            title: 'Around Flixie',
+                            subtitle:
+                                'Explore public ratings, reviews and lists',
+                            actionLabel: 'Take a look',
+                            onTap: () => context.push('/around-flixie')),
+                        const SizedBox(height: 8),
+                        GuestHomeLinkCard(
+                            icon: Icons.sports_esports,
+                            title: 'Take a break with Pip’s games',
+                            onTap: () => context.push('/play')),
+                        TextButton.icon(
+                            onPressed: _showBadges,
+                            icon: const Icon(Icons.workspace_premium_outlined),
+                            label: const Text('About badges')),
+                        const SizedBox(height: 24),
+                        Text('Communities',
+                            style: Theme.of(context).textTheme.titleLarge),
+                        const Text('Join when you’re ready to take part.'),
+                        FutureBuilder<Map<String, dynamic>>(
+                            future: _community,
+                            builder: (context, snapshot) {
+                              if (snapshot.hasError) {
+                                return TextButton(
+                                    onPressed: () => setState(() {
+                                          _community = _loadCommunity();
+                                        }),
+                                    child: const Text(
+                                        'Couldn’t load communities. Retry'));
+                              }
+                              if (!snapshot.hasData) {
+                                return const LinearProgressIndicator();
+                              }
+                              return Wrap(spacing: 8, runSpacing: 8, children: [
+                                for (final group
+                                    in snapshot.data!['communities'] as List)
+                                  if (isVisibleGenre(group['name'] as String,
+                                      id: group['id'] as int))
+                                    FlixiePill.action(
+                                        colorKey: group['name'] as String,
+                                        avatar:
+                                            GenreIcon(group['name'] as String),
+                                        label: Text(group['name'] as String),
+                                        onPressed: () => GuestAccess.require(
+                                            context,
+                                            title: 'Join ${group['name']}',
+                                            message:
+                                                'Create an account to join the conversation and share your favourites.',
+                                            path:
+                                                '/genre-communities/${group['id']}',
+                                            intent: 'community')),
+                              ]);
+                            }),
+                        const SizedBox(height: 24),
+                      ],
+                    ))),
       );
+  void _showBadges() => showFlixiePromptSheet<void>(
+        context: context,
+        builder: (sheetContext) => FlixiePromptSheetContent(
+          title: const Text('Your Flixie badges'),
+          content: const Text(
+              'Badges appear on your profile. You can explore films and build a watchlist without collecting badges or joining a community.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Keep browsing'))
+          ],
+        ),
+      );
+
+  void _signup() {
+    if (GuestWatchlistStore.instance.homeKeys.isNotEmpty) {
+      GuestAccess.clear();
+      GuestAccess.action = 'guest-watchlist';
+      GuestAccess.destination = '/guest-watchlist';
+      GuestAccess.awaitingAccount = true;
+    } else {
+      GuestAccess.beginGeneralSignup('home');
+    }
+    context.push('/auth/signup');
+  }
+
   Widget _searchButton() => OutlinedButton.icon(
       onPressed: () => context.go('/search?focus=1'),
       icon: const Icon(Icons.search),
-      label: const Text('Search movies, shows and people'));
+      label: const Text('Find a film or show'));
 
   void _openTitle(MovieShort movie) =>
       context.push('/${movie.isShow ? 'shows' : 'movies'}/${movie.id}');

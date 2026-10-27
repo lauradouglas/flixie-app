@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/reviews/app_review_service.dart';
 import 'dart:async';
 import '../../taste/data/taste_setup_store.dart';
 import '../../watchlist/data/guest_watchlist_store.dart';
@@ -79,6 +80,9 @@ class ShowDetailActionFlow {
         );
       } else {
         await ShowService.addToWatchlist(user.id, showId);
+        await AppReviewService.recordMovieInteraction(user.id,
+            hasCompletedSetup: user.completedSetup,
+            eventId: 'watchlist:show:$showId');
         await analytics.watchlistAdded(
           contentType: 'show',
           contentId: showId,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flixie_app/core/auth/push_notification_service.dart';
 
-/// Permission is offered where notifications have a clear purpose, never during signup.
+/// Permission is offered where notifications have a clear purpose.
 class NotificationOptIn extends StatefulWidget {
   const NotificationOptIn(
       {super.key,

@@ -68,3 +68,42 @@ A user-reported 401 during a separate simulator build was investigated with
 `scripts/verify-firebase-local.cjs`: fresh local sign-in, backend, Firestore access
 rules and avatar Storage all passed. The saved simulator session still needs
 sign-out/sign-in; no authentication bypass or production configuration was added.
+
+## Diary refinements — 26 October 2026
+
+The diary retains its lavender paper, serif heading, Pip, week paging, and
+month/year calendar. Day buttons filter actual watches with a whole-week reset,
+and the calendar previews the selected day, including multiple watches. Very
+narrow screens reflow the day controls to preserve touch targets.
+
+Log a film opens a film-only debounced search with stale-response guards and
+loading/error/retry states, then the existing watch editor. The add icon and
+label share a compact horizontal button. Entry menus open that editor directly,
+also for undated watches. Diary edits support the existing watched-with picker,
+retaining linked companions and individual badge borders. Friends receive their
+existing prompt to log their own watch; external companions retain the existing
+invite flow. Existing server ownership and shared-watch rules still apply.
+
+`DiaryEntryService` owns API access; diary presentation owns search and sheet
+coordination. Writes reuse one draft ID through retries, retain failed edits,
+guard account changes, and refresh diary data after save. New logs update the
+local watched-film collection only after a successful write. Diary notes remain
+separate from public/spoiler review text. Logging, sharing controls and the
+viewing recap use Diary note terminology.
+
+Checks:
+
+```sh
+flutter test test/features/profile/diary/diary_test.dart test/features/profile/diary/diary_editing_test.dart test/rewatch_log_sheet_test.dart test/features/movies/watch_log_keyboard_test.dart test/features/movies/watch_companion_log_test.dart
+flutter test tool/diary_mockups/implemented_diary_render_test.dart
+scripts/test-patrol.sh -d B49E1266-AB60-400F-B213-8AB3365CA331 --target patrol_test/diary_memory_test.dart
+```
+
+The dedicated simulator journey passed (companion addition plus retained note
+and retry), report `build/ios_results_1793019040689.xcresult`. Responsive fixture
+captures are in `output/diary-update/` and do not replace golden baselines.
+The separate `watch_review_continuation_test.dart` run produced three failures
+from its strict unexpected-request assertion for `GET /movies/id/348`. The
+watch-editor change in that flow is label/hint text only; the assertion remains
+intact and the failure is reported. Existing guarded fictional Casey fixtures
+from `seed-dev-profile-highlights.ts` support manual diary testing.

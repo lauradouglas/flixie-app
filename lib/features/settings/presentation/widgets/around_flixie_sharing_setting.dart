@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/features/social/data/community_service.dart';
 
@@ -10,8 +11,10 @@ class AroundFlixieSharingSetting extends StatefulWidget {
       this.save,
       this.onBusyChanged,
       this.enabled = true,
+      this.compact = false,
       this.contentPadding = const EdgeInsets.all(16)});
   final bool enabled;
+  final bool compact;
   final Future<bool> Function()? load;
   final Future<void> Function(bool)? save;
   final ValueChanged<bool>? onBusyChanged;
@@ -72,7 +75,7 @@ class _SharingState extends State<AroundFlixieSharingSetting> {
   Widget build(BuildContext context) => Padding(
         padding: widget.contentPadding,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SwitchListTile.adaptive(
+          ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Share on Around Flixie'),
             subtitle: Text(_enabled == null
@@ -80,21 +83,26 @@ class _SharingState extends State<AroundFlixieSharingSetting> {
                     ? 'Loading your sharing preference…'
                     : 'Sharing preference unavailable')
                 : 'Optional · change this anytime in Settings'),
-            value: _enabled ?? false,
-            onChanged:
-                !widget.enabled || _busy || _enabled == null ? null : _save,
+            trailing: PreferenceSwitch(
+                loading: _busy,
+                value: _enabled,
+                onChanged: !widget.enabled || _busy || _enabled == null
+                    ? null
+                    : _save),
           ),
           const SizedBox(height: 12),
           const Text(
               'Everyone on Flixie can see your existing and future reviews, their ratings, and public personal lists.'),
           const SizedBox(height: 12),
           const Text('Watch history, watchlists and watch plans stay out.'),
-          const SizedBox(height: 12),
-          const Text(
-              'Turn this off to stop sharing your ratings, reviews and lists through Around Flixie and community review feeds. Friends sharing stays the same.'),
-          const SizedBox(height: 12),
-          const Text(
-              'Discussions and public replies you publish are separate. Turning this off does not delete them; use Delete on each discussion or reply.'),
+          if (!widget.compact) ...[
+            const SizedBox(height: 12),
+            const Text(
+                'Turn this off to stop sharing your ratings, reviews and lists through Around Flixie and community review feeds. Friends sharing stays the same.'),
+            const SizedBox(height: 12),
+            const Text(
+                'Discussions and public replies you publish are separate. Turning this off does not delete them; use Delete on each discussion or reply.'),
+          ],
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, semanticsLabel: _error),

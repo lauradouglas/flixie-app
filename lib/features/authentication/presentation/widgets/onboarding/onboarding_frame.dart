@@ -24,7 +24,7 @@ class OnboardingFrame extends StatelessWidget {
       'Make it an easy yes.',
       'Your picks.',
       'Your favourites.',
-      'Sharing & spoilers.',
+      'Your viewing preferences.',
       'Good films start conversations.'
     ];
     const subtitles = [
@@ -32,7 +32,7 @@ class OnboardingFrame extends StatelessWidget {
       'Choose where you watch. We’ll put available picks first.',
       'A few places to start. Save what catches your eye.',
       'Bring the films you love onto your profile. This is optional.',
-      'Choose what you share and what you see. You can change these in Settings.',
+      'Choose how scores and unwatched episode details appear. Change these in Settings anytime.',
       'Browse a conversation before deciding to join. This part is optional.'
     ];
     final reduceMotion = MediaQuery.disableAnimationsOf(context);

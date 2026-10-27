@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/pip/presentation/widgets/pip_companion.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -34,16 +35,21 @@ class FlixieTabletNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 184,
+        width: MediaQuery.textScalerOf(context).scale(1) > 1.4 ? 184 : 156,
         child: Material(
           color: context.colors.tabBarBackground,
           child: SafeArea(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 28, 12, 24),
+              padding: const EdgeInsets.fromLTRB(8, 16, 8, 20),
               children: [
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(12, 0, 12, 36),
-                  child: FlixieWordmark(fontSize: 30),
+                  padding: EdgeInsets.fromLTRB(4, 0, 0, 16),
+                  child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        FlixieWordmark(fontSize: 26),
+                        PipHeaderCompanion()
+                      ]),
                 ),
                 for (final index in guest ? [0, 1, 4] : [0, 1, 2, 3, 4])
                   _destination(
@@ -103,8 +109,8 @@ class FlixieTabletNavigation extends StatelessWidget {
             onTap: onTap,
             minTileHeight: 52,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            horizontalTitleGap: 12,
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            horizontalTitleGap: 8,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             tileColor: selected ? context.colors.primary : Colors.transparent,

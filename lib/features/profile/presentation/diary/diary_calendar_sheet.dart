@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'diary_selection.dart';
+import 'diary_watch_entry.dart';
 
 const diaryPaper = Color(0xfff4edf9),
     diaryInk = Color(0xff302044),
@@ -23,6 +24,7 @@ class DiaryCalendarSheet extends StatefulWidget {
 
 class _DiaryCalendarSheetState extends State<DiaryCalendarSheet> {
   late DateTime selected = widget.week;
+  late DateTime selectedDay = widget.week;
   late DateTime month = DateTime(selected.year, selected.month);
   bool years = false;
   Text text(String s, double size, {FontWeight weight = FontWeight.w500}) =>
@@ -55,7 +57,7 @@ class _DiaryCalendarSheetState extends State<DiaryCalendarSheet> {
                           children: [
                             Row(children: [
                               Expanded(
-                                  child: text('Find a week', 26,
+                                  child: text('Find a memory', 26,
                                       weight: FontWeight.w800)),
                               IconButton(
                                   tooltip: 'Close calendar',
@@ -152,7 +154,7 @@ class _DiaryCalendarSheetState extends State<DiaryCalendarSheet> {
                               const SizedBox(width: 8),
                               Expanded(
                                   child: text(
-                                      'Film logged · Tap a day to choose its week',
+                                      'Film logged · Tap a day to see its memories',
                                       12))
                             ]),
                             const SizedBox(height: 20),
@@ -162,6 +164,21 @@ class _DiaryCalendarSheetState extends State<DiaryCalendarSheet> {
                             text(
                                 '${widget.selection.week(selected).length} watches this week',
                                 13),
+                            const SizedBox(height: 18),
+                            text(l.formatFullDate(selectedDay), 15,
+                                weight: FontWeight.w700),
+                            if ((widget.selection.days[selectedDay] ?? [])
+                                .isEmpty)
+                              Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                  child: text('No films logged this day.', 13)),
+                            for (final entry
+                                in widget.selection.days[selectedDay] ?? [])
+                              DiaryWatchEntry(
+                                  entry: entry,
+                                  rewatch: widget.selection.rewatches
+                                      .contains(entry.id)),
                           ]))),
               Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -186,7 +203,7 @@ class _DiaryCalendarSheetState extends State<DiaryCalendarSheet> {
         count = widget.selection.days[DateTime(month.year, month.month, day)]
                 ?.length ??
             0;
-    final active = diaryMonday(date) == selected;
+    final active = date == selectedDay;
     return Semantics(
         label:
             '${MaterialLocalizations.of(context).formatFullDate(date)}, $count watches',
@@ -194,7 +211,10 @@ class _DiaryCalendarSheetState extends State<DiaryCalendarSheet> {
         button: true,
         child: InkWell(
             key: ValueKey('diary-day-${date.year}-${date.month}-$day'),
-            onTap: () => setState(() => selected = diaryMonday(date)),
+            onTap: () => setState(() {
+                  selectedDay = date;
+                  selected = diaryMonday(date);
+                }),
             child: Container(
                 height: height,
                 alignment: Alignment.center,

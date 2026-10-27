@@ -47,11 +47,12 @@ class PollFixture extends SpaceFixture {
   @override
   Future<Map<String, dynamic>> get(int id, String path,
       [Map<String, String> query = const {}]) async {
-    if (path == '')
+    if (path == '') {
       return {
         ...await super.get(id, path, query),
         'canCreatePoll': canCreatePoll
       };
+    }
     if (path == '/titles') {
       return {
         'items': [

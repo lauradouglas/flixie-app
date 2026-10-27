@@ -1,3 +1,4 @@
+import '../guest_access.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
@@ -115,11 +116,17 @@ class _WhyFlixieScreenState extends State<WhyFlixieScreen> {
                       children: [
                         if (_finished) ...[
                           FilledButton(
-                              onPressed: () => context.go('/'),
+                              onPressed: () {
+                                GuestAccess.clear();
+                                context.go('/');
+                              },
                               child: const Text('Explore Flixie')),
                           const SizedBox(height: 8),
                           OutlinedButton(
-                              onPressed: () => context.push('/auth/signup'),
+                              onPressed: () {
+                                GuestAccess.beginGeneralSignup('home');
+                                context.push('/auth/signup');
+                              },
                               child: const Text('Create account')),
                           TextButton(
                               onPressed: () => _move(0),
@@ -143,7 +150,10 @@ class _WhyFlixieScreenState extends State<WhyFlixieScreen> {
                             ),
                           ]),
                           TextButton(
-                              onPressed: () => context.go('/'),
+                              onPressed: () {
+                                GuestAccess.clear();
+                                context.go('/');
+                              },
                               child: Text(_page == 0
                                   ? 'Explore Flixie instead'
                                   : 'Skip tour & explore')),
@@ -183,7 +193,7 @@ class _Overview extends StatelessWidget {
           (
             Icons.history_rounded,
             'Every watch has its own story',
-            'Dates, companions, your own rating — and a fresh entry when you rewatch.'
+            'Dates, companions, your own rating - and a fresh entry when you rewatch.'
           ),
         ])
           Padding(

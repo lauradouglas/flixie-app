@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
+import 'home_tablet_layout.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +15,10 @@ class CinemaList extends StatefulWidget {
       required this.onDetails,
       required this.onSave,
       required this.onTrailer,
+      this.showAll = false,
       this.savedIds = const {},
       this.pendingIds = const {}});
+  final bool showAll;
   final Set<int> savedIds, pendingIds;
   final List<MovieShort> movies;
   final ValueChanged<MovieShort> onDetails, onSave, onTrailer;
@@ -27,17 +31,201 @@ class _CinemaListState extends State<CinemaList> {
   bool _expanded = false;
 
   @override
-  Widget build(BuildContext context) => Column(children: [
-        for (final movie
-            in widget.movies.take(_expanded ? widget.movies.length : 3))
-          _row(context, movie),
-        if (widget.movies.length > 3)
-          TextButton(
-              onPressed: () => setState(() => _expanded = !_expanded),
-              child: Text(_expanded
-                  ? 'Show fewer cinema releases'
-                  : 'Show more cinema releases')),
-      ]);
+  Widget build(BuildContext context) {
+    final movies = widget.movies.take(_expanded ? widget.movies.length : 3);
+    final tablet = HomeTabletLayout.active(context);
+    return Column(children: [
+      if (tablet && widget.showAll)
+        LayoutBuilder(builder: (context, box) {
+          final columns = box.maxWidth >= 1080
+              ? 3
+              : box.maxWidth >= 720
+                  ? 2
+                  : 1;
+          final width = (box.maxWidth - (columns - 1) * 12) / columns;
+          return Wrap(spacing: 12, runSpacing: 12, children: [
+            for (final movie in widget.movies)
+              SizedBox(width: width, child: _tabletCard(context, movie)),
+          ]);
+        })
+      else if (tablet)
+        LayoutBuilder(builder: (context, box) {
+          final width =
+              ((box.maxWidth - 24) / (box.maxWidth >= 720 ? 3.2 : 2.2))
+                  .clamp(340.0, 420.0);
+          return SingleChildScrollView(
+              key: const ValueKey('tablet-cinema-rail'),
+              scrollDirection: Axis.horizontal,
+              child: IntrinsicHeight(
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                    for (var i = 0; i < widget.movies.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 12),
+                      SizedBox(
+                          width: width,
+                          child: _tabletCard(context, widget.movies[i])),
+                    ],
+                  ])));
+        })
+      else
+        for (final movie in movies) _row(context, movie),
+      if (!tablet && widget.movies.length > 3)
+        TextButton(
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: Text(_expanded
+                ? 'Show fewer cinema releases'
+                : 'Show more cinema releases')),
+    ]);
+  }
+
+  Widget _tabletCard(BuildContext context, MovieShort movie) {
+    final url = homeHeroImageUrl(movie.poster);
+    final saved = widget.savedIds.contains(movie.homeKey);
+    final pending = widget.pendingIds.contains(movie.homeKey);
+    final year = RegExp(r'\b(?:19|20)\d{2}\b')
+        .firstMatch(movie.releaseDate ?? '')
+        ?.group(0);
+    final height = 220 + 44 * (MediaQuery.textScalerOf(context).scale(1) - 1);
+    final synopsis =
+        movie.overview?.trim().split(RegExp(r'(?<=[.!?])\s+')).firstOrNull;
+    return Material(
+        color: context.colors.surface,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: context.colors.tabBarBorder)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+            onTap: () => widget.onDetails(movie),
+            child: SizedBox(
+                height: height,
+                child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: SizedBox(
+                              width: (height - 12) * 2 / 3,
+                              child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: url == null
+                                      ? const Icon(Icons.movie_outlined)
+                                      : CachedNetworkImage(
+                                          imageUrl: url,
+                                          fit: BoxFit.contain,
+                                          errorWidget: (_, __, ___) =>
+                                              const Icon(
+                                                  Icons.movie_outlined))))),
+                      Expanded(
+                          child: Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                        child: SingleChildScrollView(
+                                            child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                          Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Expanded(
+                                                    child: Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .only(top: 6),
+                                                        child: Text(movie.name,
+                                                            style: const TextStyle(
+                                                                fontSize: 14,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800)))),
+                                                IconButton(
+                                                    tooltip: saved
+                                                        ? 'Remove from watchlist'
+                                                        : 'Watchlist',
+                                                    onPressed: pending
+                                                        ? null
+                                                        : () => widget
+                                                            .onSave(movie),
+                                                    icon: pending
+                                                        ? const SizedBox.square(
+                                                            dimension: 18,
+                                                            child:
+                                                                CircularProgressIndicator(
+                                                                    strokeWidth:
+                                                                        2))
+                                                        : Icon(
+                                                            saved
+                                                                ? Icons.bookmark
+                                                                : Icons
+                                                                    .bookmark_outline,
+                                                            size: 20)),
+                                              ]),
+                                          Text(
+                                              'Movie${year == null ? '' : ' · $year'}',
+                                              style: TextStyle(
+                                                  color: context.colors.light,
+                                                  fontSize: 12)),
+                                          if (synopsis?.isNotEmpty == true) ...[
+                                            const SizedBox(height: 12),
+                                            Text(synopsis!,
+                                                style: TextStyle(
+                                                    color: context.colors.light,
+                                                    fontSize: 12,
+                                                    height: 1.4)),
+                                          ],
+                                        ]))),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                        spacing: 10,
+                                        runSpacing: 4,
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        children: [
+                                          if (!hideMovieRatings(
+                                                  context, movie.id) &&
+                                              (movie.voteAverage ?? 0) > 0)
+                                            Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.star_rounded,
+                                                      color: context
+                                                          .colors.warning,
+                                                      size: 18),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                      movie.voteAverage!
+                                                          .toStringAsFixed(1),
+                                                      style: TextStyle(
+                                                          color: context
+                                                              .colors.warning,
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.w800)),
+                                                ]),
+                                          if (movie.trailer?.key
+                                                  ?.trim()
+                                                  .isNotEmpty ==
+                                              true)
+                                            TextButton.icon(
+                                                onPressed: () =>
+                                                    widget.onTrailer(movie),
+                                                style: TextButton.styleFrom(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 4)),
+                                                icon: const Icon(
+                                                    Icons.play_circle_outline,
+                                                    size: 20),
+                                                label: const Text('Trailer')),
+                                        ]),
+                                  ]))),
+                    ]))));
+  }
 
   Widget _row(BuildContext context, MovieShort movie) {
     final colors = context.colors;

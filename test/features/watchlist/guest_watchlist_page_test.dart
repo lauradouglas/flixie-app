@@ -20,21 +20,21 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       await GuestWatchlistStore.instance
           .toggle(const SetupTitle(348, 'Alien', '/alien.jpg'));
-      await tester.pumpWidget(MaterialApp(
+      await tester.pumpWidget(const MaterialApp(
           home: MediaQuery(
-              data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
-              child: const GuestWatchlistPage())));
+              data: MediaQueryData(textScaler: TextScaler.linear(1.6)),
+              child: GuestWatchlistPage())));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+          find.text('Create account & keep my picks'), 160);
+      expect(find.text('Create account & keep my picks'), findsOneWidget);
       await tester.scrollUntilVisible(find.text('Alien'), 160);
       expect(find.text('Alien'), findsOneWidget);
       expect(find.text('Film'), findsOneWidget);
       expect(find.byType(Image), findsOneWidget);
-      await tester.scrollUntilVisible(
-          find.text('Create account & keep my picks'), 160);
-      expect(find.text('Create account & keep my picks'), findsOneWidget);
 
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.byTooltip('Remove Alien'));
+      await tester.scrollUntilVisible(find.byTooltip('Remove Alien').hitTestable(), 160);
       await tester.tap(find.byTooltip('Remove Alien'));
       await tester.pumpAndSettle();
       expect(await GuestWatchlistStore.instance.read(), isEmpty);
@@ -42,6 +42,40 @@ void main() {
       expect(find.text('Create account & keep my picks'), findsNothing);
     });
   }
+  testWidgets('find more switches to Discover without stacking the guest page',
+      (tester) async {
+    await GuestWatchlistStore.instance
+        .toggle(const SetupTitle(348, 'Alien', null));
+    final router = GoRouter(initialLocation: '/guest-watchlist', routes: [
+      GoRoute(
+          path: '/guest-watchlist',
+          builder: (_, __) => const GuestWatchlistPage()),
+      StatefulShellRoute.indexedStack(
+        builder: (_, __, shell) => Scaffold(body: shell),
+        branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/', builder: (_, __) => const Text('Guest Home')),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+                path: '/search',
+                builder: (_, __) => const Center(child: Text('Discover films'))),
+          ]),
+        ],
+      ),
+    ]);
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Find more to watch'), 200);
+    await tester.tap(find.text('Find more to watch'));
+    await tester.pumpAndSettle();
+    expect(find.text('Discover films'), findsOneWidget);
+    expect(find.byType(GuestWatchlistPage), findsNothing);
+    expect(router.canPop(), isFalse);
+    expect(await GuestWatchlistStore.instance.read(), hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
       'unmerged picks can be recovered explicitly from the member watchlist',
       (tester) async {

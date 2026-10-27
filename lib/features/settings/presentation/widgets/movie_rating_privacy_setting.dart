@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
@@ -38,19 +39,22 @@ class MovieRatingPrivacySetting extends StatelessWidget {
           onTap: () {
             if (canChange) change(!privacy.enabled);
           },
-          trailing: Switch.adaptive(
-            value: privacy.enabled,
+          trailing: PreferenceSwitch(
+            loading: !privacy.ratingsFailed,
+            value: privacy.loaded ? privacy.enabled : null,
             onChanged: canChange ? change : null,
           ),
         )
       else
-        SwitchListTile.adaptive(
+        ListTile(
           contentPadding: contentPadding,
           title: const Text('Rate movies first'),
           subtitle: const Text(
               'Hide other people’s movie scores until you’ve rated the movie. TV ratings stay visible.'),
-          value: privacy.enabled,
-          onChanged: canChange ? change : null,
+          trailing: PreferenceSwitch(
+              loading: !privacy.ratingsFailed,
+              value: privacy.loaded ? privacy.enabled : null,
+              onChanged: canChange ? change : null),
         ),
       if (privacy.enabled && privacy.ratingsFailed)
         Padding(

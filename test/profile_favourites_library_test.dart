@@ -23,12 +23,17 @@ void main() {
   });
   testWidgets('editable profile shows use the same poster rail as films',
       (tester) async {
-    await tester.pumpWidget(MaterialApp(home: Scaffold(
-      body: SingleChildScrollView(child: ProfileFavouritesLibrary(
-        movies: [], shows: const [{'show': {'id': 1, 'title': 'One Piece'}}],
-        people: const [], onChoosePerson: (_, __) async {})),
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+      body: SingleChildScrollView(
+          child: ProfileFavouritesLibrary(movies: const [], shows: const [
+        {
+          'show': {'id': 1, 'title': 'One Piece'}
+        }
+      ], people: const [], onChoosePerson: (_, __) async {})),
     )));
-    final rail = tester.widget<FavouritePosterRail>(find.byType(FavouritePosterRail));
+    final rail =
+        tester.widget<FavouritePosterRail>(find.byType(FavouritePosterRail));
     expect(rail.title, 'Favourite shows');
     expect(rail.onRank, isNotNull);
     expect(find.text('One Piece'), findsOneWidget);

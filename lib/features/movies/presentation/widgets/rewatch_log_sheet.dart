@@ -528,8 +528,8 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
             maxLines: 4,
             maxLength: 2000,
             decoration: const InputDecoration(
-                labelText: 'Watch comment (optional)',
-                hintText: 'Anything to remember about this watch?')),
+                labelText: 'Diary note (optional)',
+                hintText: 'What would you like to remember?')),
         if (widget.showReviewOption && widget.onReviewSelected != null)
           CheckboxListTile(
             contentPadding: EdgeInsets.zero,

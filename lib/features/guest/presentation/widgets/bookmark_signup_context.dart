@@ -36,14 +36,14 @@ class BookmarkSignupContext extends StatelessWidget {
                               poster: pick.poster)),
                     if ((snapshot.data?.length ?? 0) > 3)
                       Text(
-                          'And ${snapshot.data!.length - 3} more picks — we’ll keep them all.'),
+                          'And ${snapshot.data!.length - 3} more picks - we’ll keep them all.'),
                   ])));
     }
     if (GuestAccess.action == 'home' || GuestAccess.action == 'profile') {
       return Padding(
           padding: const EdgeInsets.only(bottom: 20),
           child: Text(GuestAccess.action == 'profile'
-              ? 'Your favourites, diary and opinions — all in one profile.'
+              ? 'Your favourites, diary and opinions - all in one profile.'
               : 'After signup, choose your first watchlist pick, favourite or diary entry.'));
     }
     return Padding(
@@ -56,7 +56,7 @@ class BookmarkSignupContext extends StatelessWidget {
               isShow: GuestAccess.destination?.startsWith('/shows/') == true,
               poster: GuestAccess.poster),
         Text(
-            '${GuestAccess.action == 'watchlist' ? 'Your first save' : GuestAccess.action == 'rate' ? 'Your first rating' : GuestAccess.action == 'review' ? 'Your first review' : 'Your first watch'}: ${GuestAccess.bookmarkTitle ?? 'your chosen title'}',
+            '${GuestAccess.action == 'watchlist' ? 'Your first save' : GuestAccess.action == 'rate' ? 'Your first rating' : GuestAccess.action == 'review' ? 'Your first review' : GuestAccess.action == 'favorite' ? 'Your favourite' : 'Your first watch'}: ${GuestAccess.bookmarkTitle ?? 'your chosen title'}',
             style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 6),
         Text(GuestAccess.action == 'watchlist'

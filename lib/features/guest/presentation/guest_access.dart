@@ -1,4 +1,8 @@
+import 'package:uuid/uuid.dart';
+import '../data/guest_diary_store.dart';
+import '../models/guest_diary_draft.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../watchlist/data/guest_watchlist_store.dart';
 import '../../authentication/data/setup_service.dart';
 import 'package:flixie_app/features/authentication/models/signup_journey.dart';
@@ -11,7 +15,9 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 
 /// A single explicit guest action, retained only for the current app session.
 class GuestAccess {
+  static final _savingPicks = <String>{};
   static SignupJourney? journey;
+  static String? diaryDraftId;
   static int? episodeId, seasonNumber, episodeNumber;
   static String? episodeTitle, poster;
   static SignupJourney? claimJourney(String userId) {
@@ -24,6 +30,7 @@ class GuestAccess {
         action: action!,
         path: destination!,
         title: bookmarkTitle,
+        diaryDraftId: diaryDraftId,
         episodeId: episodeId,
         seasonNumber: seasonNumber,
         episodeNumber: episodeNumber,
@@ -62,6 +69,7 @@ class GuestAccess {
 
   static void clear() {
     journey = null;
+    diaryDraftId = null;
     episodeId = null;
     seasonNumber = null;
     episodeNumber = null;
@@ -88,6 +96,7 @@ class GuestAccess {
         '/',
         '/search',
         '/guest-watchlist',
+        '/guest-diary',
         '/profile',
         '/welcome',
         '/why-flixie',
@@ -118,8 +127,36 @@ class GuestAccess {
   }) async {
     if (context.read<AuthProvider>().dbUser != null) return true;
     final target = path ?? GoRouterState.of(context).uri.toString();
+    if ((intent == 'rate' || intent == 'log') &&
+        RegExp(r'^/movies/[0-9]+$').hasMatch(target)) {
+      try {
+        final movieId = int.parse(target.split('/').last);
+        final drafts = await GuestDiaryStore.instance.list(null);
+        final existing = drafts
+            .where(
+                (d) => d.movieId == movieId && d.logWatch == (intent == 'log'))
+            .firstOrNull;
+        final draft = existing ??
+            GuestDiaryDraft(
+                id: const Uuid().v4(),
+                movieId: movieId,
+                title: mediaTitle ?? 'Your film',
+                poster: mediaPoster,
+                logWatch: intent == 'log');
+        await GuestDiaryStore.instance.save(draft);
+        if (context.mounted) context.push('/guest-diary?draft=${draft.id}');
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('Couldn’t open your diary draft. Please try again.')));
+        }
+      }
+      return false;
+    }
     if (intent == 'watchlist' &&
         RegExp(r'^/(movies|shows)/[0-9]+$').hasMatch(target)) {
+      if (!_savingPicks.add(target)) return false;
       try {
         final added = await GuestWatchlistStore.instance.toggle(SetupTitle(
             int.parse(target.split('/').last),
@@ -128,6 +165,26 @@ class GuestAccess {
             isShow: target.startsWith('/shows/')));
         if (context.mounted) {
           if (added) {
+            final preferences = await SharedPreferences.getInstance();
+            if (!context.mounted) return false;
+            const explainedKey = 'guest_watchlist_explained_v1';
+            if (preferences.getBool(explainedKey) == true) {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(
+                    '${mediaTitle ?? 'Your pick'} saved to your watchlist'),
+                persist: false,
+                action: SnackBarAction(
+                    label: 'View watchlist',
+                    onPressed: () {
+                      if (context.mounted) context.push('/guest-watchlist');
+                    }),
+              ));
+              return false;
+            }
+            // Explanatory feedback is offered once, never a limit on saving.
+            await preferences.setBool(explainedKey, true);
+            if (!context.mounted) return false;
             ModalRoute<dynamic>? confirmationRoute;
             final viewWatchlist = await showFlixiePromptSheet<bool>(
               context: context,
@@ -167,6 +224,8 @@ class GuestAccess {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('Couldn’t save your pick. Please try again.')));
         }
+      } finally {
+        _savingPicks.remove(target);
       }
       return false;
     }
@@ -185,7 +244,7 @@ class GuestAccess {
       'review' =>
         'Create an account, then write your review. Your thoughts, in your own words.',
       'log' =>
-        'Create an account, then add this watch to your diary — with a date, rating and who you watched with.',
+        'Create an account, then add this watch to your diary - with a date, rating and who you watched with.',
       'favorite' =>
         'Create an account and we’ll add it to your favourites. Add a few more afterwards if you like.',
       'season' =>

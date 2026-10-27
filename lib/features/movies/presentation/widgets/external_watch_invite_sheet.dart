@@ -33,20 +33,24 @@ class ExternalWatchInviteContent extends StatefulWidget {
 class _ExternalWatchInviteContentState
     extends State<ExternalWatchInviteContent> {
   bool _busy = false;
-  String? _error;
+  String? _error, _feedback;
   Future<void> _send(bool copy) async {
     setState(() {
       _busy = true;
       _error = null;
+      _feedback = null;
     });
     try {
       final url = await ExternalWatchInviteService.shareUrl(widget.invite.id);
       if (!mounted) return;
       final text =
-          'We watched ${widget.movieTitle} together! Join me on Flixie and log your watch.\n\n$url\n\nIf you need to install Flixie, open this link again afterwards. This invite is just for you.';
+          'We watched ${widget.movieTitle} together. What did you think? Add your take to our movie night on Flixie.\n\n$url\n\nIf you need to install Flixie, open this link again afterwards. This invite is just for you.';
       if (copy) {
         await Clipboard.setData(ClipboardData(text: text));
-        if (mounted) setState(() => _error = 'Invite copied');
+        if (mounted) {
+          setState(
+              () => _feedback = 'Invite copied. Nothing sent automatically.');
+        }
       } else {
         final box = context.findRenderObject() as RenderBox?;
         await Share.share(text,
@@ -80,10 +84,12 @@ class _ExternalWatchInviteContentState
                     style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 12),
                 Text(
-                    'Your watch is saved. Share this invite so they can create an account and log ${widget.movieTitle} with you.'),
+                    'Your watch is already saved. Invite them to add their own take on ${widget.movieTitle}.'),
                 const SizedBox(height: 8),
-                const Text(
-                    'Only share it with the person you watched with. Their date, rating and review are theirs to choose.'),
+                Text(
+                    'Share only with ${widget.invite.displayName}. This link doesn’t reveal your score or private diary note. Their date and rating stay their own.'),
+                if (_feedback != null)
+                  Text(_feedback!, semanticsLabel: _feedback),
                 if (_error != null)
                   Padding(
                       padding: const EdgeInsets.only(top: 12),

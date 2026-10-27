@@ -8,35 +8,390 @@ const ink = Color(0xff302044);
 const paper = Color(0xffede3fb);
 const mutedInk = Color(0xff67547d);
 const movies = [
-  ('Alien', 'MON 12', '9', 'Still makes me jump.', 'output/watch-together-mockups/alien.jpg'),
-  ('Spider-Man', 'WED 14', '8', 'A comfort rewatch.', 'output/diary-mockups/spider-man.jpg'),
-  ('Interstellar', 'FRI 16', '10', 'That ending. Every time.', 'output/diary-mockups/interstellar.jpg'),
+  (
+    'Alien',
+    'MON 12',
+    '9',
+    'Still makes me jump.',
+    'output/watch-together-mockups/alien.jpg'
+  ),
+  (
+    'Spider-Man',
+    'WED 14',
+    '8',
+    'A comfort rewatch.',
+    'output/diary-mockups/spider-man.jpg'
+  ),
+  (
+    'Interstellar',
+    'FRI 16',
+    '10',
+    'That ending. Every time.',
+    'output/diary-mockups/interstellar.jpg'
+  ),
 ];
 
 Widget diaryApp(String option, {double scale = 1}) => MaterialApp(
-  debugShowCheckedModeBanner: false,
-  theme: AppTheme.darkTheme,
-  builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)), child: child!),
-  home: DiaryConcept(option: option),
-);
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.darkTheme,
+      builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(scale)),
+          child: child!),
+      home: DiaryConcept(option: option),
+    );
 
 class DiaryConcept extends StatefulWidget {
   const DiaryConcept({super.key, required this.option});
   final String option;
-  @override State<DiaryConcept> createState() => _DiaryConceptState();
+  @override
+  State<DiaryConcept> createState() => _DiaryConceptState();
 }
+
 class _DiaryConceptState extends State<DiaryConcept> {
   final pages = PageController(initialPage: 1);
   int week = 1;
   bool get light => widget.option != 'journal';
-  @override void dispose() { pages.dispose(); super.dispose(); }
-  Text text(String value, double size, {Color? color, FontWeight weight = FontWeight.w500, String? font}) => Text(value, style: TextStyle(fontSize: size, height: 1.3, color: color ?? (light ? ink : Colors.white), fontWeight: weight, fontFamily: font));
-  Widget poster(int i, double width, {double? height}) => ClipRRect(borderRadius: BorderRadius.circular(5), child: Image.file(File(movies[i].$5), width: width, height: height ?? width * 1.48, fit: BoxFit.cover));
-  Widget score(int i, {bool onDark = false}) => Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star_rounded, size: 18, color: onDark ? const Color(0xffffd180) : const Color(0xff8b5b13)), const SizedBox(width: 4), text('${movies[i].$3}/10', 13, color: onDark ? const Color(0xffffd180) : ink, weight: FontWeight.w800)]);
-  Widget arrows() => Row(children: [IconButton(tooltip: 'Previous week', onPressed: week == 0 ? null : () => pages.previousPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOut), icon: Icon(Icons.chevron_left, color: light ? ink : Colors.white)), Expanded(child: Center(child: text(week == 1 ? '12–18 October' : week == 0 ? '5–11 October' : '19–25 October', 17, weight: FontWeight.w800))), IconButton(tooltip: 'Next week', onPressed: week == 2 ? null : () => pages.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeOut), icon: Icon(Icons.chevron_right, color: light ? ink : Colors.white))]);
-  Widget summary() => Padding(padding: const EdgeInsets.only(top: 4, bottom: 22), child: Center(child: text('3 films  ·  1 rewatch', 12, color: light ? mutedInk : const Color(0xffc3b0dd)))) ;
-  Widget notebook() => Container(margin: const EdgeInsets.fromLTRB(18, 6, 18, 12), decoration: BoxDecoration(color: paper, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x40000000), offset: Offset(0, 9), blurRadius: 18)]), child: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(20, 23, 20, 24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text('A week in films', 29, weight: FontWeight.w800, font: 'Georgia'), const SizedBox(height: 3), text('The ones you’ll remember.', 13, color: mutedInk), const SizedBox(height: 16), arrows(), summary(), for (int i = 0; i < 3; i++) ...[Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Transform.rotate(angle: i == 1 ? .045 : -.035, child: Container(padding: const EdgeInsets.all(5), color: const Color(0xfffaf6ff), child: poster(i, 77))), const SizedBox(width: 18), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text(movies[i].$2, 11, color: mutedInk, weight: FontWeight.w800), const SizedBox(height: 5), text(movies[i].$1, 19, weight: FontWeight.w800), const SizedBox(height: 5), score(i), const SizedBox(height: 9), text(movies[i].$4, 13, font: 'Georgia'), if (i == 1) ...[const SizedBox(height: 7), text('Rewatch', 11, color: mutedInk)]]))]), if (i < 2) Padding(padding: const EdgeInsets.symmetric(vertical: 18), child: Divider(height: 1, color: ink.withValues(alpha: .13)))], const SizedBox(height: 22), Row(children: [const Icon(Icons.favorite_border_rounded, size: 15, color: mutedInk), const SizedBox(width: 8), Expanded(child: text('Three films, a very good week.', 12, color: mutedInk, font: 'Georgia'))])])));
-  Widget journal() => SingleChildScrollView(padding: const EdgeInsets.fromLTRB(24, 8, 24, 28), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text('Roll the week back.', 31, weight: FontWeight.w800), const SizedBox(height: 8), text('Your own little cinema archive.', 13, color: const Color(0xffc3b0dd)), const SizedBox(height: 22), arrows(), summary(), LayoutBuilder(builder: (context, box) { final w = (box.maxWidth - 16) / 3; return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [for (int i = 0; i < 3; i++) Expanded(child: Padding(padding: EdgeInsets.only(top: i == 1 ? 16 : 0, left: i == 0 ? 0 : 8), child: Column(children: [poster(i, w, height: w * 1.48), const SizedBox(height: 10), score(i, onDark: true)])))]); }), const SizedBox(height: 28), Divider(color: Colors.white.withValues(alpha: .14)), const SizedBox(height: 9), for (int i = 0; i < 3; i++) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(width: 55, child: text(movies[i].$2.replaceFirst(' ', '\n'), 12, color: const Color(0xffb69bd6), weight: FontWeight.w800)), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text(movies[i].$1, 17, weight: FontWeight.w800), const SizedBox(height: 5), text(movies[i].$4, 13, color: const Color(0xffd9cbe9))])), if (i == 1) const Padding(padding: EdgeInsets.only(left: 5), child: Icon(Icons.replay_rounded, size: 20, color: Color(0xffb69bd6)))])), const SizedBox(height: 15), text('One week. Three different worlds.', 16, color: const Color(0xffcbb2f1), font: 'Georgia')]));
-  Widget planner() => Container(margin: const EdgeInsets.fromLTRB(18, 6, 18, 12), padding: const EdgeInsets.fromLTRB(20, 22, 20, 24), decoration: BoxDecoration(color: const Color(0xfff4edf9), borderRadius: BorderRadius.circular(14)), child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text('Dear film diary,', 29, font: 'Georgia', weight: FontWeight.w800), const SizedBox(height: 5), text('A little something for every mood.', 13, color: mutedInk), const SizedBox(height: 16), arrows(), summary(), Row(children: [for (int d = 0; d < 7; d++) Expanded(child: Column(children: [text(['M','T','W','T','F','S','S'][d], 11, color: mutedInk), const SizedBox(height: 8), Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: [0,2,4].contains(d) ? ink : const Color(0xffe7ddf0), shape: BoxShape.circle), child: text('${12+d}', 12, color: [0,2,4].contains(d) ? Colors.white : mutedInk, weight: FontWeight.w800))]))]), const SizedBox(height: 24), for (int i = 0; i < 3; i++) ...[Row(crossAxisAlignment: CrossAxisAlignment.start, children: [SizedBox(width: 38, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text(['12','14','16'][i], 25, weight: FontWeight.w800, font: 'Georgia'), text(['MON','WED','FRI'][i], 9, color: mutedInk, weight: FontWeight.w800)])), const SizedBox(width: 10), poster(i, 56), const SizedBox(width: 14), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [text(movies[i].$1, 17, weight: FontWeight.w800), const SizedBox(height: 5), score(i), const SizedBox(height: 6), text(movies[i].$4, 12, color: mutedInk), if (i==1) text('Rewatch', 11, color: mutedInk)]))]), if (i<2) Padding(padding: const EdgeInsets.symmetric(vertical: 18), child: Divider(height: 1, color: ink.withValues(alpha: .12)))], const SizedBox(height: 24), text('The quiet days count too.', 14, font: 'Georgia', color: mutedInk)])));
-  @override Widget build(BuildContext context) => Scaffold(backgroundColor: const Color(0xff110b1f), body: SafeArea(child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 530), child: Column(children: [Padding(padding: const EdgeInsets.fromLTRB(22, 16, 22, 12), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('9:41', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)), const FlixieWordmark(fontSize: 24), const Icon(Icons.battery_full_rounded, size: 19)])), const Padding(padding: EdgeInsets.fromLTRB(16, 0, 22, 14), child: Row(children: [Icon(Icons.chevron_left, size: 28, color: Color(0xffc9b3f1)), Text('Profile', style: TextStyle(fontSize: 14, color: Color(0xffc9b3f1))), Spacer(), Text('Your film diary', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15))])), Expanded(child: PageView.builder(controller: pages, itemCount: 3, onPageChanged: (value) => setState(() => week = value), itemBuilder: (_, index) => index != 1 ? Center(child: Text(index == 0 ? 'A quieter week.\nYour memories would live here.' : 'A fresh page.\nYour next film is waiting.', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xffd7c4ef), fontSize: 21, height: 1.6))) : widget.option == 'scrapbook' ? notebook() : widget.option == 'journal' ? journal() : planner())), Padding(padding: const EdgeInsets.fromLTRB(24, 6, 24, 10), child: Column(children: [Row(mainAxisAlignment: MainAxisAlignment.center, children: [for (int i = 0; i < 3; i++) Container(width: i == week ? 18 : 5, height: 5, margin: const EdgeInsets.symmetric(horizontal: 3), decoration: BoxDecoration(color: i == week ? const Color(0xffb58af8) : const Color(0xff58466e), borderRadius: BorderRadius.circular(4)))]), const SizedBox(height: 10), const Text('Swipe through your weeks', style: TextStyle(color: Color(0xffd0bee5), fontSize: 12)), const SizedBox(height: 7), const Text('Illustrative diary · October 2026', style: TextStyle(color: Color(0xffa18fb5), fontSize: 10))])), Container(width: 110, height: 4, margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(5)))])))));
+  @override
+  void dispose() {
+    pages.dispose();
+    super.dispose();
+  }
+
+  Text text(String value, double size,
+          {Color? color, FontWeight weight = FontWeight.w500, String? font}) =>
+      Text(value,
+          style: TextStyle(
+              fontSize: size,
+              height: 1.3,
+              color: color ?? (light ? ink : Colors.white),
+              fontWeight: weight,
+              fontFamily: font));
+  Widget poster(int i, double width, {double? height}) => ClipRRect(
+      borderRadius: BorderRadius.circular(5),
+      child: Image.file(File(movies[i].$5),
+          width: width, height: height ?? width * 1.48, fit: BoxFit.cover));
+  Widget score(int i, {bool onDark = false}) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.star_rounded,
+            size: 18,
+            color: onDark ? const Color(0xffffd180) : const Color(0xff8b5b13)),
+        const SizedBox(width: 4),
+        text('${movies[i].$3}/10', 13,
+            color: onDark ? const Color(0xffffd180) : ink,
+            weight: FontWeight.w800)
+      ]);
+  Widget arrows() => Row(children: [
+        IconButton(
+            tooltip: 'Previous week',
+            onPressed: week == 0
+                ? null
+                : () => pages.previousPage(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut),
+            icon: Icon(Icons.chevron_left, color: light ? ink : Colors.white)),
+        Expanded(
+            child: Center(
+                child: text(
+                    week == 1
+                        ? '12–18 October'
+                        : week == 0
+                            ? '5–11 October'
+                            : '19–25 October',
+                    17,
+                    weight: FontWeight.w800))),
+        IconButton(
+            tooltip: 'Next week',
+            onPressed: week == 2
+                ? null
+                : () => pages.nextPage(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut),
+            icon: Icon(Icons.chevron_right, color: light ? ink : Colors.white))
+      ]);
+  Widget summary() => Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 22),
+      child: Center(
+          child: text('3 films  ·  1 rewatch', 12,
+              color: light ? mutedInk : const Color(0xffc3b0dd))));
+  Widget notebook() => Container(
+      margin: const EdgeInsets.fromLTRB(18, 6, 18, 12),
+      decoration: BoxDecoration(
+          color: paper,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x40000000), offset: Offset(0, 9), blurRadius: 18)
+          ]),
+      child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 23, 20, 24),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            text('A week in films', 29,
+                weight: FontWeight.w800, font: 'Georgia'),
+            const SizedBox(height: 3),
+            text('The ones you’ll remember.', 13, color: mutedInk),
+            const SizedBox(height: 16),
+            arrows(),
+            summary(),
+            for (int i = 0; i < 3; i++) ...[
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Transform.rotate(
+                    angle: i == 1 ? .045 : -.035,
+                    child: Container(
+                        padding: const EdgeInsets.all(5),
+                        color: const Color(0xfffaf6ff),
+                        child: poster(i, 77))),
+                const SizedBox(width: 18),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      text(movies[i].$2, 11,
+                          color: mutedInk, weight: FontWeight.w800),
+                      const SizedBox(height: 5),
+                      text(movies[i].$1, 19, weight: FontWeight.w800),
+                      const SizedBox(height: 5),
+                      score(i),
+                      const SizedBox(height: 9),
+                      text(movies[i].$4, 13, font: 'Georgia'),
+                      if (i == 1) ...[
+                        const SizedBox(height: 7),
+                        text('Rewatch', 11, color: mutedInk)
+                      ]
+                    ]))
+              ]),
+              if (i < 2)
+                Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    child:
+                        Divider(height: 1, color: ink.withValues(alpha: .13)))
+            ],
+            const SizedBox(height: 22),
+            Row(children: [
+              const Icon(Icons.favorite_border_rounded,
+                  size: 15, color: mutedInk),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: text('Three films, a very good week.', 12,
+                      color: mutedInk, font: 'Georgia'))
+            ])
+          ])));
+  Widget journal() => SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        text('Roll the week back.', 31, weight: FontWeight.w800),
+        const SizedBox(height: 8),
+        text('Your own little cinema archive.', 13,
+            color: const Color(0xffc3b0dd)),
+        const SizedBox(height: 22),
+        arrows(),
+        summary(),
+        LayoutBuilder(builder: (context, box) {
+          final w = (box.maxWidth - 16) / 3;
+          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (int i = 0; i < 3; i++)
+              Expanded(
+                  child: Padding(
+                      padding: EdgeInsets.only(
+                          top: i == 1 ? 16 : 0, left: i == 0 ? 0 : 8),
+                      child: Column(children: [
+                        poster(i, w, height: w * 1.48),
+                        const SizedBox(height: 10),
+                        score(i, onDark: true)
+                      ])))
+          ]);
+        }),
+        const SizedBox(height: 28),
+        Divider(color: Colors.white.withValues(alpha: .14)),
+        const SizedBox(height: 9),
+        for (int i = 0; i < 3; i++)
+          Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(
+                    width: 55,
+                    child: text(movies[i].$2.replaceFirst(' ', '\n'), 12,
+                        color: const Color(0xffb69bd6),
+                        weight: FontWeight.w800)),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      text(movies[i].$1, 17, weight: FontWeight.w800),
+                      const SizedBox(height: 5),
+                      text(movies[i].$4, 13, color: const Color(0xffd9cbe9))
+                    ])),
+                if (i == 1)
+                  const Padding(
+                      padding: EdgeInsets.only(left: 5),
+                      child: Icon(Icons.replay_rounded,
+                          size: 20, color: Color(0xffb69bd6)))
+              ])),
+        const SizedBox(height: 15),
+        text('One week. Three different worlds.', 16,
+            color: const Color(0xffcbb2f1), font: 'Georgia')
+      ]));
+  Widget planner() => Container(
+      margin: const EdgeInsets.fromLTRB(18, 6, 18, 12),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+      decoration: BoxDecoration(
+          color: const Color(0xfff4edf9),
+          borderRadius: BorderRadius.circular(14)),
+      child: SingleChildScrollView(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        text('Dear film diary,', 29, font: 'Georgia', weight: FontWeight.w800),
+        const SizedBox(height: 5),
+        text('A little something for every mood.', 13, color: mutedInk),
+        const SizedBox(height: 16),
+        arrows(),
+        summary(),
+        Row(children: [
+          for (int d = 0; d < 7; d++)
+            Expanded(
+                child: Column(children: [
+              text(['M', 'T', 'W', 'T', 'F', 'S', 'S'][d], 11, color: mutedInk),
+              const SizedBox(height: 8),
+              Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                      color:
+                          [0, 2, 4].contains(d) ? ink : const Color(0xffe7ddf0),
+                      shape: BoxShape.circle),
+                  child: text('${12 + d}', 12,
+                      color: [0, 2, 4].contains(d) ? Colors.white : mutedInk,
+                      weight: FontWeight.w800))
+            ]))
+        ]),
+        const SizedBox(height: 24),
+        for (int i = 0; i < 3; i++) ...[
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(
+                width: 38,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      text(['12', '14', '16'][i], 25,
+                          weight: FontWeight.w800, font: 'Georgia'),
+                      text(['MON', 'WED', 'FRI'][i], 9,
+                          color: mutedInk, weight: FontWeight.w800)
+                    ])),
+            const SizedBox(width: 10),
+            poster(i, 56),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  text(movies[i].$1, 17, weight: FontWeight.w800),
+                  const SizedBox(height: 5),
+                  score(i),
+                  const SizedBox(height: 6),
+                  text(movies[i].$4, 12, color: mutedInk),
+                  if (i == 1) text('Rewatch', 11, color: mutedInk)
+                ]))
+          ]),
+          if (i < 2)
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                child: Divider(height: 1, color: ink.withValues(alpha: .12)))
+        ],
+        const SizedBox(height: 24),
+        text('The quiet days count too.', 14, font: 'Georgia', color: mutedInk)
+      ])));
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      backgroundColor: const Color(0xff110b1f),
+      body: SafeArea(
+          child: Center(
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 530),
+                  child: Column(children: [
+                    const Padding(
+                        padding: EdgeInsets.fromLTRB(22, 16, 22, 12),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('9:41',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800)),
+                              FlixieWordmark(fontSize: 24),
+                              Icon(Icons.battery_full_rounded, size: 19)
+                            ])),
+                    const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 0, 22, 14),
+                        child: Row(children: [
+                          Icon(Icons.chevron_left,
+                              size: 28, color: Color(0xffc9b3f1)),
+                          Text('Profile',
+                              style: TextStyle(
+                                  fontSize: 14, color: Color(0xffc9b3f1))),
+                          Spacer(),
+                          Text('Your film diary',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 15))
+                        ])),
+                    Expanded(
+                        child: PageView.builder(
+                            controller: pages,
+                            itemCount: 3,
+                            onPageChanged: (value) =>
+                                setState(() => week = value),
+                            itemBuilder: (_, index) => index != 1
+                                ? Center(
+                                    child: Text(
+                                        index == 0
+                                            ? 'A quieter week.\nYour memories would live here.'
+                                            : 'A fresh page.\nYour next film is waiting.',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            color: Color(0xffd7c4ef),
+                                            fontSize: 21,
+                                            height: 1.6)))
+                                : widget.option == 'scrapbook'
+                                    ? notebook()
+                                    : widget.option == 'journal'
+                                        ? journal()
+                                        : planner())),
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 6, 24, 10),
+                        child: Column(children: [
+                          Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                for (int i = 0; i < 3; i++)
+                                  Container(
+                                      width: i == week ? 18 : 5,
+                                      height: 5,
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 3),
+                                      decoration: BoxDecoration(
+                                          color: i == week
+                                              ? const Color(0xffb58af8)
+                                              : const Color(0xff58466e),
+                                          borderRadius:
+                                              BorderRadius.circular(4)))
+                              ]),
+                          const SizedBox(height: 10),
+                          const Text('Swipe through your weeks',
+                              style: TextStyle(
+                                  color: Color(0xffd0bee5), fontSize: 12)),
+                          const SizedBox(height: 7),
+                          const Text('Illustrative diary · October 2026',
+                              style: TextStyle(
+                                  color: Color(0xffa18fb5), fontSize: 10))
+                        ])),
+                    Container(
+                        width: 110,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)))
+                  ])))));
 }

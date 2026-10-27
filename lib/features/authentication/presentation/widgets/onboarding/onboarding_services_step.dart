@@ -1,3 +1,4 @@
+import 'onboarding_account_choices.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import '../../controllers/onboarding_controller.dart';
@@ -115,6 +116,8 @@ class OnboardingServicesStep extends StatelessWidget {
                 onPressed: controller.busy ? null : controller.clearProviders,
                 child: const Text('I don’t use streaming services')),
           ],
+          OnboardingAccountChoices(
+              key: ValueKey(controller.userId), controller: controller),
         ],
       ];
 }

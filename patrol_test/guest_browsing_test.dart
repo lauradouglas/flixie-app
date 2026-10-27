@@ -22,7 +22,7 @@ import '../test/support/api_fixture.dart';
 
 void main() {
   patrolTest(
-      'guest browses Home and a film; save prompts without a write; You offers signup',
+      'guest browses Home and a film; saves locally without an account; You offers signup',
       ($) async {
     // Patrol fixtures intentionally use the test-only preferences API.
     // ignore: invalid_use_of_visible_for_testing_member
@@ -60,8 +60,15 @@ void main() {
           Provider<MovieService>.value(value: movies),
         ],
         child: MaterialApp.router(
-            routerConfig: router, theme: AppTheme.darkTheme, builder: (context,child) => MediaQuery(data: MediaQuery.of(context).copyWith(disableAnimations:true),child:child!))));
-    await $(find.byTooltip('Play with Pip')).tap();
+            routerConfig: router,
+            theme: AppTheme.darkTheme,
+            builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(disableAnimations: true),
+                child: child!))));
+    await $.tester.scrollUntilVisible(
+        find.text('Take a break with Pip’s games'), 400,
+        scrollable: find.byType(Scrollable).first);
+    await $('Take a break with Pip’s games').tap();
     expect(find.byType(PipGamesScreen), findsOneWidget);
     for (final path in [
       '/play/pip-pairs',
@@ -75,7 +82,9 @@ void main() {
     }
     router.go('/');
     await $.pumpAndSettle();
-    await $('Alien').tap();
+    await $.tester.scrollUntilVisible(find.text('Trending now'), -400,
+        scrollable: find.byType(Scrollable).first);
+    await $(find.text('Alien').first).tap();
     movies.core[348]!.complete(const Movie(
         id: 348,
         title: 'Alien',
@@ -83,8 +92,8 @@ void main() {
         runtime: 117));
     await $.pumpAndSettle();
     await $('Watchlist').scrollTo().tap();
-    await $('Save this film for later').waitUntilVisible();
-    await $('Keep exploring').tap();
+    await $('Added to your watchlist').waitUntilVisible();
+    await $('Keep browsing').tap();
     expect(requests.where((r) => r.method != 'GET'), isEmpty);
     expect(movies.reviewCalls, 0);
     router.pop();

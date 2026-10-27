@@ -188,7 +188,7 @@ class _PickForUsScreenState extends State<_PickForUsFlow> {
                 error.statusCode >= 400 &&
                 error.statusCode < 500
             ? error.message
-            : 'Couldn’t find your picks. Your choices are saved—please try again.');
+            : 'Couldn’t find your picks. Your choices are saved-please try again.');
       }
     } finally {
       if (mounted) setState(() => _picking = false);

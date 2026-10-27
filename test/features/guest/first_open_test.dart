@@ -42,8 +42,12 @@ void main() {
     });
   }
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
-  testWidgets('first launch welcomes once; a fresh router opens Home next time',
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    GuestAccess.clear();
+  });
+  testWidgets(
+      'fresh guest entry welcomes once; a fresh router opens Home next time',
       (tester) async {
     final auth = GuestAuth(), analytics = ActionAnalytics();
     late BuildContext context;
@@ -51,7 +55,7 @@ void main() {
       context = c;
       return const SizedBox();
     })));
-    for (final expected in ['/welcome', '/']) {
+    for (final expected in ['/', '/']) {
       final router = buildRouter(auth, analytics, GuestReferrals());
       router.go('/');
       final match = await router.routeInformationParser

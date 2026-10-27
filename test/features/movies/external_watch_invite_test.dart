@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/guest/data/guest_diary_store.dart';
+import 'package:flixie_app/features/guest/presentation/guest_diary_page.dart';
+import 'package:flixie_app/core/auth/referral_attribution_store.dart';
 import 'package:provider/provider.dart';
 import 'package:flixie_app/core/auth/auth_provider.dart';
 import 'package:flixie_app/features/movies/presentation/widgets/watch_invite_signup_context.dart';
@@ -40,6 +43,7 @@ void main() {
   });
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    GuestDiaryStore.instance = GuestDiaryStore();
     StarredPeople.instance.loaded = true;
   });
   for (final size in [
@@ -144,7 +148,7 @@ void main() {
         MovieWatchEntry.fromJson(watch.toJson()).externalInvite!.id, 'invite');
   });
   testWidgets(
-      'recipient confirms before claiming and opens the exact watch editor',
+      'member edits independently before claiming and explicitly saving the watch',
       (tester) async {
     final token = 'a' * 43;
     final calls = <String>[];
@@ -152,17 +156,26 @@ void main() {
     useApiFixture(MockClient((request) async {
       calls.add('${request.method} ${request.url.path}');
       return http.Response(
-          jsonEncode(request.method == 'POST'
-              ? {'requestId': 'specific-watch'}
-              : {
-                  'movie': {'id': 348, 'title': 'Alien'},
-                  'watchedAt': null,
-                  'owner': {
-                    'id': 'laura',
-                    'username': 'Laura',
-                    'profileBadges': ['EARLY_ADOPTER']
-                  }
-                }),
+          jsonEncode(request.url.path.endsWith('/state')
+              ? {
+                  'request': {
+                    'id': 'specific-watch',
+                    'movieId': 348,
+                    'movie': {'id': 348, 'title': 'Alien'}
+                  },
+                  'hasCurrentUserLoggedWatch': true
+                }
+              : request.method == 'POST'
+                  ? {'requestId': 'specific-watch'}
+                  : {
+                      'movie': {'id': 348, 'title': 'Alien'},
+                      'watchedAt': null,
+                      'owner': {
+                        'id': 'laura',
+                        'username': 'Laura',
+                        'profileBadges': ['EARLY_ADOPTER']
+                      }
+                    }),
           200);
     }));
     final auth = StoreScreenshotAuth();
@@ -171,89 +184,33 @@ void main() {
           path: '/invite',
           builder: (_, __) => ExternalWatchInviteScreen(token: token)),
       GoRoute(
-          path: '/watch-requests/:id',
-          builder: (_, state) => Text(
-              'Open ${state.pathParameters['id']} log=${state.uri.queryParameters['log']}'))
+          path: '/watch-entry-saved/:id',
+          builder: (_, state) => Text('Saved ${state.pathParameters['id']}'))
     ]);
     addTearDown(auth.dispose);
     addTearDown(router.dispose);
     await tester.pumpWidget(storeScreenshotApp(auth, router));
     await tester.pumpAndSettle();
-    expect(find.text('Laura says you watched Alien together.'), findsOneWidget);
+    expect(find.text('Laura invited you to remember Alien together.'),
+        findsOneWidget);
     expect(calls.where((v) => v.startsWith('POST')), isEmpty);
-    await tester.tap(find.text('Log my watch'));
+    await tester.tap(find.text('Add my take'));
     await tester.pumpAndSettle();
-    expect(find.text('Open specific-watch log=true'), findsOneWidget);
+    expect(calls.where((v) => v.startsWith('POST')), isEmpty);
+    await tester.scrollUntilVisible(
+        find.text('Save to my account').hitTestable(), 250,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Save to my account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved specific-watch'), findsOneWidget);
     expect(await PendingWatchInviteStore.read(), isNull);
     expect(await PendingWatchInviteStore.readLog('store-viewer'),
         'specific-watch');
-    expect(calls.where((v) => v.startsWith('POST')).length, 1);
+    expect(calls.where((v) => v.startsWith('POST')).length, 2);
   });
   testWidgets(
-      'Rate now preserves context through signup and automatically opens the invited viewing',
-      (tester) async {
-    final token = 'b' * 43, calls = <String>[];
-    final auth = InviteAuth()..current = AuthStatus.unauthenticated;
-    useApiFixture(MockClient((request) async {
-      calls.add('${request.method} ${request.url.path}');
-      return http.Response(
-          jsonEncode(request.method == 'POST'
-              ? {'requestId': 'interstellar-watch'}
-              : {
-                  'movie': {'id': 157336, 'title': 'Interstellar'},
-                  'owner': {
-                    'id': 'doug',
-                    'username': 'Dougasaur',
-                    'profileBadges': ['EARLY_ADOPTER']
-                  }
-                }),
-          200);
-    }));
-    late GoRouter router;
-    router = GoRouter(initialLocation: '/invite', routes: [
-      GoRoute(
-          path: '/invite',
-          builder: (_, __) => ExternalWatchInviteScreen(token: token)),
-      GoRoute(
-          path: '/auth/signup',
-          builder: (_, __) => Scaffold(
-                  body: Column(children: [
-                const WatchInviteSignupContext(),
-                FilledButton(
-                    onPressed: () {
-                      auth.current = AuthStatus.authenticated;
-                      router.go('/invite');
-                    },
-                    child: const Text('Complete fixture sign-up'))
-              ]))),
-      GoRoute(
-          path: '/watch-requests/:id',
-          builder: (_, state) =>
-              Scaffold(body: Text('Rate ${state.pathParameters['id']}'))),
-    ]);
-    addTearDown(router.dispose);
-    addTearDown(auth.dispose);
-    await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
-        value: auth,
-        child: MaterialApp.router(
-            theme: AppTheme.darkTheme, routerConfig: router)));
-    await tester.pumpAndSettle();
-    expect(find.text('Dougasaur says you watched Interstellar together.'),
-        findsOneWidget);
-    expect(calls, contains('GET /guest/watch-invites/$token'));
-    expect(calls.where((v) => v.startsWith('POST')), isEmpty);
-    await tester.tap(find.text('Rate now'));
-    await tester.pumpAndSettle();
-    expect(find.text('Interstellar with Dougasaur'), findsOneWidget);
-    expect(await PendingWatchInviteStore.shouldResume(token), isTrue);
-    await tester.tap(find.text('Complete fixture sign-up'));
-    await tester.pumpAndSettle();
-    expect(find.text('Rate interstellar-watch'), findsOneWidget);
-    expect(auth.dbUser!.completedSetup, isFalse);
-    expect(calls.where((v) => v.startsWith('POST')).length, 1);
-    expect(
-        await PendingWatchInviteStore.readLog('fixture'), 'interstellar-watch');
-  });
+      'guest external invite keeps independent fields through signup and safe retry',
+      externalGuestJourney);
   testWidgets(
       'saved invite watch keeps onboarding optional until the member continues',
       (tester) async {
@@ -282,4 +239,142 @@ void main() {
     expect(find.text('Set up Flixie'), findsOneWidget);
     expect(await PendingWatchInviteStore.readLog('fixture'), isNull);
   });
+}
+
+Future<void> externalGuestJourney(WidgetTester tester) async {
+  SharedPreferences.setMockInitialValues({});
+  GuestDiaryStore.instance = GuestDiaryStore();
+  final token = 'b' * 43;
+  final auth = InviteAuth()..current = AuthStatus.unauthenticated;
+  final writes = <Map<String, dynamic>>[];
+  var claims = 0, fail = true;
+  useApiFixture(MockClient((request) async {
+    if (request.url.path.endsWith('/claim')) {
+      claims++;
+      return http.Response(jsonEncode({'requestId': 'alien-together'}), 200);
+    }
+    if (request.url.path.endsWith('/watch-confirmations')) {
+      writes.add(Map<String, dynamic>.from(jsonDecode(request.body) as Map));
+      if (fail) {
+        return http.Response(jsonEncode({'message': 'Offline fixture'}), 503);
+      }
+      return http.Response('{}', 200);
+    }
+    if (request.url.path.endsWith('/state')) {
+      return http.Response(
+          jsonEncode({
+            'request': {
+              'id': 'alien-together',
+              'movieId': 348,
+              'movie': {'id': 348, 'title': 'Alien'}
+            },
+            'hasCurrentUserLoggedWatch': true
+          }),
+          200);
+    }
+    return http.Response(
+        jsonEncode({
+          'movie': {'id': 348, 'title': 'Alien'},
+          'owner': {
+            'id': 'laura',
+            'username': 'Laura',
+            'profileBadges': ['EARLY_ADOPTER']
+          },
+          'referralCode': 'FLXLAURA'
+        }),
+        200);
+  }));
+  late GoRouter router;
+  router = GoRouter(initialLocation: '/invite', routes: [
+    GoRoute(
+        path: '/invite',
+        builder: (_, __) => ExternalWatchInviteScreen(token: token)),
+    GoRoute(
+        path: '/guest-diary',
+        builder: (_, s) =>
+            GuestDiaryPage(draftId: s.uri.queryParameters['draft'])),
+    GoRoute(
+        path: '/auth/signup',
+        builder: (_, __) => Scaffold(
+            body: FilledButton(
+                onPressed: () async {
+                  auth.current = AuthStatus.authenticated;
+                  await GuestDiaryStore.instance.claim('fixture');
+                  router.go('/invite');
+                },
+                child: const Text('Complete fixture sign-up')))),
+    GoRoute(
+        path: '/watch-entry-saved/:id',
+        builder: (_, s) => WatchInviteSavedScreen(
+            requestId: s.pathParameters['id']!,
+            movieTitle: 'Alien',
+            rating: 8)),
+  ]);
+  addTearDown(router.dispose);
+  addTearDown(auth.dispose);
+  await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+      value: auth,
+      child:
+          MaterialApp.router(theme: AppTheme.darkTheme, routerConfig: router)));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Add my take'));
+  await tester.pumpAndSettle();
+  expect(claims, 0);
+  expect(writes, isEmpty);
+  expect(
+      (tester.widget<TextField>(find.byType(TextField).last)).controller!.text,
+      isEmpty);
+  await tester.tap(find.text('8'));
+  await tester.enterText(find.byType(TextField).first, '2026-10-20');
+  await tester.enterText(find.byType(TextField).last, 'My own Alien memory');
+  FocusManager.instance.primaryFocus?.unfocus();
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+      find.text('Preview my entry').hitTestable(), 250,
+      scrollable: find.byType(Scrollable).first);
+  await tester.tap(find.text('Preview my entry'));
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+      find.byType(CheckboxListTile).hitTestable(), 250,
+      scrollable: find.byType(Scrollable).first);
+  await tester.tap(find.byType(CheckboxListTile));
+  await tester.pumpAndSettle();
+  await tester.scrollUntilVisible(
+      find.text('Create account & keep my entry').hitTestable(), 250,
+      scrollable: find.byType(Scrollable).first);
+  await tester.tap(find.text('Create account & keep my entry'));
+  await tester.pumpAndSettle();
+  expect(await SharedPreferencesReferralAttributionStore().read(), 'FLXLAURA');
+  expect(writes, isEmpty);
+  expect(claims, 0);
+  await tester.tap(find.text('Complete fixture sign-up'));
+  await tester.pumpAndSettle();
+  expect(find.text('My own Alien memory'), findsOneWidget);
+  expect(find.text('2026-10-20'), findsOneWidget);
+  expect(claims, 0);
+  await tester.scrollUntilVisible(
+      find.text('Save to my account').hitTestable(), 250,
+      scrollable: find.byType(Scrollable).first);
+  await tester.tap(find.text('Save to my account'));
+  await tester.pumpAndSettle();
+  expect(
+      find.text('Couldn’t finish saving. Your entry is still here. Try again.'),
+      findsOneWidget);
+  final retained = (await GuestDiaryStore.instance.list('fixture')).single;
+  expect(retained.watchRequestId, 'alien-together');
+  expect(retained.note, 'My own Alien memory');
+  fail = false;
+  await tester.scrollUntilVisible(
+      find.text('Save to my account').hitTestable(), 250,
+      scrollable: find.byType(Scrollable).first);
+  await tester.tap(find.text('Save to my account'));
+  await tester.pumpAndSettle();
+  expect(claims, 1);
+  expect(writes, hasLength(2));
+  expect(writes.first, writes.last);
+  expect(writes.last['rating'], 8);
+  expect(writes.last['reviewText'], 'My own Alien memory');
+  expect(writes.last['publishReview'], false);
+  expect(find.text('One movie night. Your own take.'), findsOneWidget);
+  expect(await GuestDiaryStore.instance.list('fixture'), isEmpty);
 }

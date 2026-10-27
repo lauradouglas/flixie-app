@@ -7,6 +7,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 spec = importlib.util.spec_from_file_location('screenshots', Path(__file__).with_name('store-screenshots.py'))
@@ -155,6 +156,30 @@ class ScreenshotRunnerTest(unittest.TestCase):
                 offset += length + 12
             expected = b''.join(b'\0' + bytes(v for i, v in enumerate(row) if i % 4 != 3) for row in rows)
             self.assertEqual(zlib.decompress(compressed), expected)
+
+    def test_capture_invokes_only_dart_instrumentation_on_android(self):
+        key = 'ORG_GRADLE_PROJECT_android.testInstrumentationRunnerArguments.class'
+        for platform in ('android', 'ios'):
+            with self.subTest(platform=platform), \
+                    mock.patch.dict(runner.os.environ, {'CAPTURE_ENV': 'preserved'}, clear=True), \
+                    mock.patch.object(runner.http.server, 'HTTPServer') as server, \
+                    mock.patch.object(runner.threading, 'Thread'), \
+                    mock.patch.object(runner, 'run'), \
+                    mock.patch.object(runner, 'cleanup'), \
+                    mock.patch.object(runner.subprocess, 'Popen') as popen:
+                server.return_value.server_port = 12345
+                popen.return_value.poll.return_value = 1
+                popen.return_value.returncode = 1
+                with self.assertRaisesRegex(RuntimeError, 'Capture failed'):
+                    runner.capture_set(platform, 'dedicated-device', 'fixture',
+                                       'en-GB', self.staging)
+                environment = popen.call_args.kwargs['env']
+                self.assertEqual(environment['CAPTURE_ENV'], 'preserved')
+                if platform == 'android':
+                    self.assertEqual(environment[key], 'com.flixie.app.MainActivityTest')
+                else:
+                    self.assertNotIn(key, environment)
+                self.assertNotIn(key, runner.os.environ)
 
     def test_transparent_capture_is_rejected_instead_of_changing_its_pixels(self):
         image = self.staging / 'transparent.png'

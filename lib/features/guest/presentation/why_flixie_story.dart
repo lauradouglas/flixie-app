@@ -21,7 +21,7 @@ enum WhyFlixieStory {
         friends =>
           'A friend’s favourite. A film you both want to see. Your next great watch can start with your people.',
         providers =>
-          'See watch providers right in your watchlist. Filter by your subscriptions and see which saved films you can put on tonight — and which friends want to watch too.',
+          'See watch providers right in your watchlist. Filter by your subscriptions and see which saved films you can put on tonight - and which friends want to watch too.',
         plans =>
           'Use Pick for Us when you need a hand choosing. Turn your pick into a watch plan with friends, with the film and the night in one place.',
         watches =>

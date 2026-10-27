@@ -1,3 +1,6 @@
+import 'package:flixie_app/features/home/presentation/widgets/home_watch_plan_card.dart';
+import 'package:flixie_app/features/home/presentation/widgets/home_tablet_layout.dart';
+import 'package:flixie_app/features/home/presentation/widgets/section_header.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
@@ -73,4 +76,50 @@ void main() {
       }
     });
   }
+  testWidgets('wide Home previews one priority plan and retains See all',
+      (tester) async {
+    final states = [
+      for (final title in ['Alien', 'The Odyssey'])
+        HomeWatchPlanState(
+            plan: WatchRequest(
+                id: title,
+                requesterId: 'friend',
+                recipientId: 'me',
+                status: 'pending',
+                type: 'MOVIE_WATCH_REQUEST',
+                movie: WatchRequestMovieDetails(id: 1, title: title)),
+            type: HomeWatchPlanStateType.chooseFinalMovie,
+            priority: 1,
+            eyebrow: 'Needs your reply',
+            title: title,
+            supportingText: 'Invited by a friend',
+            actionLabel: 'View invitation',
+            requiresAttention: true)
+    ];
+    var openedAll = false;
+    String? opened;
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: HomeTabletScope(
+                    child: SizedBox(
+                        width: 300,
+                        child: Column(children: [
+                          HomeSectionHeader(
+                              title: 'Watch together',
+                              onSeeAll: () => openedAll = true),
+                          HomeWatchPlanColumn(
+                              states: states,
+                              onOpen: (s) => opened = s.plan.id),
+                        ])))))));
+    expect(find.byType(HomeWatchPlanCard), findsOneWidget);
+    expect(find.text('Alien'), findsWidgets);
+    expect(find.text('The Odyssey'), findsNothing);
+    await tester.tap(find.text('View invitation'));
+    expect(opened, 'Alien');
+    await tester.tap(find.text('See all'));
+    expect(openedAll, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 }

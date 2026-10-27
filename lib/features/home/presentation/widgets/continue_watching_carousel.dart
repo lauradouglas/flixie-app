@@ -1,3 +1,4 @@
+import 'home_tablet_layout.dart';
 import '../models/home_image_urls.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -22,24 +23,33 @@ class ContinueWatchingCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 120 + MediaQuery.textScalerOf(context).scale(20),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: contentPadding,
-        itemCount: shows.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          final show = shows[index];
-          return ContinueWatchingCard(
-            show: show,
-            onTap: () => onTap(show),
-            onRemove:
-                onRemove == null ? null : () => _confirmRemove(context, show),
-          );
-        },
-      ),
-    );
+    final compact = HomeTabletLayout.active(context);
+    return LayoutBuilder(
+        builder: (context, box) => SizedBox(
+              height: compact
+                  ? 112
+                  : 120 + MediaQuery.textScalerOf(context).scale(20),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: contentPadding,
+                itemCount: shows.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  final show = shows[index];
+                  return ContinueWatchingCard(
+                    width: compact
+                        ? ((box.maxWidth - 52) / 3).clamp(164.0, 230.0)
+                        : null,
+                    height: compact ? 112 : null,
+                    show: show,
+                    onTap: () => onTap(show),
+                    onRemove: onRemove == null
+                        ? null
+                        : () => _confirmRemove(context, show),
+                  );
+                },
+              ),
+            ));
   }
 
   Future<void> _confirmRemove(
@@ -76,8 +86,11 @@ class ContinueWatchingCard extends StatelessWidget {
     required this.show,
     required this.onTap,
     this.onRemove,
+    this.width,
+    this.height,
   });
 
+  final double? width, height;
   final ContinueWatchingShow show;
   final VoidCallback onTap;
   final VoidCallback? onRemove;
@@ -85,7 +98,7 @@ class ContinueWatchingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cardWidth =
-        (MediaQuery.sizeOf(context).width * .46).clamp(164.0, 230.0);
+        width ?? (MediaQuery.sizeOf(context).width * .46).clamp(164.0, 230.0);
     final episode = show.lastWatchedEpisode;
     final episodeLabel = episode == null
         ? '${show.watchedEpisodes} episodes watched'
@@ -95,7 +108,7 @@ class ContinueWatchingCard extends StatelessWidget {
 
     return SizedBox(
       width: cardWidth,
-      height: 120 + MediaQuery.textScalerOf(context).scale(20),
+      height: height ?? 120 + MediaQuery.textScalerOf(context).scale(20),
       child: Material(
         color: Colors.transparent,
         child: InkWell(

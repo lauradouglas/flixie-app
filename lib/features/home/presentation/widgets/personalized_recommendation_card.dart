@@ -1,3 +1,4 @@
+import 'home_tablet_layout.dart';
 import '../models/home_image_urls.dart';
 import 'package:flixie_app/features/settings/data/movie_rating_privacy.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -44,7 +45,118 @@ class PersonalizedRecommendationCard extends StatelessWidget {
         ? 'Picked for you based on your movie taste'
         : visibleReasons.first;
     final supportingReasons = visibleReasons.skip(1);
+    final actionButtons = _recommendationActions(context,
+        tablet: HomeTabletLayout.active(context));
 
+    if (HomeTabletLayout.active(context)) {
+      final year = DateTime.tryParse(movie.releaseDate ?? '')?.year;
+      return Material(
+          color: context.colors.surface,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: context.colors.tabBarBorder)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+              onTap: onTap,
+              child: Column(children: [
+                Expanded(
+                    child: LayoutBuilder(
+                        builder: (context, box) => Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  SizedBox(
+                                      key: const ValueKey(
+                                          'tablet-recommendation-artwork'),
+                                      width: box.maxHeight * 2 / 3,
+                                      child: ClipRRect(
+                                          borderRadius: const BorderRadius.only(
+                                              bottomRight: Radius.circular(12)),
+                                          child: _poster(context,
+                                              fit: BoxFit.contain))),
+                                  Expanded(
+                                      child: SingleChildScrollView(
+                                          child: Padding(
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                      12, 10, 12, 8),
+                                              child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(movie.name,
+                                                        style: const TextStyle(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.w800,
+                                                            height: 1.2)),
+                                                    const SizedBox(height: 5),
+                                                    Text(
+                                                        'Movie${year == null ? '' : ' · $year'}',
+                                                        style: TextStyle(
+                                                            color: context
+                                                                .colors.light,
+                                                            fontSize: 12)),
+                                                    if (!hideMovieRatings(
+                                                            context,
+                                                            movie.id) &&
+                                                        (movie.voteAverage ??
+                                                                0) >
+                                                            0) ...[
+                                                      const SizedBox(height: 5),
+                                                      Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                                Icons
+                                                                    .star_rounded,
+                                                                color: context
+                                                                    .colors
+                                                                    .warning,
+                                                                size: 18),
+                                                            const SizedBox(
+                                                                width: 4),
+                                                            Text(
+                                                                movie
+                                                                    .voteAverage!
+                                                                    .toStringAsFixed(
+                                                                        1),
+                                                                style: TextStyle(
+                                                                    color: context
+                                                                        .colors
+                                                                        .warning,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w800,
+                                                                    fontSize:
+                                                                        13)),
+                                                          ]),
+                                                    ],
+                                                    const SizedBox(height: 6),
+                                                    Text(primaryReason,
+                                                        style: TextStyle(
+                                                            color: context
+                                                                .colors
+                                                                .warningTint,
+                                                            fontSize: 12,
+                                                            height: 1.3)),
+                                                  ])))),
+                                ]))),
+                Padding(
+                    key: const ValueKey('tablet-recommendation-actions'),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            alignment: WrapAlignment.spaceBetween,
+                            children: [
+                              ...actionButtons,
+                            ]))),
+              ])));
+    }
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -189,60 +301,10 @@ class PersonalizedRecommendationCard extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                         child: Row(
                           children: [
-                            _ActionButton(
-                              tooltip: isPreviouslyWatched
-                                  ? 'Log another watch'
-                                  : 'Mark watched',
-                              icon: isPreviouslyWatched
-                                  ? Icons.replay_circle_filled_rounded
-                                  : Icons.check_circle_outline_rounded,
-                              color: context.colors.success,
-                              borderColor: context.colors.success
-                                  .withValues(alpha: 0.38),
-                              backgroundColor: context.colors.success
-                                  .withValues(alpha: 0.10),
-                              onPressed: onMarkWatched,
-                            ),
-                            const SizedBox(width: 5),
-                            _ActionButton(
-                              tooltip: isBookmarked
-                                  ? 'Remove from watchlist'
-                                  : 'Add to watchlist',
-                              icon: isBookmarked
-                                  ? Icons.bookmark_rounded
-                                  : Icons.bookmark_outline_rounded,
-                              color: context.colors.warning,
-                              borderColor: context.colors.warning
-                                  .withValues(alpha: 0.38),
-                              backgroundColor: context.colors.warning
-                                  .withValues(alpha: 0.10),
-                              isBusy: isBookmarkUpdating,
-                              onPressed:
-                                  isBookmarkUpdating ? null : onBookmarkTap,
-                            ),
-                            const SizedBox(width: 5),
-                            _ActionButton(
-                              tooltip: 'Not interested',
-                              icon: Icons.visibility_off_outlined,
-                              color: context.colors.danger,
-                              borderColor:
-                                  context.colors.danger.withValues(alpha: 0.72),
-                              backgroundColor:
-                                  context.colors.danger.withValues(alpha: 0.08),
-                              animateBeforeAction: true,
-                              onPressed: onNotInterested,
-                            ),
-                            const SizedBox(width: 5),
-                            _ActionButton(
-                              tooltip: 'Movie details',
-                              icon: Icons.info_outline_rounded,
-                              color: const Color(0xFF64B5F6),
-                              borderColor: const Color(0xFF64B5F6)
-                                  .withValues(alpha: 0.38),
-                              backgroundColor: const Color(0xFF64B5F6)
-                                  .withValues(alpha: 0.10),
-                              onPressed: onTap,
-                            ),
+                            for (var i = 0; i < actionButtons.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 5),
+                              actionButtons[i],
+                            ],
                           ],
                         ),
                       ),
@@ -257,17 +319,68 @@ class PersonalizedRecommendationCard extends StatelessWidget {
     );
   }
 
+  List<Widget> _recommendationActions(BuildContext context,
+          {required bool tablet}) =>
+      [
+        _ActionButton(
+          label: tablet ? (isPreviouslyWatched ? 'Rewatch' : 'Watched') : null,
+          size: tablet ? 44 : 32,
+          tooltip: isPreviouslyWatched ? 'Log another watch' : 'Mark watched',
+          icon: isPreviouslyWatched
+              ? Icons.replay_circle_filled_rounded
+              : Icons.check_circle_outline_rounded,
+          color: context.colors.success,
+          borderColor: context.colors.success.withValues(alpha: 0.38),
+          backgroundColor: context.colors.success.withValues(alpha: 0.10),
+          onPressed: onMarkWatched,
+        ),
+        _ActionButton(
+          label: tablet ? (isBookmarked ? 'Saved' : 'Save') : null,
+          size: tablet ? 44 : 32,
+          tooltip: isBookmarked ? 'Remove from watchlist' : 'Add to watchlist',
+          icon: isBookmarked
+              ? Icons.bookmark_rounded
+              : Icons.bookmark_outline_rounded,
+          color: context.colors.warning,
+          borderColor: context.colors.warning.withValues(alpha: 0.38),
+          backgroundColor: context.colors.warning.withValues(alpha: 0.10),
+          isBusy: isBookmarkUpdating,
+          onPressed: isBookmarkUpdating ? null : onBookmarkTap,
+        ),
+        _ActionButton(
+          label: tablet ? 'Hide' : null,
+          size: tablet ? 44 : 32,
+          tooltip: 'Not interested',
+          icon: Icons.visibility_off_outlined,
+          color: context.colors.danger,
+          borderColor: context.colors.danger.withValues(alpha: 0.72),
+          backgroundColor: context.colors.danger.withValues(alpha: 0.08),
+          animateBeforeAction: true,
+          onPressed: onNotInterested,
+        ),
+        _ActionButton(
+          label: tablet ? 'Details' : null,
+          size: tablet ? 44 : 32,
+          tooltip: 'Movie details',
+          icon: Icons.info_outline_rounded,
+          color: const Color(0xFF64B5F6),
+          borderColor: const Color(0xFF64B5F6).withValues(alpha: 0.38),
+          backgroundColor: const Color(0xFF64B5F6).withValues(alpha: 0.10),
+          onPressed: onTap,
+        ),
+      ];
+
   String get _metadata {
     final year = DateTime.tryParse(movie.releaseDate ?? '')?.year;
     return [if (year != null) '$year', 'Movie'].join(' · ');
   }
 
-  Widget _poster(BuildContext context) {
+  Widget _poster(BuildContext context, {BoxFit fit = BoxFit.cover}) {
     final url = homeRecommendationImageUrl(movie.poster);
     if (url == null) return _fallbackPoster(context);
     return CachedNetworkImage(
       imageUrl: url,
-      fit: BoxFit.cover,
+      fit: fit,
       errorWidget: (_, __, ___) => _fallbackPoster(context),
     );
   }
@@ -290,8 +403,12 @@ class _ActionButton extends StatefulWidget {
     this.backgroundColor,
     this.animateBeforeAction = false,
     this.isBusy = false,
+    this.size = 32,
+    this.label,
   });
 
+  final String? label;
+  final double size;
   final String tooltip;
   final IconData icon;
   final Color color;
@@ -380,44 +497,68 @@ class _ActionButtonState extends State<_ActionButton>
       message: widget.tooltip,
       child: ScaleTransition(
         scale: _tapScale,
-        child: IconButton(
-          onPressed: widget.onPressed == null ? null : _handlePressed,
-          icon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 280),
-            switchInCurve: Curves.easeOutBack,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) => RotationTransition(
-              turns: Tween<double>(begin: -0.08, end: 0).animate(animation),
-              child: ScaleTransition(scale: animation, child: child),
-            ),
-            child: RotationTransition(
-              key: ValueKey(widget.icon),
-              turns: widget.isBusy
-                  ? _busyController
-                  : const AlwaysStoppedAnimation<double>(0),
-              child: Icon(
-                widget.icon,
-                size: 19,
+        child: widget.label != null
+            ? TextButton(
+                onPressed: widget.onPressed == null ? null : _handlePressed,
+                style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    foregroundColor: widget.color,
+                    disabledForegroundColor: widget.color,
+                    textStyle: const TextStyle(
+                        fontFamily: 'Manrope',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  RotationTransition(
+                      turns: widget.isBusy
+                          ? _busyController
+                          : const AlwaysStoppedAnimation<double>(0),
+                      child: Icon(widget.icon, size: 17)),
+                  const SizedBox(width: 4),
+                  Text(widget.label!),
+                ]))
+            : IconButton(
+                onPressed: widget.onPressed == null ? null : _handlePressed,
+                icon: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeIn,
+                  transitionBuilder: (child, animation) => RotationTransition(
+                    turns:
+                        Tween<double>(begin: -0.08, end: 0).animate(animation),
+                    child: ScaleTransition(scale: animation, child: child),
+                  ),
+                  child: RotationTransition(
+                    key: ValueKey(widget.icon),
+                    turns: widget.isBusy
+                        ? _busyController
+                        : const AlwaysStoppedAnimation<double>(0),
+                    child: Icon(
+                      widget.icon,
+                      size: 19,
+                    ),
+                  ),
+                ),
+                color: widget.color,
+                // Keep the selected icon legible while its optimistic update is
+                // being confirmed by the API.
+                disabledColor: widget.color,
+                padding: EdgeInsets.zero,
+                constraints: BoxConstraints.tightFor(
+                    width: widget.size, height: widget.size),
+                style: IconButton.styleFrom(
+                  backgroundColor: widget.backgroundColor ??
+                      context.colors.navy.withValues(alpha: 0.56),
+                  side: BorderSide(
+                    color: widget.borderColor ??
+                        Colors.white.withValues(alpha: 0.08),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
-            ),
-          ),
-          color: widget.color,
-          // Keep the selected icon legible while its optimistic update is
-          // being confirmed by the API.
-          disabledColor: widget.color,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-          style: IconButton.styleFrom(
-            backgroundColor: widget.backgroundColor ??
-                context.colors.navy.withValues(alpha: 0.56),
-            side: BorderSide(
-              color: widget.borderColor ?? Colors.white.withValues(alpha: 0.08),
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
       ),
     );
   }

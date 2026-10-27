@@ -258,6 +258,7 @@ void main() {
     expect(selected?.type, HomeWatchPlanStateType.waitingForLogs);
     expect(selected?.colorRole, WatchPlanColorRole.waiting);
     expect(selected?.title, 'Waiting for @Jamie');
+    expect(selected?.actionLabel, 'View recap');
   });
 
   test('my early logged watch waits for the other person', () {

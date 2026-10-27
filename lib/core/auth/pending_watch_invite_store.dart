@@ -1,7 +1,24 @@
+import 'referral_attribution_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Retains a single watch link through authentication, setup and app restarts.
 class PendingWatchInviteStore {
+  static const _referralKey = 'watch_invite_applied_referral_v1';
+  static Future<void> referralConsent(String? code, bool connect) async {
+    final prefs = await SharedPreferences.getInstance();
+    final store = SharedPreferencesReferralAttributionStore();
+    final existing = await store.read();
+    if (connect && code != null && existing == null) {
+      await store.save(code);
+      await prefs.setString(_referralKey, code);
+    } else if (!connect &&
+        prefs.getString(_referralKey) == existing &&
+        existing != null) {
+      await store.clear();
+      await prefs.remove(_referralKey);
+    }
+  }
+
   static const _key = 'pending_watch_invite_v1';
   static const _intentKey = 'pending_watch_invite_ready_v1';
   static const _logKey = 'pending_watch_invite_log_v1';
@@ -44,6 +61,7 @@ class PendingWatchInviteStore {
   }
 
   static Future<void> clear() async {
+    await referralConsent(null, false);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
     await prefs.remove(_intentKey);

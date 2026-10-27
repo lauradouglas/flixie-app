@@ -414,7 +414,7 @@ class _WatchRestSheetState extends State<_WatchRestSheet> {
         ..clear()
         ..addAll(failed);
       _error =
-          'Some films couldn’t be added. Your saved films are safe—try the remaining ones again.';
+          'Some films couldn’t be added. Your saved films are safe-try the remaining ones again.';
     });
   }
 

@@ -286,8 +286,30 @@ void main() {
         isTrue);
     expect(body?['firstName'], 'Film Fan');
     expect(body?['lastName'], '');
+    expect(body?['communitySharing'], true);
     expect(authService.submittedDisplayName, 'Film Fan');
     expect(provider.dbUser?.firstName, 'Film Fan');
+  });
+
+  test('avatar signup preserves explicit Around Flixie opt-out', () async {
+    Map<String, dynamic>? saved;
+    final provider = AuthProvider(authService, MovieService(),
+        prefetchAfterAuth: false, profileCreator: (body) async {
+      saved = Map<String, dynamic>.from(body);
+      return _createdUser();
+    });
+    addTearDown(provider.dispose);
+    expect(
+        await provider.beginAvatarSignUp(
+            termsAccepted: true,
+            communitySharing: false,
+            email: 'viewer@example.com',
+            password: 'Password1!',
+            firstName: 'Casey',
+            lastName: '',
+            username: 'casey_fixture'),
+        true);
+    expect(saved?['communitySharing'], false);
   });
 
   test('signup forwards a normalized referral code', () async {

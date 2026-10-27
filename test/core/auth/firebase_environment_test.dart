@@ -4,7 +4,7 @@ import 'package:flixie_app/core/auth/firebase_environment.dart';
 void main() {
   test('local native options use a valid-format dummy key and demo resources',
       () {
-    final options = FirebaseEnvironment.localOptions;
+    const options = FirebaseEnvironment.localOptions;
     expect(options.apiKey, matches(RegExp(r'^AIza[A-Za-z0-9_-]{35}$')));
     expect(options.projectId, 'demo-flixie-local');
     expect(options.storageBucket, 'demo-flixie-local.appspot.com');

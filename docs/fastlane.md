@@ -72,13 +72,15 @@ This tooling does not retire support for iOS 1.0.0 build 70.
 ## Store screenshots
 
 The screenshot lanes capture these eight screens, in order: Home, Alex River's
-profile, Watchlist, an Alien Watch Plan with Jamie, the Drama community,
+film diary, Watchlist, an Alien Watch Plan with Jamie, the Drama community,
 Interstellar (movie 157336), The Newsroom (show 15621), and the rating sheet.
 They use the production screens, theme and main navigation with fictional
 test-only accounts and isolated API responses. Firebase login and the live
 backend are not started. Public TMDB artwork needs internet access. The fixture
 copy is English (en-GB), dark mode. The capture app uses the same purple
-root backdrop as production so transparent routes do not render black. Shared
+root backdrop as production so transparent routes do not render black. The
+current blue-purple root colour is `#151522`; diary viewings are solo fictional
+entries with ratings and personal notes. Shared
 fictional friend ratings populate Home, Watchlist and movie details consistently.
 The Alien plan is scheduled three days ahead at 19:30. Provider offers are
 illustrative UK purchase data, not a live availability check.
@@ -129,7 +131,10 @@ Android uses the existing dedicated **Flixie_Patrol** AVD; change `android.avd`
 to another dedicated AVD if needed. Android requires SDK platform-tools (`adb`
 on PATH), the pinned Patrol CLI, and the JDK/SDK described in `docs/testing.md`.
 The capture lane clears Fastlane’s Bundler environment for the SDK subprocess
-so Flutter can use the separately installed CocoaPods.
+so Flutter can use the separately installed CocoaPods. Android screenshot runs
+select `com.flixie.app.MainActivityTest` through the Gradle instrumentation class
+argument; standalone widget and auth-persistence tests retain their own runners
+and prerequisites and are not part of screenshot capture.
 Capture devices must be named **Flixie Screenshots…** / **Flixie Patrol** on iOS,
 or **Flixie_Screenshots…** / **Flixie_Patrol…** on Android: Patrol reinstalls the
 app. The runner serializes concurrent capture commands because Patrol generates
@@ -178,9 +183,8 @@ bundle exec fastlane android prepare_screenshots
 ```
 
 Inspect `fastlane/store-presentation/review.html` and the full-resolution PNGs in
-`fastlane/store-presentation/en-GB/`. The upload order is Home → friends’ movie
-ratings → Watchlist → Watch Plan → personal rating → TV progress → Community →
-Profile. Android uses the same order with its native captures. Its movie-detail
+`fastlane/store-presentation/en-GB/`. The upload order is Home → Film diary → title availability → Community →
+Watch Plan → Watchlist → personal rating → TV progress. Android uses the same order with its native captures. Its movie-detail
 headline highlights where to watch, since friends’ ratings sit below the
 fold on that display. Android files are generated
 under `fastlane/store-presentation-android/en-GB/images/phoneScreenshots/`, with
@@ -786,3 +790,140 @@ Apple accepted132 at11:48 London, completed processing/internal distribution at
 11:54, tester notes attached. Artifacts/logs/readback under
 build/releases/ios/2.0.6-132/. No backend deployment, App Review, Android upload or
 Slack messages. Optional new referral-resolver endpoint remains undeployed.
+
+## Guest Home and profile TestFlight 2.0.6 (133) — 25 October 2026
+
+User authorised TestFlight deployment of the current app for phone review. Built with production main/Firebase/HTTPS API; source hashes matched after archiving and signed release entitlements validated. Includes current profile/taste/diary work, guest Home hierarchy, visible header signup, films-only Home Trending, local guest picks and sustained-use app-review timing. Production lib analysis, release guard and 20 release harness tests/112 assertions passed. Focused guest/native checks passed in preceding implementation; the existing signed-in Home friend-fetch expectation failure was documented and reproduced with the previous endpoint. Full regression was not requested or run.
+
+Apple accepted the upload at 16:17:55 London, completed processing at 16:22:59 and distributed internally at 16:23:01. Independent App Store Connect read confirms build da211411-2683-40cf-8d92-74c83a35907d, VALID / IN_BETA_TESTING. Retained IPA, SHA-256/source manifest, tester notes and logs: build/releases/ios/2.0.6-133/. No App Review submission, Android upload, backend deployment or Slack messages.
+
+
+## Guest diary, referrals and Pip TestFlight 2.0.6 (134) — 25 October 2026
+
+Release in progress with explicit user approval for the production backend and
+legacy referral conversion. Isolated backend commit
+`4d081dceec9e7c738dea31ae52661afd0114cfe2` adds profile highlights, server-owned
+Pip collection and backwards-compatible short referral codes. Backend local CI:
+761 tests passed; exact release source also passed the real two-person local
+PostgreSQL/HTTP referral journey. Deployment workflow 40239501655 takes a private
+database backup, applies four additive migrations and waits for the alias-aware
+API before converting codes and checking old-link resolution. Production outcome
+is recorded below after verification.
+
+Signed IPA 2.0.6 (134) includes guest diary/signup continuation, external-person
+logging, referral visibility with capped saved-film prompts, Cinema Club Pip,
+Pip peeks in, signup sharing/availability choices and final status-coloured
+Watch together cards with partial recap navigation. App `lib` analysis and release
+guards pass; release harness: 20 tests/111 assertions. Source manifest matches
+the signed archive inputs. Production signing entitlements pass and PipPeeksIn is
+declared for iPhone and iPad. SHA-256:
+`60c58534c1052a9843300a8cddb4aba71fb9658d20089db2fa7816cd3b0ebeaf`.
+
+Artifacts, source hashes, tester notes and logs are retained under
+`build/releases/ios/2.0.6-134/`. Physical-device signup/link handling, icon changes
+and push delivery remain on `docs/testing/pip-testflight-checklist.md`. No App
+Review submission, Android release or Slack messages are authorised here.
+
+Apple accepted the binary at 22:20 London and finished processing at 22:25.
+Independent App Store Connect readback confirms build
+`e2d9b7d5-999d-4372-8425-577c2e1a8892`: VALID / IN_BETA_TESTING, with en-GB tester
+notes attached. Backend deployment verification remains pending below.
+
+Backend workflow 40239501655 completed successfully at 22:29 London: 761 tests
+passed, private pre-migration backup retained, all four additive migrations
+applied, API deployed, 45 long referral codes shortened with legacy aliases
+preserved. The conversion verified stored aliases for every converted account
+and publicly resolved the first three old links to their new canonical codes.
+Independent live readback confirms health 200, alias-aware resolver's expected
+INVALID_REFERRAL_CODE response for a nonexistent code, and protected Pip route
+401 without authentication. No production fixtures were created. Authenticated
+phone/reward checks remain in the tester checklist.
+
+
+## Header alignment TestFlight 2.0.6 (135) — 25 October 2026
+
+User requested a TestFlight update for Pip's optical vertical centring beside
+the Home wordmark. The 28px artwork and 48px target are retained. Focused analysis
+passes; hot reload succeeded without runtime errors. Release guard and 20 release
+harness tests/111 assertions pass. Source hashes matched the signed archive inputs
+and production signing entitlements validate as 2.0.6 (135).
+
+Apple accepted the upload at 22:43:30 London. At 22:58 the upload API still reports
+PROCESSING with no errors or warnings (upload 7405e88b-818e-4b86-b5e2-8a0a3d3f1111).
+Internal availability is not confirmed yet. The existing Fastlane process remains
+running to attach tester notes when the build appears. Artifacts and status logs
+are retained under build/releases/ios/2.0.6-135/. No backend changes or redeployment
+were needed for this visual fix.
+
+
+## Signup and guest Watchlist TestFlight 2.0.6 (136) — 26 October 2026
+
+User requested TestFlight deployment of the current app. Signed production
+main/Firebase/HTTPS API IPA validated as 2.0.6 (136); source hashes remained
+unchanged across the archive. Production lib analysis, 20 focused setup/onboarding/guest
+Watchlist tests, iOS release guard and 20 release harness tests/112 assertions pass.
+Full regression and Patrol were not run for this upload.
+
+Apple accepted the upload at 10:32:46 London, finished processing at 10:37:23
+and distributed internally at 10:37:24. Independent App Store Connect readback
+confirms build `167bc7c2-69ff-496c-a8b9-e95990e414f0` is VALID / IN_BETA_TESTING,
+with tester notes attached. Artifacts, source manifest, tester notes and logs
+are retained under `build/releases/ios/2.0.6-136/`. No App Review submission,
+backend deployment, Android upload or Slack messages were performed.
+
+## Rating share cards TestFlight 2.0.6 (137) — 26 October 2026
+
+User authorised TestFlight. Built the current working tree with production
+main/Firebase/HTTPS API. Includes redesigned rating cards, colour/Pip options,
+Quick share with referral clipboard and Photos actions, and quieter automatic
+session recovery. Production lib analysis clean; 65 focused sharing/auth tests,
+iOS release guards and 20 release harness tests/112 assertions passed. Source
+hashes remained unchanged during archive and production signing validated.
+Apple accepted the upload at 14:39 London and finished processing at 14:44.
+Independent readback confirms build `50f72c0c-a2a4-4cca-8528-945fc0f7979b` is
+VALID / IN_BETA_TESTING. Tester notes attached. Evidence and signed IPA retained
+in `build/releases/ios/2.0.6-137/`. No App Review, backend or Android deployment;
+Slack notifications suppressed. Instagram Link sticker insertion remains manual.
+
+## Charcoal dark-mode TestFlight 2.0.6 (138) — 26 October 2026
+
+User authorised the dark-mode trial for TestFlight. Only app_theme.dart differs
+from build137's source manifest. Production analysis clean; all15 focused brand/
+contrast tests, release guard and20 release harness tests/112 assertions passed.
+The earlier broader appearance run has a missing AuthProvider fixture failure;
+no assertions were weakened. Signed release entitlements validated; source hashes
+unchanged across archive. IPA and evidence retained at build/releases/ios/2.0.6-138/.
+Apple accepted the upload at15:34:58 London. At15:42 it remains pending processing
+and is not yet in the builds list; internal TestFlight availability is unconfirmed.
+Fastlane remains running to attach the supplied tester notes when it appears.
+No App Review, backend or Android deployment; Slack notifications suppressed.
+
+
+## Blue-purple release and diary store screenshots — 26 October 2026
+
+User explicitly requests updated Apple/Android store screenshots, TestFlight upload and App Review submission of the current blue-purple local build. Build 138 is the earlier charcoal trial; 139 is being archived from the current source. Screenshot preparation replaces the generic profile slide with the production film diary, shown second, within each eight-image set. Solo fictional watches illustrate ratings and personal notes. Presentation backdrop matches production `#151522`. Capture, upload and review outcomes will be recorded after verification.
+
+
+Build 139 archive completed at 16:38 London. Signed production entitlements and unchanged source hashes verified; production Dart analysis clean. Focused appearance/screenshot checks: 16 passed; Watch Plan checks: 41 passed; release harness: 20 tests/112 assertions; release guard passed. Apple accepted the TestFlight binary at 16:41:18; processing/internal distribution still pending. The screenshot-only fixture needed updated library hydration and current TMDB-score fields. Native inspection found stale LiveTest overlay text at the top edge; the capture harness now repaints views after clearing the label, with corrected captures queued. No full regression run or Slack messages.
+
+Apple finished processing build 139 at 16:47:30 and distributed internally at
+16:47:31. Independent readback confirms `0e6198bb-0f9b-4df8-80f1-b3e3aeb0c0cc`,
+VALID / IN_BETA_TESTING, with tester notes attached. This supersedes the pending
+processing status above. Store listing screenshot refresh/submission remains in progress.
+
+
+Apple screenshot upload completed at 17:05 London. All 32 en-GB/en-US iPhone/iPad images independently match local MD5 checksums and configured order, with diary second. Submitted 2.0.6 (139) at 17:07:19. Independent API read confirms version and review `11def773-6136-4cba-931e-2b5fb57f14cc` are WAITING_FOR_REVIEW, attached build `0e6198bb-0f9b-4df8-80f1-b3e3aeb0c0cc` is VALID, and the existing AFTER_APPROVAL release policy is preserved. Evidence: `build/releases/ios/2.0.6-139/app-review-state.json` and `build/store-screenshots/blue-purple-2026-10-26/apple-verification.json`.
+
+Android initial screenshot instrumentation accidentally included standalone AuthSessionPersistenceTest (requires its own local auth emulator) and widget tests before stalling. Capture now passes the Gradle MainActivityTest class filter only; 12 capture-runner and 19 presentation checks pass, including the subprocess environment regression. The focused phone recapture passes after a cold restart; tablet capture and UK/US Play listing update remain in progress.
+
+
+## Password and review timing release 2.0.6 (140) — 26 October 2026
+
+User authorised replacing the pending Apple submission and submitting Google Play. Source differs from Apple 139 only in auth_ui.dart (hyphens accepted), app_review_policy.dart (48 hours/two days/three distinct actions), and app_review_idle_gate.dart (four seconds idle). The 120-day cooldown remains. Production lib analysis, 19 focused password/review tests, release guard and 20 release harness tests/112 assertions pass. Signed builds/uploads are in progress; final store states will be recorded after verification. Existing Apple AFTER_APPROVAL policy and store screenshots are preserved. Slack notifications suppressed.
+
+Google accepted the Android upload at 17:38 London. Independent API readback confirms production version 2.0.6, code 140, status completed. Signed bundle, checksum and matching source manifest retained in build/releases/android/2.0.6-140/. Apple accepted the binary at 17:36:42; processing and replacement submission remain pending.
+
+
+Android native focused captures passed for phone (1080×1920), 7-inch (900×1600) and 10-inch (1440×2560). All 24 framed sources pass source-hash/dimension validation; identical UK and US copies retained. Google Play editor verified all 48 placements in configured order with diary second, and both localized names/descriptions unchanged. Saved and submitted six screenshot-category changes (three categories × en-GB/en-US). Google required restarting the already pending Android 2.0.6 production review to include them; final Publishing overview shows all six screenshot changes alongside that release under **Changes in review**, with automatic quick checks still running. This task did not build or upload the existing Android production bundle. Managed publishing remains off. The 24 new screenshot assets are labeled for existing AI-generated Pip artwork; the unchanged app icon/feature graphic labels were left alone. Google server checksums were not available through this UI workflow; local hashes, source dimensions and Console content/order were verified. Evidence: `build/store-screenshots/blue-purple-2026-10-26/google-final-verification.json`, `google-review-dom.txt` and `google-review.jpg`. Dedicated screenshot simulators/emulator shut down after capture. No Slack messages or backend deployment.
+
+Apple finished processing at 17:42:19 London and distributed build 140 internally at 17:42:20. Cancelled build 139's pending submission, selected 140 and successfully resubmitted at 17:44:11. Independent API readback confirms version 2.0.6 WAITING_FOR_REVIEW, attached build c9410ddb-7ce3-4317-a67e-e92c84fbf6bb / 140 VALID, release type AFTER_APPROVAL. Evidence, IPA and source/checksum manifests: build/releases/ios/2.0.6-140/. Both requested store submissions are complete; store approval/public availability is not asserted. No backend deployment or Slack messages.

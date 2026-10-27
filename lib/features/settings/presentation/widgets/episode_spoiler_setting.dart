@@ -1,3 +1,4 @@
+import 'package:flixie_app/core/widgets/preference_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import '../../data/episode_spoiler_preference.dart';
@@ -35,18 +36,29 @@ class EpisodeSpoilerSettingState extends State<EpisodeSpoilerSetting> {
   @override
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: preference,
-        builder: (context, _) => SettingsTile(
-          icon: Icons.visibility_off_outlined,
-          label: 'Hide episode spoilers',
-          description:
-              'Hide titles, images and descriptions for episodes you haven’t watched.',
-          onTap: () {
-            if (!preference.saving) _change(!preference.hide);
-          },
-          trailing: Switch.adaptive(
-            value: preference.hide,
-            onChanged: preference.saving ? null : _change,
+        builder: (context, _) =>
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SettingsTile(
+            icon: Icons.visibility_off_outlined,
+            label: 'Hide episode spoilers',
+            description:
+                'Hide titles, images and descriptions for episodes you haven’t watched.',
+            onTap: () {
+              if (preference.loaded && !preference.saving) {
+                _change(!preference.hide);
+              }
+            },
+            trailing: PreferenceSwitch(
+              loading: !preference.loadFailed,
+              value: preference.loaded ? preference.hide : null,
+              onChanged:
+                  !preference.loaded || preference.saving ? null : _change,
+            ),
           ),
-        ),
+          if (preference.loadFailed)
+            TextButton(
+                onPressed: () => preference.load().catchError((Object _) {}),
+                child: const Text('Retry spoiler preference')),
+        ]),
       );
 }

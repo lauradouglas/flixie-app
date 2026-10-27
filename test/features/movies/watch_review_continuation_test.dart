@@ -59,7 +59,7 @@ void main() {
     await tap(tester, '8');
     await tap(tester, 'Recommend');
     await tester.enterText(
-        find.widgetWithText(TextField, 'Watch comment (optional)'),
+        find.widgetWithText(TextField, 'Diary note (optional)'),
         'Cinema night with Robin');
     await tap(tester, 'Write a review next');
     expect(find.byType(WriteReviewSheet), findsNothing);

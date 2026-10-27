@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/home/presentation/widgets/home_tablet_layout.dart';
+import 'package:flixie_app/features/home/presentation/widgets/cinema_list.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,6 +76,69 @@ void main() {
     expect(find.text('No cinema releases available for this region right now.'),
         findsOneWidget);
     expect(find.text('Alien'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+      'tablet See all opens bounded cinema sheet with live save and detail actions',
+      (tester) async {
+    tester.view.physicalSize = const Size(1100, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final membership = ValueNotifier<Set<int>>({});
+    addTearDown(membership.dispose);
+    var countryChanges = 0;
+    final opened = <int>[], saved = <int>[];
+    final movies = List.generate(
+        8, (i) => MovieShort(id: i, name: 'Cinema $i', voteAverage: 8));
+    await tester.pumpWidget(host(HomeTabletScope(
+        child: ValueListenableBuilder<Set<int>>(
+            valueListenable: membership,
+            builder: (_, ids, __) => InCinemasSection(
+                  region: 'GB',
+                  onChangeCountry: () async {
+                    countryChanges++;
+                  },
+                  loader: (_) async => movies,
+                  watchlistChanges: membership,
+                  savedIds: ids,
+                  mediaBuilder: (data) => CinemaList(
+                      movies: data,
+                      onDetails: (_) {},
+                      onSave: (_) {},
+                      onTrailer: (_) {}),
+                  onDetails: (m) => opened.add(m.id),
+                  onTrailer: (_) {},
+                  onSave: (m) {
+                    saved.add(m.id);
+                    membership.value = {...membership.value, m.id};
+                  },
+                )))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('UK theatres'));
+    await tester.pumpAndSettle();
+    expect(countryChanges, 1);
+    await tester.tap(find.text('See all'));
+    await tester.pumpAndSettle();
+    final sheet = find.byType(BottomSheet);
+    expect(sheet, findsOneWidget);
+    expect(tester.getSize(sheet).height, lessThan(900));
+    expect(find.descendant(of: sheet, matching: find.text('Cinema 7')),
+        findsOneWidget);
+    final firstSave =
+        find.descendant(of: sheet, matching: find.byTooltip('Watchlist')).first;
+    await tester.tap(firstSave);
+    await tester.pumpAndSettle();
+    expect(saved, [0]);
+    expect(
+        find.descendant(
+            of: sheet, matching: find.byTooltip('Remove from watchlist')),
+        findsOneWidget);
+    await tester
+        .tap(find.descendant(of: sheet, matching: find.text('Cinema 0')));
+    await tester.pumpAndSettle();
+    expect(opened, [0]);
+    expect(find.byType(BottomSheet), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

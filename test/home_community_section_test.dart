@@ -121,4 +121,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Explore Around Flixie'), findsOneWidget);
   });
+  testWidgets('tablet activity preview requests and displays five posts',
+      (tester) async {
+    final service = HomeFeedFixture();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: HomeCommunitySection(
+                    userId: 'viewer', service: service, previewLimit: 5)))));
+    await tester.pumpAndSettle();
+    expect(service.lastLimit, 5);
+    expect(find.byType(ActivityTile), findsNWidgets(5));
+    expect(tester.takeException(), isNull);
+  });
 }

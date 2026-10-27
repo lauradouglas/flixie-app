@@ -5,7 +5,7 @@ import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/features/guest/presentation/guest_access.dart';
 import 'package:flixie_app/features/guest/presentation/guest_home_screen.dart';
 import 'package:flixie_app/features/guest/presentation/pages/why_flixie_screen.dart';
-import 'package:flixie_app/features/guest/presentation/widgets/guest_home_welcome.dart';
+import 'package:flixie_app/features/guest/presentation/widgets/guest_diary_teaser.dart';
 import 'package:flixie_app/features/guest/presentation/widgets/why_flixie_button.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/features/profile/presentation/widgets/profile_badges.dart';
@@ -16,7 +16,7 @@ GoRouter _router(String initialLocation) => GoRouter(
         GoRoute(
             path: '/',
             builder: (_, __) => const Scaffold(
-                body: SingleChildScrollView(child: GuestHomeWelcome()))),
+                body: SingleChildScrollView(child: GuestDiaryTeaser()))),
         GoRoute(
             path: '/welcome', builder: (_, __) => const GuestWelcomeScreen()),
         GoRoute(
@@ -61,7 +61,8 @@ void main() {
   });
 
   for (final path in ['/welcome', '/', '/profile']) {
-    testWidgets('$path offers tour only after an explicit tap; system Back returns',
+    testWidgets(
+        '$path offers tour only after an explicit tap; system Back returns',
         (tester) async {
       final router = _router(path);
       GuestAccess.destination = '/movies/348';
@@ -81,7 +82,7 @@ void main() {
       router.pop();
       await tester.pumpAndSettle();
       expect(router.routeInformationProvider.value.uri.path, path);
-      expect(find.byType(WhyFlixieButton), findsOneWidget);
+      expect(find.text(WhyFlixieButton.label), findsOneWidget);
       expect(GuestAccess.destination, '/movies/348');
       expect(GuestAccess.action, 'watchlist');
     });
@@ -145,6 +146,8 @@ void main() {
     expect(find.text('Find a film.\nBring your people.'), findsOneWidget);
     await _tap(tester, 'Create account');
     expect(find.text('Signup destination'), findsOneWidget);
+    expect(GuestAccess.action, 'home');
+    expect(GuestAccess.awaitingAccount, isTrue);
     router.pop();
     await tester.pumpAndSettle();
     expect(find.text('Find a film.\nBring your people.'), findsOneWidget);
@@ -153,8 +156,7 @@ void main() {
     expect(GuestAccess.destination, isNull);
   });
 
-  testWidgets(
-      'Explore and Skip exit the tour without app navigation chrome',
+  testWidgets('Explore and Skip exit the tour without app navigation chrome',
       (tester) async {
     final router = _router('/why-flixie');
     await _mount(tester, router);

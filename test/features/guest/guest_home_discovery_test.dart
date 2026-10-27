@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -14,6 +15,7 @@ import 'package:flixie_app/features/guest/presentation/widgets/guest_home_welcom
 import '../../support/api_fixture.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   setUpAll(() async {
     for (final family in ['Manrope', 'Roboto', '.SF Pro Display']) {
       await (FontLoader(family)
@@ -88,7 +90,8 @@ void main() {
           const AssetImage('assets/icon/community_pips/pip-flixie-hoodie.png'),
           tester.element(find.byType(GuestHomeWelcome))));
       await tester.pump();
-      expect(find.text('Create account').hitTestable(), findsNothing);
+      expect(find.text('Keep my picks across devices').hitTestable(),
+          findsNothing);
       expect(tester.takeException(), isNull);
       // Capture the phone/tablet opening viewport when explicitly requested.
       if (Platform.environment['GUEST_HOME_CAPTURE'] == '1') {
@@ -104,11 +107,13 @@ void main() {
       }
       await tester.scrollUntilVisible(find.text('In cinemas'), 300,
           scrollable: find.byType(Scrollable).first);
-      expect(find.text('Make it yours.').hitTestable(), findsNothing);
-      await tester.scrollUntilVisible(find.text('Create account'), 300,
+      expect(find.text('Your picks, wherever you sign in.').hitTestable(),
+          findsNothing);
+      await tester.scrollUntilVisible(
+          find.text('Keep my picks across devices'), 300,
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Create account'));
+      await tester.tap(find.text('Keep my picks across devices'));
       await tester.pumpAndSettle();
       expect(find.text('Signup destination'), findsOneWidget);
       expect(tester.takeException(), isNull);

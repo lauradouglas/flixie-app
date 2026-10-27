@@ -24,7 +24,7 @@ const Set<String> _unsupportedGenreNames = {
 };
 final _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 final _firebaseSpecialCharacterPattern =
-    RegExp(r'''[\^\$\*\.\[\]\{\}\(\)\?"!@#%&/\\,><':;\|_~]''');
+    RegExp(r'''[\^\$\*\.\[\]\{\}\(\)\?"!@#%&/\\,><':;\|_~-]''');
 
 String? validateFirebasePassword(String? value) {
   final password = value ?? '';

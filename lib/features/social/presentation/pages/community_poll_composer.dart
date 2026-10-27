@@ -178,7 +178,7 @@ class _CommunityPollComposerState extends State<CommunityPollComposer> {
                                     leading: const Icon(Icons.schedule),
                                     title: const Text('Closing time'),
                                     subtitle: Text(_closesAt == null
-                                        ? 'No deadline — close whenever you like'
+                                        ? 'No deadline - close whenever you like'
                                         : '${MaterialLocalizations.of(context).formatFullDate(_closesAt!)} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(_closesAt!))}'),
                                     onTap: _sending ? null : _chooseDeadline),
                                 if (_closesAt != null)

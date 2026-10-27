@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/referrals/presentation/social_invite_empty_state.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import '../widgets/people_directory.dart';
@@ -119,6 +120,10 @@ class _SocialPeopleViewState extends State<SocialPeopleView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (friends.isEmpty &&
+                (data?.pendingFriends.isEmpty ?? true) &&
+                (data?.requestedFriends.isEmpty ?? true))
+              const SocialInviteEmptyState(),
             PeopleDirectory(
               active: widget.active,
               userId: context.read<AuthProvider>().dbUser?.id ?? '',

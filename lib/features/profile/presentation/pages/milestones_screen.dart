@@ -220,7 +220,7 @@ class _MilestonesContentState extends State<MilestonesContent> {
                   padding: const EdgeInsets.symmetric(vertical: 32),
                   child: Text(
                       data.owner
-                          ? 'No milestones here yet. Keep enjoying your films and shows—there’s no rush.'
+                          ? 'No milestones here yet. Keep enjoying your films and shows-there’s no rush.'
                           : 'No earned milestones to show yet.',
                       style: TextStyle(color: context.colors.light))),
             for (final group in groups)

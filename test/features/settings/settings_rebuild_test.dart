@@ -33,6 +33,10 @@ void main() {
         child: MaterialApp(
             theme: AppTheme.darkTheme, home: const SettingsScreen())));
     await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.text('Personalisation')).dy,
+        lessThan(tester.getTopLeft(find.text('Account')).dy));
+    expect(find.text('My Pip'), findsOneWidget);
+    expect(find.text('Sign-in methods'), findsNothing);
     final target = find.byWidgetPredicate(
         (widget) => widget is SettingsTile && widget.label == 'Edit details');
     final original = tester.widget(target);

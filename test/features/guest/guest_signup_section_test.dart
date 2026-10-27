@@ -27,10 +27,13 @@ void main() {
                               onSignup: () => signup++,
                               onSignin: () => signin++)))))));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.text('Make it yours.'), findsOneWidget);
-      expect(find.text('Log watches and rate favourites'), findsOneWidget);
-      await tester.ensureVisible(find.text('Create account'));
-      await tester.tap(find.text('Create account'));
+      expect(find.text('Your picks, wherever you sign in.'), findsOneWidget);
+      expect(
+          find.text(
+              'Your watchlist works here already. An account keeps it across devices and gives your ratings and diary a home.'),
+          findsOneWidget);
+      await tester.ensureVisible(find.text('Keep my picks across devices'));
+      await tester.tap(find.text('Keep my picks across devices'));
       expect(signup, 1);
       await tester.ensureVisible(find.text('Already a member? Sign in'));
       await tester.tap(find.text('Already a member? Sign in'));
