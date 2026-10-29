@@ -357,7 +357,7 @@ class GenreReviewCard extends StatelessWidget {
         const SizedBox(height: 10),
         Text(review!.body,
             style: TextStyle(
-                fontSize: 15, height: 1.6, color: context.colors.light)),
+                fontSize: 14, height: 1.6, color: context.colors.light)),
       ],
       if (rating != null && !hideAverage) ...[
         const SizedBox(height: 16),

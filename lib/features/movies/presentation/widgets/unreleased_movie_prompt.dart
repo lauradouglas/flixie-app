@@ -41,11 +41,11 @@ class UnreleasedMoviePrompt extends StatelessWidget {
           Text(
               'Our release information says ${title?.trim().isNotEmpty == true ? title : 'this film'} hasn’t been released yet. Seen an early screening? You can still log your watch.',
               style: TextStyle(
-                  color: context.colors.light, fontSize: 16, height: 1.5)),
+                  color: context.colors.light, fontSize: 14, height: 1.5)),
           const SizedBox(height: 16),
           Text('Do you want to continue?',
               style: TextStyle(
-                  color: context.colors.light, fontSize: 16, height: 1.5)),
+                  color: context.colors.light, fontSize: 14, height: 1.5)),
           const SizedBox(height: 24),
           FilledButton(
               onPressed: onBack,

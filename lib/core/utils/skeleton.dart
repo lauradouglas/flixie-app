@@ -638,7 +638,7 @@ class ErrorRetryWidget extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(color: context.colors.medium, fontSize: 15),
+              style: TextStyle(color: context.colors.medium, fontSize: 14),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(

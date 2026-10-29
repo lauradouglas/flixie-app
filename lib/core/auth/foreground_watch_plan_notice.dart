@@ -216,7 +216,7 @@ class WatchPlanNoticeBanner extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(notice.body,
                             style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 14,
                                 height: 1.4,
                                 color: dark
                                     ? FlixieColors.lightTint

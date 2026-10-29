@@ -17,6 +17,13 @@ class FavouriteAuth extends TestAuth {
       iconColorId: 0,
       completedSetup: true,
       darkMode: false,
+      favoriteShows: List.generate(
+          3,
+          (i) => {
+                'id': 'show-$i',
+                'rank': i + 1,
+                'show': {'name': 'Show ${i + 1}', 'firstAirDate': '2020-01-01'}
+              }),
       favoriteMovies: List.generate(
           10,
           (i) => FavoriteMovie(
@@ -53,25 +60,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(added, isFalse);
   });
-  testWidgets(
-      'ranking editor supports accessible moves without changing saved order before save',
-      (tester) async {
-    final auth = FavouriteAuth();
-    await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
-        value: auth,
-        child: MaterialApp(
-            home: Scaffold(
-                body: Builder(
-                    builder: (context) => TextButton(
-                        onPressed: () =>
-                            showFavouriteRankingSheet(context, shows: false),
-                        child: const Text('Rank')))))));
-    await tester.tap(find.text('Rank'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Move down').first);
-    await tester.pumpAndSettle();
-    expect(tester.getTopLeft(find.text('Film 2')).dy,
-        lessThan(tester.getTopLeft(find.text('Film 1')).dy));
-    expect(auth.dbUser.favoriteMovies!.first.movieId, 1);
-  });
+  for (final shows in [false, true]) {
+    testWidgets(
+        'ranking editor supports accessible moves without saving, shows: $shows',
+        (tester) async {
+      final auth = FavouriteAuth();
+      await tester.pumpWidget(ChangeNotifierProvider<AuthProvider>.value(
+          value: auth,
+          child: MaterialApp(
+              home: Scaffold(
+                  body: Builder(
+                      builder: (context) => TextButton(
+                          onPressed: () =>
+                              showFavouriteRankingSheet(context, shows: shows),
+                          child: const Text('Rank')))))));
+      await tester.tap(find.text('Rank'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Move down').first);
+      await tester.pumpAndSettle();
+      expect(
+          tester.getTopLeft(find.text(shows ? 'Show 2' : 'Film 2')).dy,
+          lessThan(
+              tester.getTopLeft(find.text(shows ? 'Show 1' : 'Film 1')).dy));
+      expect(auth.dbUser.favoriteMovies!.first.movieId, 1);
+    });
+  }
 }

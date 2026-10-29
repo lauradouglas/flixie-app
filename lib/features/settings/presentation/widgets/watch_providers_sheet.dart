@@ -206,7 +206,7 @@ class _WatchProvidersSheetState extends State<WatchProvidersSheet> {
               'Choose the streaming services you use. Flixie can then show what you can watch now.',
               style: TextStyle(
                 color: context.colors.medium,
-                fontSize: 13,
+                fontSize: 14,
                 height: 1.4,
               ),
             ),

@@ -99,7 +99,7 @@ class FakeAnime extends FakeGenres {
 }
 
 void main() {
-  testWidgets('light joined community uses a soft mint surface',
+  testWidgets('light joined community uses a quiet accessible text action',
       (tester) async {
     final service = FakeGenres()..joined = true;
     final theme = AppTheme.lightTheme;
@@ -107,16 +107,11 @@ void main() {
         theme: theme,
         home: Scaffold(body: GenreCommunitiesView(service: service))));
     await tester.pumpAndSettle();
-    final button = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, '✓ Joined'));
+    final button =
+        tester.widget<TextButton>(find.widgetWithText(TextButton, '✓ Joined'));
     expect(button.style!.foregroundColor!.resolve({}),
         theme.colorScheme.onSecondaryContainer);
-    final surface = tester.widget<AnimatedContainer>(find
-        .ancestor(
-            of: find.text('✓ Joined'), matching: find.byType(AnimatedContainer))
-        .first);
-    expect((surface.decoration! as BoxDecoration).color,
-        theme.colorScheme.secondaryContainer);
+    expect(find.widgetWithText(OutlinedButton, '✓ Joined'), findsNothing);
     expect(tester.takeException(), isNull);
     if (const bool.fromEnvironment('COMMUNITY_CAPTURE')) {
       final boundary = tester.renderObject<RenderRepaintBoundary>(
@@ -193,7 +188,7 @@ void main() {
         home: Scaffold(body: GenreCommunitiesView(service: service))));
     await tester.pumpAndSettle();
     final before = tester.getTopLeft(find.text('Horror'));
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Join').first);
+    await tester.tap(find.widgetWithText(TextButton, 'Join').first);
     await tester.pumpAndSettle();
     expect(service.joined, isFalse);
     await tester.tap(find.text('Join community'));

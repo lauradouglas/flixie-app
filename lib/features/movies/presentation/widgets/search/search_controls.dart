@@ -109,7 +109,11 @@ class SearchModeSelector extends StatelessWidget {
                 : Icon(
                     mode.icon,
                     size: 17,
-                    color: selected ? Colors.white : context.colors.medium,
+                    color: selected
+                        ? const Color(0xFF271140)
+                        : Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFFB9A0FF)
+                            : FlixieColors.primary,
                   ),
             onSelected: (_) => onChanged(mode),
           );

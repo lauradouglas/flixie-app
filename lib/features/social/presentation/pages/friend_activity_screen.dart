@@ -304,7 +304,7 @@ class _FriendActivityScreenState extends State<FriendActivityScreen> {
                                                           left: 52),
                                                   child: Text(comment.body,
                                                       style: const TextStyle(
-                                                          fontSize: 15,
+                                                          fontSize: 14,
                                                           height: 1.5))),
                                           ])),
                                 if (_commentError != null) ...[

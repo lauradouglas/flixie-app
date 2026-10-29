@@ -16,7 +16,7 @@ GoRouter _router(String initialLocation) => GoRouter(
         GoRoute(
             path: '/',
             builder: (_, __) => const Scaffold(
-                body: SingleChildScrollView(child: GuestDiaryTeaser()))),
+                body: SingleChildScrollView(child: Column(children: [GuestDiaryTeaser(), WhyFlixieButton()])))),
         GoRoute(
             path: '/welcome', builder: (_, __) => const GuestWelcomeScreen()),
         GoRoute(
@@ -47,7 +47,13 @@ Future<void> _mount(WidgetTester tester, GoRouter router,
 }
 
 Future<void> _tap(WidgetTester tester, String text) async {
-  await tester.ensureVisible(find.text(text));
+  if (find.text(text).evaluate().isEmpty) {
+    await tester.scrollUntilVisible(find.text(text), 400,
+        scrollable: find.byType(Scrollable).first);
+  }
+  await Scrollable.ensureVisible(tester.element(find.text(text)),
+      alignment: .5);
+  await tester.pumpAndSettle();
   await tester.tap(find.text(text));
   await tester.pumpAndSettle();
 }

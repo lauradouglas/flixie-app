@@ -12,13 +12,13 @@ class GuestHomeWelcome extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Text('What’s your next watch?',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineMedium
-                        ?.copyWith(fontWeight: FontWeight.w800)),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontSize: 26,
+                        height: 1.2,
+                        fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 const Text(
-                    'Find films and shows. Save your next watch. No account needed.'),
+                    'Find films and shows. Save your next watch.\nNo account needed.'),
               ])),
           const SizedBox(width: 8),
           Image.asset('assets/icon/community_pips/pip-flixie-hoodie.png',

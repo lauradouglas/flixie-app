@@ -65,6 +65,12 @@ class PipCollectionController extends ChangeNotifier
     if (!_disposed) notifyListeners();
   }
 
+  Future<void> refreshAfterReward() async {
+    final generation = _generation;
+    await _loading;
+    if (_current(generation)) await refresh();
+  }
+
   Future<void> refresh() {
     if (_disposed || _userId == null || saving) return Future.value();
     final generation = _generation;
@@ -107,6 +113,7 @@ class PipCollectionController extends ChangeNotifier
 
   Future<void> select(String pip) => _save({'activePip': pip});
   Future<void> acknowledge() => _save({'seen': true});
+  Future<void> acknowledgeSeasonal(String key) => _save({'seenPip': key});
   Future<void> _save(Map<String, dynamic> body) async {
     if (saving || _userId == null) throw StateError('Please wait.');
     if (body['activePip'] == 'og' && (!verified || !collection.ogUnlocked)) {
@@ -122,6 +129,12 @@ class PipCollectionController extends ChangeNotifier
     await _loading;
     if (owner == null || saving || !_current(generation)) {
       throw StateError('Sign in again.');
+    }
+    final choice = body['activePip'];
+    if (choice is String &&
+        PipCollection.supportedSeasonal(choice) &&
+        (!verified || !collection.owns(choice))) {
+      throw StateError('Refresh your rewards before choosing this Pip.');
     }
     saving = true;
     _notify();

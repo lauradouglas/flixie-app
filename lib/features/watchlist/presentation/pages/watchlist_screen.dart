@@ -546,7 +546,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                   const SizedBox(height: 16),
                   Text(
                     emptyLabel,
-                    style: const TextStyle(color: Colors.grey, fontSize: 16),
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                     textAlign: TextAlign.center,
                   ),
                   if (hasItems)

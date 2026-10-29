@@ -47,14 +47,14 @@ abstract final class FlixieTypography {
 
   static const TextStyle bodyLarge = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 16,
+    fontSize: 14,
     height: 1.5,
     fontWeight: FontWeight.w500,
   );
 
   static const TextStyle body = TextStyle(
     fontFamily: fontFamily,
-    fontSize: 16,
+    fontSize: 14,
     height: 1.5,
     fontWeight: FontWeight.w400,
   );

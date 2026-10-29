@@ -214,7 +214,7 @@ class _GuestDiaryPageState extends State<GuestDiaryPage> {
                                 style: const TextStyle(
                                     color: diaryInk,
                                     fontFamily: 'Manrope',
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     height: 1.4),
                                 child: Column(
                                     crossAxisAlignment:

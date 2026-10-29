@@ -121,3 +121,13 @@ Movie social fixtures: `../FlixieBE/scripts/seed-dev-movie-opinions.ts`.
 ## Flixie branding
 
 Always use the Flixie text wordmark (white **flix**, purple **ie** on dark surfaces), matching `lib/core/widgets/flixie_wordmark.dart`. Use the official Flixie F icon for compact branding, not a generic movie icon. Preserve this rule in admin/web work as well as the app.
+
+## Movie poster proportions
+
+Always preserve movie posters’ portrait proportions (normally 2:3) and show the full artwork. Do not stretch posters or crop them into landscape banners; use contain fitting where needed. This applies across Flixie app/admin mockups and implementation. For curated-list Home cards, show at least four distinct film posters when the list has four or more films. The four-poster request does not change reward completion targets. User preference confirmed 28 October 2026.
+
+## Paragraph typography
+
+Use a 14 logical-pixel base size for paragraph/body copy throughout the app, with the shared theme body styles (normally 1.5 line height). Preserve system text scaling, wrapping and scroll access at larger text sizes. Headings, buttons and compact metadata retain their semantic roles; do not globally shrink all text. User preference confirmed 28 October 2026.
+
+Movie and show synopsis previews on Home/trending, cinema cards and search results use 12 logical pixels as an explicit exception to the 14 paragraph default, per user feedback on 28 October 2026. Preserve system text scaling; do not shrink general copy or titles.

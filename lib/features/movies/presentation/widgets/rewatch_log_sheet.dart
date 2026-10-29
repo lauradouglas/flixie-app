@@ -59,6 +59,7 @@ class RewatchLogSheet extends StatefulWidget {
   const RewatchLogSheet(
       {super.key,
       this.embedded = false,
+      this.requireRating = false,
       this.onBusyChanged,
       this.onClose,
       this.initialRating,
@@ -82,7 +83,7 @@ class RewatchLogSheet extends StatefulWidget {
       this.initialWatchedAt,
       this.initialDateUnknown = false});
   final ValueChanged<bool>? onBusyChanged;
-  final bool embedded;
+  final bool embedded, requireRating;
   final VoidCallback? onClose;
   final double? initialRating;
   final bool? initialRecommended;
@@ -185,6 +186,11 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (widget.requireRating && _rating == null) {
+      setState(() =>
+          _error = 'Add your rating to count this film towards the challenge.');
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -447,7 +453,7 @@ class _RewatchLogSheetState extends State<RewatchLogSheet> {
                     _saving ? null : () => setState(() => _rating = null),
                 child: const Text('Clear'))
           else
-            _hint('Optional')
+            _hint(widget.requireRating ? 'Required' : 'Optional')
         ]),
         const SizedBox(height: 8),
         LayoutBuilder(builder: (context, box) {

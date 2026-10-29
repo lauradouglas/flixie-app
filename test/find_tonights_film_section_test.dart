@@ -45,9 +45,10 @@ void main() {
                                               'Picker destination')))))))))));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(find.text('Solo or with friends. Start with your mood.'),
+      expect(find.text('Find tonight’s film, solo or with friends.'),
           findsOneWidget);
-      expect(tester.getSize(find.byType(FilledButton)).width, size.width - 32);
+      expect(find.text('Start with your mood'), findsOneWidget);
+      expect(find.byType(FilledButton), findsNothing);
       if (const bool.fromEnvironment('UX_CAPTURE')) {
         await tester.runAsync(() async {
           final image = await (boundary.currentContext!.findRenderObject()!
@@ -65,7 +66,7 @@ void main() {
       expect(find.text('Picker destination'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.text('Find tonight’s film'), findsOneWidget);
+      expect(find.text('What are you in the mood for?'), findsOneWidget);
     });
   }
 }

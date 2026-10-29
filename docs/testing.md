@@ -1786,3 +1786,10 @@ Final iPad confirmation report: `build/ios_results_1792872346251.xcresult`,
 1/1 passed, zero failures/skips (95s capture body). This focused confirmation
 covered the corrected film/TV rating/review contexts and the TV watchlist
 country/provider selection that had failed in the initial iPad scan.
+
+
+Curated list focused checks: `flutter test test/features/curated_lists`. Includes account-switch isolation, completion reconciliation, reward ownership, full diary-log-to-explicit-Pip-selection journey, and 320/768/1180-width layouts with 1.7 text scaling. The same isolated fictional journey is covered by `scripts/test-patrol.sh -d <dedicated-device> -t patrol_test/curated_lists_test.dart`; no real accounts or production credentials are used.
+
+28 October 2026: curated-list Patrol journey passed on dedicated Flixie Profile Patrol simulator B49E1266-AB60-400F-B213-8AB3365CA331 (one test). Result bundle: `build/ios_results_1793209811084.xcresult`. Focused Flutter checks passed (37 tests including signup handoff); Dart analysis clean. Development iPad hot reload succeeded with no recorded runtime errors.
+
+Watch-and-rate refinement: nine curated-list checks and six ordinary diary-sheet checks passed, including refusing an unrated challenge log before any diary write. Backend progression regression asserts the rated-entry query and no reward for an unrated watched film; type checks and admin build passed. Dedicated native Patrol journey passed again: `build/ios_results_1793210745647.xcresult`.

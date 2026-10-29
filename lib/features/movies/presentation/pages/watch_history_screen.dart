@@ -450,9 +450,11 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
         Expanded(
             child: _showShows
                 ? WatchedShowsHistory(
-                    query: _searchController.text, sortBy: _sortBy,
+                    query: _searchController.text,
+                    sortBy: _sortBy,
                     onCountChanged: (count) {
-                      if (mounted && count != _showCount) setState(() => _showCount = count);
+                      if (mounted && count != _showCount)
+                        setState(() => _showCount = count);
                     })
                 : _loading
                     ? const ContentListSkeleton()
@@ -523,7 +525,7 @@ class _WatchHistoryScreenState extends State<WatchHistoryScreen> {
             _searchController.text.isNotEmpty
                 ? 'No movies found'
                 : 'No watch history yet',
-            style: TextStyle(color: context.colors.medium, fontSize: 16),
+            style: TextStyle(color: context.colors.medium, fontSize: 14),
           ),
         ],
       ),
@@ -560,4 +562,3 @@ class _WatchedEntry {
 // ---------------------------------------------------------------------------
 // Card widget
 // ---------------------------------------------------------------------------
-

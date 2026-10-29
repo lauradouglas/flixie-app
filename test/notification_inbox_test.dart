@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/models/notification.dart';
@@ -5,6 +6,51 @@ import 'package:flixie_app/features/profile/presentation/widgets/notification_in
 import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 
 void main() {
+  testWidgets(
+      'tablet activity keeps avatar border, poster and notification actions',
+      (tester) async {
+    tester.view.physicalSize = const Size(1180, 820);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var opens = 0, options = 0;
+    final notification = FlixieNotification.fromJson({
+      'id': 'reaction',
+      'userId': 'me',
+      'type': 'COMMUNITY_REACTION',
+      'data': {
+        'actorId': 'actor',
+        'posterPath': '/alien.jpg',
+        'mediaTitle': 'Alien'
+      },
+      'senderUser': {
+        'id': 'actor',
+        'username': 'Robin',
+        'profileBadges': ['EARLY_ADOPTER']
+      },
+    });
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: NotificationInboxCard(
+      notification: notification,
+      date: '12m ago',
+      onOpen: () => opens++,
+      onOptions: () => options++,
+    ))));
+    expect(
+        tester
+            .widget<ProfileAvatarView>(find.byType(ProfileAvatarView))
+            .profileBadges,
+        ['EARLY_ADOPTER']);
+    expect(find.byType(CachedNetworkImage), findsOneWidget);
+    expect(find.text('Alien'), findsOneWidget);
+    await tester.tap(find.textContaining('reacted').first);
+    expect(opens, 1);
+    await tester.tap(find.byTooltip('Notification options'));
+    expect(options, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   test('community reaction identifies the hydrated sender and their border',
       () {
     final notification = FlixieNotification.fromJson({

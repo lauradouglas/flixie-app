@@ -204,7 +204,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
           textInputAction:
               body ? TextInputAction.newline : TextInputAction.next,
           cursorColor: _paperInk,
-          style: const TextStyle(color: _paperInk, fontSize: 15, height: 1.6),
+          style: const TextStyle(color: _paperInk, fontSize: 14, height: 1.6),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: _paperMuted),
@@ -502,7 +502,7 @@ class _WriteReviewSheetState extends State<WriteReviewSheet> {
                                                                 color: context
                                                                     .colors
                                                                     .medium,
-                                                                fontSize: 13,
+                                                                fontSize: 14,
                                                                 height: 1.5)),
                                                       ])),
                                                   const SizedBox(width: 12),

@@ -22,7 +22,9 @@ class InCinemasSection extends StatefulWidget {
       this.loader,
       this.initialMovies = const [],
       this.loadingPlaceholder = const TrendingCarouselSkeleton(),
-      this.mediaBuilder});
+      this.mediaBuilder,
+      this.bottomSpacing = 28});
+  final double bottomSpacing;
   final Future<void> Function()? onChangeCountry;
   final Listenable? watchlistChanges;
   final String region;
@@ -157,7 +159,7 @@ class InCinemasSectionState extends State<InCinemasSection>
   Widget build(BuildContext context) {
     super.build(context);
     return Padding(
-        padding: const EdgeInsets.only(bottom: 28),
+        padding: EdgeInsets.only(bottom: widget.bottomSpacing),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (HomeTabletLayout.active(context))
             Row(children: [

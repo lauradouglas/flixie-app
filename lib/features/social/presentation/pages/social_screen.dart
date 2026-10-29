@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:flixie_app/core/auth/auth_provider.dart';
-import 'package:flixie_app/features/profile/presentation/widgets/add_friend_sheet.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/navigation/tab_refresh_controller.dart';
 import 'package:flixie_app/core/widgets/flixie_page.dart';
@@ -59,20 +58,6 @@ class _SocialScreenState extends State<SocialScreen> {
     if (mounted) setState(() => _refreshRevision++);
   }
 
-  void _showAddFriendSheet() {
-    showModalBottomSheet(
-      context: context,
-      useRootNavigator: true,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: context.colors.tabBarBackgroundFocused,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const AddFriendSheet(),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final viewer =
@@ -107,29 +92,23 @@ class _SocialScreenState extends State<SocialScreen> {
               _visited.add(_selectedTab);
             }),
           ),
-          Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(spacing: 16, children: [
-                    TextButton.icon(
-                        onPressed: () => context.push('/plans'),
-                        icon: const Icon(Icons.event_outlined, size: 19),
-                        label: const Text('Plans')),
-                    if (_selectedTab == 0) ...[
-                      TextButton.icon(
-                          onPressed: _showAddFriendSheet,
-                          icon: const Icon(Icons.person_search_outlined,
-                              size: 19),
-                          label: const Text('Find friends')),
-                      TextButton.icon(
-                          onPressed: () =>
-                              context.push('/invite-friend?from=social'),
-                          icon: const Icon(Icons.person_add_alt_1_outlined,
-                              size: 19),
-                          label: const Text('Invite')),
-                    ],
-                  ]))),
+          if (_selectedTab == 1 || _selectedTab == 0)
+            Padding(
+                padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                child: Row(children: [
+                  Expanded(
+                      child: Text(
+                          _selectedTab == 0 ? 'Your people' : 'Activity feed',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: context.colors.white))),
+                  TextButton.icon(
+                      onPressed: () => context.push('/plans'),
+                      icon: const Icon(Icons.event_outlined, size: 19),
+                      label:
+                          const Text('Plans', style: TextStyle(fontSize: 14))),
+                ])),
           Expanded(
             child: LayoutBuilder(builder: (context, constraints) {
               final feed = ClipRect(

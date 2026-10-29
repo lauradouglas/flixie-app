@@ -30,6 +30,31 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
   List<User> _results = [];
   String? _searchError;
   final Set<String> _sentRequests = {};
+  final Set<String> _friends = {}, _incoming = {};
+
+  Future<void> _relationships(String viewer) async {
+    final data = await _friendActions.getFriends(viewer);
+    if (!mounted || context.read<AuthProvider>().dbUser?.id != viewer) return;
+    Set<String> ids(List<Friendship> rows) => rows
+        .expand((row) => [
+              row.friendId,
+              row.friend?.id,
+              row.recipient?.id,
+              row.requester?.id,
+            ])
+        .whereType<String>()
+        .where((id) => id != viewer)
+        .toSet();
+    setState(() {
+      _friends
+        ..clear()
+        ..addAll(ids(data.friendships));
+      _incoming
+        ..clear()
+        ..addAll(ids(data.pendingFriends));
+      _sentRequests.addAll(ids(data.requestedFriends));
+    });
+  }
 
   @override
   void dispose() {
@@ -39,7 +64,7 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
 
   Future<void> _search() async {
     final query = _searchController.text.trim();
-    if (query.isEmpty) return;
+    if (query.isEmpty || _searching) return;
 
     setState(() {
       _searching = true;
@@ -50,6 +75,11 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
     try {
       final auth = context.read<AuthProvider>();
       final myId = auth.dbUser?.id;
+      if (myId == null) {
+        setState(() => _searching = false);
+        return;
+      }
+      await _relationships(myId);
 
       List<User> results;
 
@@ -66,11 +96,9 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
       }
 
       // Exclude the current user from results.
-      if (myId != null) {
-        results = results.where((u) => u.id != myId).toList();
-      }
+      results = results.where((u) => u.id != myId).toList();
 
-      if (mounted) {
+      if (mounted && context.read<AuthProvider>().dbUser?.id == myId) {
         setState(() {
           _results = results;
           _searching = false;
@@ -91,11 +119,22 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
     final auth = context.read<AuthProvider>();
     final analytics = context.read<AnalyticsController>();
     final myId = auth.dbUser?.id;
-    if (myId == null) return;
+    if (myId == null ||
+        _friends.contains(user.id) ||
+        _incoming.contains(user.id) ||
+        _sentRequests.contains(user.id)) {
+      return;
+    }
 
     setState(() => _sentRequests.add(user.id));
 
     try {
+      await _relationships(myId);
+      if (!mounted || context.read<AuthProvider>().dbUser?.id != myId) return;
+      if (_friends.contains(user.id) || _incoming.contains(user.id)) {
+        setState(() => _sentRequests.remove(user.id));
+        return;
+      }
       await _friendActions.sendFriendRequest({
         'requesterId': myId,
         'recipientId': user.id,
@@ -144,150 +183,168 @@ class _AddFriendSheetState extends State<AddFriendSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+  Widget build(BuildContext context) => LayoutBuilder(
+      builder: (context, box) => ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: box.maxHeight * .85),
+            child: Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom),
+              child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                            child: Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                    color: context.colors.medium
+                                        .withValues(alpha: .4),
+                                    borderRadius: BorderRadius.circular(2)))),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          const Expanded(
+                              child: Text('Add a friend',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700))),
+                          IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.close)),
+                        ]),
+                        Text('Search for someone by their username.',
+                            style: TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: context.colors.light)),
+                        const SizedBox(height: 16),
+                        TextField(
+                            controller: _searchController,
+                            style: const TextStyle(fontSize: 14),
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) => _search(),
+                            decoration: InputDecoration(
+                                hintText: 'Username',
+                                prefixIcon: Icon(Icons.search,
+                                    size: 20, color: context.colors.light),
+                                filled: true,
+                                fillColor: context.colors.surfaceElevated,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 14),
+                                border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none),
+                                enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none),
+                                focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none),
+                                suffixIcon: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: IconButton.filled(
+                                        tooltip: 'Search',
+                                        onPressed: _searching ? null : _search,
+                                        style: IconButton.styleFrom(
+                                            backgroundColor:
+                                                FlixieColors.primary,
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(44, 44)),
+                                        icon: _searching
+                                            ? const SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                        color: Colors.white))
+                                            : const Icon(Icons.arrow_forward,
+                                                size: 20))))),
+                        if (_searchError != null) ...[
+                          const SizedBox(height: 16),
+                          Text(_searchError!,
+                              style: TextStyle(
+                                  fontSize: 14, color: context.colors.light)),
+                        ],
+                        if (_results.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          for (final user in _results) _result(user),
+                          const SizedBox(height: 12),
+                          Text('Send a request to connect on Flixie.',
+                              style: TextStyle(
+                                  fontSize: 12, color: context.colors.light)),
+                        ],
+                      ])),
+            ),
+          ));
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scrollController) => Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.colors.medium.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Add Friend',
-              style:
-                  textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Search by username',
-              style:
-                  textTheme.bodySmall?.copyWith(color: context.colors.medium),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(color: context.colors.light),
-                    decoration: InputDecoration(
-                      hintText: 'Username…',
-                      hintStyle: TextStyle(color: context.colors.medium),
-                      prefixIcon:
-                          Icon(Icons.search, color: context.colors.medium),
-                      filled: true,
-                      fillColor: context.colors.tabBarBackground,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                    ),
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _search(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _searching ? null : _search,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: FlixieColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: _searching
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Search'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _results.isEmpty && _searchError != null
-                ? Center(
-                    child: Text(
-                      _searchError!,
-                      style: textTheme.bodyMedium
-                          ?.copyWith(color: context.colors.medium),
-                    ),
-                  )
-                : ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _results.length,
-                    itemBuilder: (_, i) {
-                      final user = _results[i];
-                      final sent = _sentRequests.contains(user.id);
-                      final color = _userAvatarColor(user);
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: ProfileAvatarView(
-                          avatar: user.avatar,
-                          fallbackText: user.initials ??
-                              (user.username.isNotEmpty
-                                  ? user.username[0].toUpperCase()
-                                  : '?'),
-                          fallbackColor: color,
-                          size: 40,
-                          profileBadges: user.profileBadges,
-                        ),
-                        title: Text(user.username,
-                            style: TextStyle(color: context.colors.light)),
-                        subtitle: Text(
-                          'Flixie member',
-                          style: TextStyle(
-                              color: context.colors.medium, fontSize: 12),
-                        ),
-                        trailing: sent
-                            ? Icon(Icons.check_circle,
-                                color: context.colors.success)
-                            : ElevatedButton(
-                                onPressed: () => _sendRequest(user),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: FlixieColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                ),
-                                child: const Text('Add'),
-                              ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
+  Widget _result(User user) {
+    final sent = _sentRequests.contains(user.id);
+    final identity = Row(children: [
+      Padding(
+          padding: const EdgeInsets.all(4),
+          child: ProfileAvatarView(
+              avatar: user.avatar,
+              profileBadges: user.profileBadges,
+              fallbackText: user.initials ??
+                  (user.username.isEmpty
+                      ? '?'
+                      : user.username[0].toUpperCase()),
+              fallbackColor: _userAvatarColor(user),
+              size: 36)),
+      const SizedBox(width: 10),
+      Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+            user.firstName?.isNotEmpty == true
+                ? user.firstName!
+                : user.username,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+        Text('@${user.username}',
+            style: TextStyle(fontSize: 12, color: context.colors.light)),
+      ])),
+    ]);
+    final action = _friends.contains(user.id) ||
+            _incoming.contains(user.id) ||
+            sent
+        ? Text(
+            _friends.contains(user.id)
+                ? 'Already friends'
+                : _incoming.contains(user.id)
+                    ? 'Request received'
+                    : 'Request sent',
+            style: TextStyle(fontSize: 12, color: context.colors.success))
+        : FilledButton(
+            onPressed: () => _sendRequest(user),
+            style: FilledButton.styleFrom(
+                backgroundColor: FlixieColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 44),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10))),
+            child: const Text('Add friend', style: TextStyle(fontSize: 13)));
+    return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: LayoutBuilder(builder: (context, box) {
+          if (box.maxWidth < 300 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.4) {
+            return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  identity,
+                  const SizedBox(height: 8),
+                  Align(alignment: Alignment.centerRight, child: action)
+                ]);
+          }
+          return Row(children: [
+            Expanded(child: identity),
+            const SizedBox(width: 12),
+            action
+          ]);
+        }));
   }
 }

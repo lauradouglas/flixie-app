@@ -113,19 +113,22 @@ class HomeHeroCard extends StatelessWidget {
                       contentSized ? MainAxisSize.min : MainAxisSize.max,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                          color: context.colors.primary.withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(6)),
-                      child: Text(movie.isShow ? 'TV show' : 'Movie',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: context.colors.primaryText)),
-                    ),
-                    const SizedBox(height: 8),
+                    if (movie.isShow) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                            color:
+                                context.colors.primary.withValues(alpha: .12),
+                            borderRadius: BorderRadius.circular(6)),
+                        child: Text('TV show',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: context.colors.primaryText)),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -159,6 +162,7 @@ class HomeHeroCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         HeroCompactIconButton(
+                          alignment: Alignment.topRight,
                           tooltip: inWatchlist
                               ? 'Remove from watchlist'
                               : 'Watchlist',
@@ -167,7 +171,7 @@ class HomeHeroCard extends StatelessWidget {
                               : Icons.bookmark_outline_rounded,
                           foregroundColor: inWatchlist
                               ? context.colors.primaryText
-                              : context.colors.light,
+                              : context.colors.warning,
                           isBusy: isUpdating,
                           onPressed: onWatchlist,
                         ),

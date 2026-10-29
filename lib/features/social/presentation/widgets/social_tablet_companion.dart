@@ -42,7 +42,7 @@ class SocialTabletCompanion extends StatelessWidget {
         if (plans.isEmpty)
           Text('Make a plan and find something to watch with your people.',
               style: TextStyle(
-                  color: context.colors.light, fontSize: 15, height: 1.5)),
+                  color: context.colors.light, fontSize: 14, height: 1.5)),
         for (final plan in plans) ...[
           Material(
             color: context.colors.surface,

@@ -1,4 +1,5 @@
 import 'package:flixie_app/features/social/presentation/widgets/friend_search_scope.dart';
+import 'package:flixie_app/features/profile/presentation/widgets/profile_avatar_view.dart';
 import 'package:flixie_app/core/utils/skeleton.dart';
 import 'package:flixie_app/core/widgets/flixie_toast.dart';
 import 'package:flutter/material.dart';
@@ -56,7 +57,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet>
   int _step = 0;
   List<FriendshipUser> _friends = [];
   final List<String> _selectedFriendIds = [];
-  bool _loadingFriends = false;
+  bool _loadingFriends = false, _friendsFailed = false;
   bool _inviting = false;
   final TextEditingController _searchController = TextEditingController();
 
@@ -73,11 +74,12 @@ class _CreateGroupSheetState extends State<CreateGroupSheet>
     if (!_formKey.currentState!.validate()) return;
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (!_owns || userId == null) return;
+    FocusScope.of(context).unfocus();
     _loadFriendsForInvite(userId);
     setState(() => _step = 1);
   }
 
-  Future<void> _createGroupWithMembers() async {
+  Future<void> _createGroupWithMembers({bool withoutInvites = false}) async {
     final userId = context.read<AuthProvider>().dbUser?.id;
     if (!_owns || userId == null) return;
     if (_inviting) return;
@@ -85,7 +87,7 @@ class _CreateGroupSheetState extends State<CreateGroupSheet>
     try {
       final members = [
         {'memberId': userId, 'role': 'OWNER', 'inviteStatus': 'ACCEPTED'},
-        ..._selectedFriendIds.map((id) => {
+        ...(withoutInvites ? <String>[] : _selectedFriendIds).map((id) => {
               'memberId': id,
               'role': 'MEMBER',
               'inviteStatus': 'PENDING',
@@ -125,7 +127,12 @@ class _CreateGroupSheetState extends State<CreateGroupSheet>
   }
 
   Future<void> _loadFriendsForInvite(String userId) async {
-    if (_owns) setState(() => _loadingFriends = true);
+    if (_owns) {
+      setState(() {
+        _loadingFriends = true;
+        _friendsFailed = false;
+      });
+    }
     try {
       final data = await _friendActions.getFriends(userId);
       if (mounted && _owns) {
@@ -138,305 +145,305 @@ class _CreateGroupSheetState extends State<CreateGroupSheet>
         });
       }
     } catch (_) {
-      if (_owns) setState(() => _loadingFriends = false);
+      if (_owns) {
+        setState(() {
+          _loadingFriends = false;
+          _friendsFailed = true;
+        });
+      }
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+  Widget build(BuildContext context) => PopScope(
+      canPop: !_inviting,
+      child: LayoutBuilder(
+          builder: (context, constraints) => ConstrainedBox(
+                constraints:
+                    BoxConstraints(maxHeight: constraints.maxHeight * .9),
+                child: Padding(
+                    padding: EdgeInsets.only(
+                        bottom: MediaQuery.viewInsetsOf(context).bottom),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const SizedBox(height: 12),
+                      Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color:
+                                  context.colors.medium.withValues(alpha: .4),
+                              borderRadius: BorderRadius.circular(2))),
+                      Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
+                          child: Row(children: [
+                            if (_step == 1)
+                              IconButton(
+                                  tooltip: 'Back to group details',
+                                  onPressed: _inviting
+                                      ? null
+                                      : () => setState(() => _step = 0),
+                                  icon: const Icon(Icons.arrow_back)),
+                            Expanded(
+                                child: Text(
+                                    _step == 0
+                                        ? 'Create a group'
+                                        : 'Invite friends',
+                                    style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700))),
+                            IconButton(
+                                tooltip: 'Close',
+                                onPressed: _inviting
+                                    ? null
+                                    : () => Navigator.pop(context),
+                                icon: const Icon(Icons.close)),
+                          ])),
+                      Flexible(
+                          fit: _step == 0 ? FlexFit.loose : FlexFit.tight,
+                          child: SingleChildScrollView(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                              child: _step == 0
+                                  ? Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                          _details(),
+                                          const SizedBox(height: 12),
+                                          _actions(inline: true),
+                                        ])
+                                  : _invitations())),
+                      if (_step == 1) _actions(),
+                    ])),
+              )));
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (_, scrollController) => _step == 0
-          ? _buildFormStep(scrollController, textTheme)
-          : _buildInviteStep(scrollController),
-    );
-  }
-
-  Widget _buildFormStep(
-      ScrollController scrollController, TextTheme textTheme) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      padding: EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.colors.medium.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Create Group',
-              style:
-                  textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            _inputField(
-              controller: _nameController,
-              label: 'Group Name *',
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Name is required' : null,
-            ),
-            const SizedBox(height: 14),
-            _inputField(
-              controller: _abbrController,
-              label: 'Abbreviation (optional, max 4 chars)',
-              maxLength: 4,
-            ),
-            const SizedBox(height: 14),
-            _inputField(
-              controller: _descController,
-              label: 'Description (optional)',
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Visibility',
-              style: textTheme.bodyMedium
-                  ?.copyWith(color: context.colors.light, fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                VisibilityChip(
-                  label: 'Public',
-                  selected: _isPublic,
-                  onTap: () => setState(() => _isPublic = true),
-                ),
-                const SizedBox(width: 10),
-                VisibilityChip(
-                  label: 'Private',
-                  selected: !_isPublic,
-                  onTap: () => setState(() => _isPublic = false),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: FlixieColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Next',
-                    style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInviteStep(ScrollController scrollController) {
-    final query = _searchController.text.toLowerCase();
-    final filtered = orderedFriends(_friends, (f) => f, query);
-
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        Container(
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: context.colors.medium.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Add Members',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'to "${_nameController.text}"',
-                      style:
-                          TextStyle(color: context.colors.medium, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: _inviting ? null : _createGroupWithMembers,
-                child: Text('Skip',
-                    style: TextStyle(color: context.colors.medium)),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: TextField(
-            controller: _searchController,
-            onChanged: (_) => setState(() {}),
-            style: TextStyle(color: context.colors.light),
-            decoration: InputDecoration(
-              hintText: 'Search friends…',
-              hintStyle: TextStyle(color: context.colors.medium),
-              prefixIcon: Icon(Icons.search, color: context.colors.medium),
-              filled: true,
-              fillColor: context.colors.tabBarBackground,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: _loadingFriends
-              ? const ContentListSkeleton()
-              : filtered.isEmpty
-                  ? Center(
-                      child: Text(
-                        _friends.isEmpty
-                            ? 'No friends to invite yet'
-                            : 'No matches',
-                        style: TextStyle(color: context.colors.medium),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: scrollController,
-                      itemCount: filtered.length,
-                      itemBuilder: (_, i) {
-                        final friend = filtered[i];
-                        final selected = _selectedFriendIds.contains(friend.id);
-                        return CheckboxListTile(
-                          value: selected,
-                          onChanged: (val) => setState(() {
-                            if (val == true) {
-                              _selectedFriendIds.add(friend.id);
-                            } else {
-                              _selectedFriendIds.remove(friend.id);
-                            }
-                          }),
-                          title: Text(friend.username,
-                              style: TextStyle(color: context.colors.light)),
-                          activeColor: FlixieColors.primary,
-                          checkColor: Colors.white,
-                          secondary: CircleAvatar(
-                            backgroundColor:
-                                FlixieColors.primary.withValues(alpha: 0.2),
-                            child: Text(
-                              friend.username[0].toUpperCase(),
-                              style: const TextStyle(
-                                color: FlixieColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-        ),
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-              20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 16),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _inviting ? null : _createGroupWithMembers,
-              style: ElevatedButton.styleFrom(
+  Widget _actions({bool inline = false}) => Padding(
+      padding: EdgeInsets.fromLTRB(inline ? 0 : 20, 8, inline ? 0 : 20, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        FilledButton(
+            onPressed: _inviting
+                ? null
+                : _step == 0
+                    ? _submit
+                    : _createGroupWithMembers,
+            style: FilledButton.styleFrom(
                 backgroundColor: FlixieColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                minimumSize: const Size(0, 44),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _inviting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(
-                      _selectedFriendIds.isEmpty
-                          ? 'Create Group'
-                          : 'Create & Invite ${_selectedFriendIds.length}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-            ),
-          ),
-        ),
-      ],
-    );
+                    borderRadius: BorderRadius.circular(12))),
+            child: _inviting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : Text(
+                    _step == 0
+                        ? 'Continue'
+                        : _selectedFriendIds.isEmpty
+                            ? 'Create group'
+                            : 'Create & invite ${_selectedFriendIds.length}',
+                    style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700))),
+        if (_step == 0) ...[
+          const SizedBox(height: 8),
+          Text('Invite friends next. You can create it on your own.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: context.colors.light)),
+        ] else if (_selectedFriendIds.isNotEmpty)
+          TextButton(
+              onPressed: _inviting
+                  ? null
+                  : () {
+                      _createGroupWithMembers(withoutInvites: true);
+                    },
+              child: const Text('Create without invites',
+                  style: TextStyle(fontSize: 14))),
+      ]));
+
+  Widget _details() => Form(
+      key: _formKey,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Step 1 of 2',
+            style: TextStyle(fontSize: 12, color: context.colors.light)),
+        const SizedBox(height: 16),
+        _inputField(
+            controller: _nameController,
+            label: 'Group name *',
+            validator: (v) =>
+                v == null || v.trim().isEmpty ? 'Name is required' : null),
+        const SizedBox(height: 14),
+        _inputField(
+            controller: _abbrController,
+            label: 'Short name · Optional',
+            maxLength: 4),
+        const SizedBox(height: 14),
+        _inputField(
+            controller: _descController,
+            label: 'Description · Optional',
+            maxLines: 2),
+        const SizedBox(height: 16),
+        Text('Visibility',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: context.colors.white)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 10, children: [
+          VisibilityChip(
+              label: 'Public',
+              selected: _isPublic,
+              onTap: () => setState(() => _isPublic = true)),
+          VisibilityChip(
+              label: 'Private',
+              selected: !_isPublic,
+              onTap: () => setState(() => _isPublic = false)),
+        ]),
+      ]));
+
+  Widget _invitations() {
+    final filtered = orderedFriends(
+        _friends, (f) => f, _searchController.text.toLowerCase());
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Step 2 of 2 · ${_nameController.text.trim()}',
+          style: TextStyle(fontSize: 12, color: context.colors.light)),
+      const SizedBox(height: 14),
+      const Text('Choose who to invite. You can add more people later.',
+          style: TextStyle(fontSize: 14, height: 1.5)),
+      const SizedBox(height: 12),
+      TextField(
+          controller: _searchController,
+          onChanged: (_) => setState(() {}),
+          style: const TextStyle(fontSize: 14),
+          decoration: _decoration().copyWith(
+              hintText: 'Search friends',
+              prefixIcon: const Icon(Icons.search, size: 20))),
+      const SizedBox(height: 12),
+      if (_loadingFriends)
+        const ContentListSkeleton()
+      else if (_friendsFailed) ...[
+        const Text('Couldn’t load your friends.',
+            style: TextStyle(fontSize: 14)),
+        TextButton(
+            onPressed: () => _loadFriendsForInvite(_viewer!),
+            child: const Text('Retry')),
+      ] else if (filtered.isEmpty)
+        Padding(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            child: Column(children: [
+              Icon(Icons.people_outline,
+                  size: 28, color: context.colors.primaryText),
+              const SizedBox(height: 12),
+              Text(_friends.isEmpty ? 'No friends to invite yet' : 'No matches',
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600)),
+              if (_friends.isEmpty) ...[
+                const SizedBox(height: 8),
+                const Text(
+                    'You can create your group now and invite people later.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, height: 1.5)),
+              ],
+            ]))
+      else
+        for (final friend in filtered)
+          CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _selectedFriendIds.contains(friend.id),
+              onChanged: _inviting
+                  ? null
+                  : (selected) => setState(() {
+                        if (selected == true) {
+                          if (!_selectedFriendIds.contains(friend.id)) {
+                            _selectedFriendIds.add(friend.id);
+                          }
+                        } else {
+                          _selectedFriendIds.remove(friend.id);
+                        }
+                      }),
+              title: Text(
+                  friend.firstName?.isNotEmpty == true
+                      ? friend.firstName!
+                      : friend.username,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: Text('@${friend.username}',
+                  style: TextStyle(fontSize: 12, color: context.colors.light)),
+              secondary: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: ProfileAvatarView(
+                      avatar: friend.avatar,
+                      profileBadges: friend.profileBadges,
+                      fallbackText: friend.username.isEmpty
+                          ? '?'
+                          : friend.username[0].toUpperCase(),
+                      fallbackColor: FlixieColors.primary,
+                      size: 36)),
+              activeColor: FlixieColors.primary,
+              checkColor: Colors.white),
+      if (_selectedFriendIds.isNotEmpty)
+        Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+                '${_selectedFriendIds.length} ${_selectedFriendIds.length == 1 ? 'friend' : 'friends'} selected',
+                style: TextStyle(fontSize: 12, color: context.colors.light))),
+    ]);
   }
 
-  Widget _inputField({
-    required TextEditingController controller,
-    required String label,
-    int? maxLength,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      maxLength: maxLength,
-      maxLines: maxLines,
-      validator: validator,
-      style: TextStyle(color: context.colors.light),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: context.colors.medium, fontSize: 13),
-        counterStyle: TextStyle(color: context.colors.medium),
+  InputDecoration _decoration() => InputDecoration(
         filled: true,
-        fillColor: context.colors.tabBarBackground,
+        fillColor: context.colors.surfaceElevated,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: context.colors.tabBarBorder),
-        ),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: context.colors.tabBarBorder),
-        ),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: FlixieColors.primary),
-        ),
-      ),
-    );
-  }
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: context.colors.primaryText)),
+      );
+
+  Widget _inputField(
+          {required TextEditingController controller,
+          required String label,
+          int? maxLength,
+          int maxLines = 1,
+          String? Function(String?)? validator}) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label,
+            style: TextStyle(fontSize: 12, color: context.colors.white)),
+        const SizedBox(height: 6),
+        TextFormField(
+            controller: controller,
+            maxLength: maxLength,
+            maxLines: maxLines,
+            validator: validator,
+            style: const TextStyle(fontSize: 14),
+            decoration: _decoration().copyWith(
+                counterText: '',
+                suffixIcon: maxLength == null
+                    ? null
+                    : ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: controller,
+                        builder: (context, value, _) => Padding(
+                            padding: const EdgeInsets.only(right: 14),
+                            child: Center(
+                                widthFactor: 1,
+                                heightFactor: 1,
+                                child: Text(
+                                    '${value.text.characters.length}/$maxLength',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: context.colors.medium))))))),
+        if (maxLength != null) ...[
+          const SizedBox(height: 6),
+          Text('Up to $maxLength characters',
+              style: TextStyle(fontSize: 11, color: context.colors.medium)),
+        ],
+      ]);
 }
 
 Future<void> showProfileCreateGroupSheet(BuildContext context,

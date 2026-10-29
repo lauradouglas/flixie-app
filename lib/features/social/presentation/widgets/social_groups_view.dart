@@ -17,7 +17,6 @@ import 'package:flixie_app/features/profile/data/notification_service.dart';
 import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import 'package:flixie_app/features/social/presentation/widgets/group_card.dart';
-import 'package:flixie_app/features/social/presentation/widgets/group_avatar.dart';
 import 'package:flixie_app/features/social/presentation/widgets/invitation_card.dart';
 import 'package:flixie_app/features/social/presentation/widgets/social_section_header.dart';
 
@@ -226,9 +225,7 @@ class _SocialGroupsViewState extends State<SocialGroupsView> {
   }
 
   Widget _buildMyGroupsTab(List<Group> pendingGroups, List<Group> myGroups) {
-    final sortedGroups = _sortGroups(myGroups);
     final displayedGroups = _filterGroups(myGroups);
-    final recentGroups = sortedGroups.take(8).toList();
     final isSearching = _searchController.text.trim().isNotEmpty;
 
     return SingleChildScrollView(
@@ -239,17 +236,18 @@ class _SocialGroupsViewState extends State<SocialGroupsView> {
         children: [
           LayoutBuilder(builder: (context, constraints) {
             final actions = <Widget>[
-              OutlinedButton.icon(
+              FilledButton.icon(
                 onPressed: _showCreateGroupSheet,
                 icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text('Create'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: context.colors.primaryText,
-                  side: const BorderSide(color: FlixieColors.primary),
+                label: const Text('Create group'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: FlixieColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 44),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                      const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
@@ -277,14 +275,14 @@ class _SocialGroupsViewState extends State<SocialGroupsView> {
             final reflow = constraints.maxWidth < 280 ||
                 (constraints.maxWidth < 420 &&
                     MediaQuery.textScalerOf(context).scale(14) > 18);
-            if (reflow) {
+            if (reflow || constraints.maxWidth < 600) {
               return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     GroupSearchField(controller: _searchController),
                     const SizedBox(height: 10),
                     Wrap(
-                        alignment: WrapAlignment.end,
+                        alignment: WrapAlignment.spaceBetween,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: actions),
                   ]);
@@ -296,50 +294,6 @@ class _SocialGroupsViewState extends State<SocialGroupsView> {
             ]);
           }),
           const SizedBox(height: 18),
-          if (recentGroups.isNotEmpty) ...[
-            const SocialSectionHeader(title: 'RECENT GROUPS'),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 80 + MediaQuery.textScalerOf(context).scale(11) * 3,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: recentGroups.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                itemBuilder: (_, i) {
-                  final g = recentGroups[i];
-                  return GestureDetector(
-                    onTap: () async {
-                      final deleted =
-                          await context.push<bool>('/groups/${g.id}');
-                      if (mounted && deleted == true) await _load();
-                    },
-                    child: Column(
-                      children: [
-                        GroupAvatar(group: g, radius: 34),
-                        const SizedBox(height: 7),
-                        SizedBox(
-                          width: 72,
-                          child: Text(
-                            g.abbreviation?.isNotEmpty == true
-                                ? g.abbreviation!
-                                : g.name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: context.colors.medium,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
           if (pendingGroups.isNotEmpty) ...[
             GroupInviteBanner(
               group: pendingGroups.first,
@@ -351,7 +305,7 @@ class _SocialGroupsViewState extends State<SocialGroupsView> {
           const Row(
             children: [
               Expanded(
-                child: SocialSectionHeader(title: 'YOUR GROUPS'),
+                child: SocialSectionHeader(title: 'Your groups'),
               ),
               FlixiePill.label(label: Text('Most active')),
             ],
@@ -382,13 +336,6 @@ class _SocialGroupsViewState extends State<SocialGroupsView> {
   }
 
   Widget _buildRequestsTab(List<Group> pendingGroups) {
-    if (pendingGroups.isEmpty) {
-      return SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: NoGroupInvitesCard(onCreateGroup: _showCreateGroupSheet),
-      );
-    }
     final sortedPending = _sortGroups(pendingGroups);
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -399,17 +346,33 @@ class _SocialGroupsViewState extends State<SocialGroupsView> {
           TextButton.icon(
             onPressed: () => setState(() => _innerTab = 0),
             icon: const Icon(Icons.arrow_back_rounded),
-            label: const Text('Your groups'),
+            label: const Text('Back to groups'),
           ),
           const SizedBox(height: 8),
-          PendingGroupInviteSummary(count: sortedPending.length),
-          const SizedBox(height: 12),
-          ...sortedPending.map((g) => GroupInvitationCard(
-                group: g,
-                invitedByUsername: _inviteNotifications[g.id]?.senderName,
-                onAccept: () => _respondToInvite(g, 'ACCEPTED'),
-                onDecline: () => _respondToInvite(g, 'DECLINED'),
-              )),
+          if (sortedPending.isEmpty) ...[
+            const SizedBox(height: 16),
+            Icon(Icons.mark_email_read_outlined,
+                size: 28, color: context.colors.primaryText),
+            const SizedBox(height: 12),
+            Text('No pending invites',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.white)),
+            const SizedBox(height: 8),
+            Text('Group invitations will appear here.',
+                style: TextStyle(
+                    fontSize: 14, height: 1.5, color: context.colors.light)),
+          ] else ...[
+            PendingGroupInviteSummary(count: sortedPending.length),
+            const SizedBox(height: 12),
+            ...sortedPending.map((g) => GroupInvitationCard(
+                  group: g,
+                  invitedByUsername: _inviteNotifications[g.id]?.senderName,
+                  onAccept: () => _respondToInvite(g, 'ACCEPTED'),
+                  onDecline: () => _respondToInvite(g, 'DECLINED'),
+                )),
+          ],
         ],
       ),
     );

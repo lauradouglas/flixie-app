@@ -8,7 +8,7 @@ import '../../models/pip_collection.dart';
 import '../controllers/pip_collection_controller.dart';
 
 Future<void> showMyPipSheet(BuildContext context,
-    {bool celebrate = false}) async {
+    {bool celebrate = false, String? initialPane}) async {
   final controller = context.read<PipCollectionController?>();
   if (controller == null || controller.userId == null) return;
   final owner = controller.userId;
@@ -21,7 +21,10 @@ Future<void> showMyPipSheet(BuildContext context,
       isDismissible: false,
       enableDrag: false,
       constraints: const BoxConstraints(maxWidth: 600),
-      builder: (_) => MyPipSheet(controller: controller, celebrate: celebrate));
+      builder: (_) => MyPipSheet(
+          controller: controller,
+          celebrate: celebrate,
+          initialPane: initialPane));
   if (controller.userId == owner &&
       controller.collection.celebrationPending &&
       controller.verified) {
@@ -36,16 +39,19 @@ class MyPipSheet extends StatefulWidget {
       {super.key,
       required this.controller,
       this.celebrate = false,
+      this.initialPane,
       this.icons});
   final PipCollectionController controller;
   final bool celebrate;
+  final String? initialPane;
   final AppIconService? icons;
   @override
   State<MyPipSheet> createState() => _MyPipSheetState();
 }
 
 class _MyPipSheetState extends State<MyPipSheet> {
-  late String pane = widget.celebrate ? 'celebrate' : 'collection';
+  late String pane =
+      widget.initialPane ?? (widget.celebrate ? 'celebrate' : 'collection');
   late String selectedPip = widget.controller.collection.activePip;
   late final String? owner = widget.controller.userId;
   String selectedIcon = 'default', currentIcon = 'default';
@@ -298,13 +304,23 @@ class _MyPipSheetState extends State<MyPipSheet> {
                   art('og', size: 56),
                   selectedPip == 'og',
                   () => setState(() => selectedPip = 'og')),
+            for (final pip in c.collection.unlockedPips)
+              choice(
+                  PipCollection.label(pip.key),
+                  'Unlocked · yours to keep',
+                  art(pip.key, size: 56),
+                  selectedPip == pip.key,
+                  () => setState(() => selectedPip = pip.key)),
             if (selectedPip == 'cinemaClub' && !owned)
               primary(c.verified ? 'How to unlock' : 'Refresh rewards',
                   c.verified ? () => change('rules') : () => c.refresh())
             else
               primary(
                   error == null ? 'Use this Pip' : 'Try again',
-                  (selectedPip == 'cinemaClub' && !canChoose) ||
+                  (PipCollection.supportedSeasonal(selectedPip) &&
+                              (!c.verified ||
+                                  !c.collection.owns(selectedPip))) ||
+                          (selectedPip == 'cinemaClub' && !canChoose) ||
                           (selectedPip == 'og' &&
                               (!c.verified || !c.collection.ogUnlocked))
                       ? null

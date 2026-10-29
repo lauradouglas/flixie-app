@@ -1,4 +1,5 @@
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
+import 'package:flixie_app/app/theme/app_theme.dart';
 import 'package:flixie_app/core/api/api_client.dart';
 import 'package:flixie_app/core/utils/app_logger.dart';
 import '../../data/people_cache.dart';
@@ -16,11 +17,13 @@ class PeopleDirectory extends StatefulWidget {
       required this.userId,
       required this.friends,
       this.service = const CommunityService(),
-      this.active = true});
+      this.active = true,
+      this.actions});
   final String userId;
   final List<FriendshipUser> friends;
   final CommunityService service;
   final bool active;
+  final Widget? actions;
 
   @override
   State<PeopleDirectory> createState() => _PeopleDirectoryState();
@@ -283,10 +286,26 @@ class _PeopleDirectoryState extends State<PeopleDirectory>
     final starred = people.where((u) => _stars.contains(u.id)).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       TextField(
-          decoration: const InputDecoration(
-              hintText: 'Search people', prefixIcon: Icon(Icons.search)),
+          style: const TextStyle(fontSize: 14),
+          decoration: InputDecoration(
+              hintText: 'Search people',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              filled: true,
+              fillColor: context.colors.surface,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none)),
           onChanged: (v) => setState(() => _query = v.trim().toLowerCase())),
       const SizedBox(height: 12),
+      if (widget.actions != null) ...[
+        widget.actions!,
+        const SizedBox(height: 16),
+      ],
       Wrap(spacing: 8, children: [
         FlixiePill.choice(
             label: Text('Friends ${widget.friends.length}'),

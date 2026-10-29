@@ -1,4 +1,3 @@
-import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -37,15 +36,6 @@ class GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final count = memberCount ?? group.memberCount;
-    final status = statusLabel != null && statusLabel!.isNotEmpty
-        ? _GroupInfoChip(
-            label: statusLabel!,
-            color: statusLabel == 'Invite pending'
-                ? context.colors.warning
-                : statusLabel == 'Community'
-                    ? context.colors.medium
-                    : context.colors.success)
-        : null;
     if (compact) {
       final description = group.description?.trim() ?? '';
       return Padding(
@@ -89,107 +79,59 @@ class GroupCard extends StatelessWidget {
         ),
       );
     }
-    return GestureDetector(
-      onTap: onTap ?? () => context.push('/groups/${group.id}'),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        // Give the final status row the same comfortable clearance as the
-        // top content; it was sitting too close to the card edge on phones.
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-        decoration: BoxDecoration(
-          color: context.colors.tabBarBackgroundFocused,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: context.colors.tabBarBorder),
-        ),
-        child: Column(
-          children: [
-            LayoutBuilder(builder: (context, constraints) {
-              final reflow = constraints.maxWidth < 330 ||
-                  MediaQuery.textScalerOf(context).scale(12) > 18;
-              return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap ?? () => context.push('/groups/${group.id}'),
+              child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        GroupAvatar(group: group, radius: 30),
+                        GroupAvatar(group: group, radius: 22),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      group.name,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: context.colors.textPrimary,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  Icon(Icons.more_horiz_rounded,
-                                      color: context.colors.medium, size: 20),
-                                ],
-                              ),
-                              if (count != null)
+                              Text(group.name,
+                                  style: TextStyle(
+                                      color: context.colors.white,
+                                      fontSize: 15,
+                                      height: 1.35,
+                                      fontWeight: FontWeight.w700)),
+                              if (count != null) ...[
+                                const SizedBox(height: 4),
                                 Text(
-                                  '${_formatCount(count)} member${count == 1 ? '' : 's'}',
-                                  style: const TextStyle(
-                                    color: FlixieColors.primary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
+                                    '${_formatCount(count)} member${count == 1 ? '' : 's'}',
+                                    style: TextStyle(
+                                        color: context.colors.light,
+                                        fontSize: 12)),
+                              ],
                               if (members.isNotEmpty) ...[
-                                const SizedBox(height: 7),
+                                const SizedBox(height: 8),
                                 _MemberAvatars(
                                     members: members, totalCount: count),
                               ],
-                            ],
-                          ),
-                        ),
-                        if (status != null && !reflow)
-                          Padding(
-                              padding: const EdgeInsets.only(top: 34),
-                              child: status),
-                      ],
-                    ),
-                    if (status != null && reflow)
-                      Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: status),
-                  ]);
-            }),
-            const SizedBox(height: 10),
-            Divider(height: 1, color: context.colors.tabBarBorder),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    group.description?.trim().isNotEmpty == true
-                        ? group.description!.trim()
-                        : statusLabel ?? 'Open group',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.colors.medium,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded,
-                    color: FlixieColors.primary),
-              ],
-            ),
-          ],
-        ),
-      ),
+                              if (statusLabel != null &&
+                                  statusLabel != 'Community') ...[
+                                const SizedBox(height: 6),
+                                Text(statusLabel!,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: context.colors.light)),
+                              ],
+                            ])),
+                        const SizedBox(width: 8),
+                        Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Icon(Icons.chevron_right_rounded,
+                                color: context.colors.primaryText, size: 22)),
+                      ])))),
     );
   }
 }
@@ -270,17 +212,5 @@ class _MemberAvatars extends StatelessWidget {
         ]),
       );
     });
-  }
-}
-
-class _GroupInfoChip extends StatelessWidget {
-  const _GroupInfoChip({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return FlixiePill.label(label: Text(label));
   }
 }

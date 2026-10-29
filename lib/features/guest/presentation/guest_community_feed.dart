@@ -90,32 +90,46 @@ class GuestCommunityFeedState extends State<GuestCommunityFeed> {
         const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Text('Public ratings, reviews and lists will appear here.')),
-      for (final item in (widget.preview ? _items.take(3) : _items))
-        ActivityTile(
-            key: ValueKey('guest:${item.type.value}:${item.id}'),
-            item: item,
-            feedStyle: true,
-            community: true,
-            detailSource: DetailSource.communityActivity,
-            onDiscussion: () => GuestAccess.require(context,
-                title: 'Join the conversation',
-                message:
-                    'Create an account to read and write comments, and connect with film people.',
-                path:
-                    '/community/posts/${item.userId}/${item.type.value}/${item.id}')),
-      if (!widget.preview && _cursor != null)
-        TextButton(
-            onPressed: _more ? null : () => _load(more: true),
-            child: Text(_more ? 'Loading…' : 'Load more')),
     ]);
-    if (widget.preview) return content;
+    if (widget.preview) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ...content.children,
+        for (final item in _items.take(3)) _activity(item)
+      ]);
+    }
+    final headers = content.children;
+
     return Scaffold(
         appBar: AppBar(title: const Text('Around Flixie')),
         body: RefreshIndicator(
             onRefresh: refresh,
-            child: ListView(
+            child: ListView.builder(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(20),
-                children: content.children)));
+                itemCount:
+                    headers.length + _items.length + (_cursor == null ? 0 : 1),
+                itemBuilder: (context, index) {
+                  if (index < headers.length) return headers[index];
+                  final itemIndex = index - headers.length;
+                  if (itemIndex < _items.length) {
+                    return _activity(_items[itemIndex]);
+                  }
+                  return TextButton(
+                      onPressed: _more ? null : () => _load(more: true),
+                      child: Text(_more ? 'Loading…' : 'Load more'));
+                })));
   }
+
+  Widget _activity(ActivityListItem item) => ActivityTile(
+      key: ValueKey('guest:${item.type.value}:${item.id}'),
+      item: item,
+      feedStyle: true,
+      community: true,
+      detailSource: DetailSource.communityActivity,
+      onDiscussion: () => GuestAccess.require(context,
+          title: 'Join the conversation',
+          message:
+              'Create an account to read and write comments, and connect with film people.',
+          path:
+              '/community/posts/${item.userId}/${item.type.value}/${item.id}'));
 }

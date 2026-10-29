@@ -1,3 +1,4 @@
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flutter/material.dart';
 
@@ -19,6 +20,26 @@ class SpecialAvatarFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (badges.contains('BORDER_CHRISTMAS_LIGHTS')) {
+      return LayoutBuilder(builder: (context, constraints) {
+        final padding = frameWidth ??
+            (constraints.hasBoundedWidth ? constraints.maxWidth * .09 : 4.0);
+        return Stack(
+          children: [
+            Padding(padding: EdgeInsets.all(padding), child: child),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: SvgPicture.asset(
+                  'assets/icon/christmas_lights_border.svg',
+                  key: const ValueKey('christmas-lights-avatar-border'),
+                  excludeFromSemantics: true,
+                ),
+              ),
+            ),
+          ],
+        );
+      });
+    }
     if (!badges.contains('FOUNDER') &&
         !badges.contains('OG_USER') &&
         !badges.contains('VERIFIED') &&
@@ -78,6 +99,13 @@ class ProfileBadgePills extends StatelessWidget {
 
   static const _details = <String,
       ({String label, String description, IconData icon, Color color})>{
+    'BORDER_CHRISTMAS_LIGHTS': (
+      label: 'Christmas Lights',
+      description:
+          'Earned by completing a Flixie challenge with this avatar border reward.',
+      icon: Icons.celebration_rounded,
+      color: Color(0xFFFFD458),
+    ),
     'FOUNDER': (
       label: 'Founder',
       description: 'Created Flixie and helped start the community.',
@@ -144,6 +172,7 @@ class ProfileBadgePills extends StatelessWidget {
       'VERIFIED',
       'EARLY_ADOPTER',
       'FOUNDING_FILM_FRIEND',
+      'BORDER_CHRISTMAS_LIGHTS',
       'STAFF',
       'PARTNER',
       'PEACH_USER',
@@ -182,6 +211,7 @@ class ProfileBadgePills extends StatelessWidget {
                   badge.id != allVisible.first.id &&
                   (badge.id == 'EARLY_ADOPTER' ||
                       badge.id == 'FOUNDING_FILM_FRIEND' ||
+                      badge.id == 'BORDER_CHRISTMAS_LIGHTS' ||
                       badge.id == 'PEACH_USER' ||
                       badge.id == 'OG_GINGER'),
             ),

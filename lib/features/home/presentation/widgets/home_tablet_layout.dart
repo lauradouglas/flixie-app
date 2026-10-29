@@ -12,8 +12,16 @@ class HomeTabletLayout extends StatelessWidget {
       required this.plans,
       required this.picker,
       required this.community,
-      required this.games});
-  final Widget greeting, discovery, cinemas, plans, picker, community, games;
+      required this.games,
+      this.curatedLists = const SizedBox.shrink()});
+  final Widget greeting,
+      discovery,
+      cinemas,
+      plans,
+      picker,
+      community,
+      games,
+      curatedLists;
 
   static bool trendingActive(BuildContext context) =>
       active(context) ||
@@ -23,20 +31,73 @@ class HomeTabletLayout extends StatelessWidget {
           MediaQuery.sizeOf(context).width >= 700 &&
           MediaQuery.textScalerOf(context).scale(1) <= 1.4);
 
+  static bool portrait(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<HomeTabletScope>()?.portrait ??
+      false;
+
   static bool active(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<HomeTabletScope>() != null;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+        final portrait = box.maxWidth >= 700 &&
+            MediaQuery.sizeOf(context).shortestSide >= 600 &&
+            MediaQuery.sizeOf(context).height >
+                MediaQuery.sizeOf(context).width &&
+            MediaQuery.textScalerOf(context).scale(1) <= 1.4;
         final tablet = MediaQuery.sizeOf(context).shortestSide >= 600 &&
             box.maxWidth >= 900 &&
             MediaQuery.textScalerOf(context).scale(1) <= 1.4;
+        if (portrait) {
+          return HomeTabletScope(
+              portrait: true,
+              child: Column(
+                  key: const ValueKey('home-tablet-portrait-layout'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    greeting,
+                    Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              discovery,
+                              curatedLists,
+                              cinemas,
+                              const SizedBox(height: 16),
+                              IntrinsicHeight(
+                                  child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                    Expanded(
+                                        flex: 3,
+                                        child: Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 12),
+                                            child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Expanded(child: plans),
+                                                  games,
+                                                ]))),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                        flex: 2,
+                                        child: _panel(context, picker)),
+                                  ])),
+                              community,
+                            ])),
+                  ]));
+        }
         if (!tablet) {
           return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 greeting,
                 discovery,
+                curatedLists,
                 cinemas,
                 picker,
                 community,
@@ -59,16 +120,18 @@ class HomeTabletLayout extends StatelessWidget {
                             flex: 13,
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [discovery, cinemas])),
+                                children: [discovery, curatedLists, cinemas])),
                         const SizedBox(width: 16),
                         Expanded(
                             flex: 7,
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  _panel(context, plans),
+                                  plans,
+                                  const SizedBox(height: 12),
                                   _panel(context, picker),
-                                  _panel(context, community),
+                                  community,
+                                  const SizedBox(height: 12),
                                   games
                                 ]))
                       ]))
@@ -83,7 +146,10 @@ class HomeTabletLayout extends StatelessWidget {
 }
 
 class HomeTabletScope extends InheritedWidget {
-  const HomeTabletScope({super.key, required super.child});
+  const HomeTabletScope(
+      {super.key, required super.child, this.portrait = false});
+  final bool portrait;
   @override
-  bool updateShouldNotify(HomeTabletScope oldWidget) => false;
+  bool updateShouldNotify(HomeTabletScope oldWidget) =>
+      portrait != oldWidget.portrait;
 }

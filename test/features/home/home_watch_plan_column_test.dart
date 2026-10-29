@@ -13,6 +13,40 @@ import 'package:flixie_app/features/home/presentation/models/home_watch_plan_sta
 import 'package:flixie_app/models/watch_request.dart';
 
 void main() {
+  testWidgets('portrait plan preserves contextual and creation actions',
+      (tester) async {
+    var opens = 0, creates = 0;
+    final state = HomeWatchPlanState(
+        plan: WatchRequest(
+            id: 'fixture',
+            requesterId: 'friend',
+            recipientId: 'me',
+            status: 'pending',
+            type: 'MOVIE_WATCH_REQUEST',
+            movie: const WatchRequestMovieDetails(id: 1, title: 'Alien')),
+        type: HomeWatchPlanStateType.chooseFinalMovie,
+        priority: 1,
+        eyebrow: 'Needs your reply',
+        title: 'Alien',
+        supportingText: 'Invited by a friend',
+        actionLabel: 'View invitation',
+        requiresAttention: true);
+    await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+            body: SizedBox(
+                width: 430,
+                child: PortraitHomeWatchPlanCard(
+                    state: state,
+                    onOpen: () => opens++,
+                    onCreate: () => creates++)))));
+    await tester.tap(find.text('View invitation'));
+    await tester.tap(find.text('Make a Watch Plan'));
+    expect(opens, 1);
+    expect(creates, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final width in [320.0, 600.0, 1024.0]) {
     testWidgets(
         'tablet plan column shows both actions in order at width $width',

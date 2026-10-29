@@ -190,7 +190,10 @@ class NotificationInboxCard extends StatelessWidget {
             : switch (n.watchPlanEvent) {
                 'PLAN_INVITED' => needs ? 'View invitation' : 'View plan',
                 'SCHEDULE_PROPOSED' => needs ? 'Review proposal' : 'View plan',
-                'PLAN_READY_TO_LOG' || 'COMPANION_LOGGED' || 'COMPANION_RATED' => 'Log watch',
+                'PLAN_READY_TO_LOG' ||
+                'COMPANION_LOGGED' ||
+                'COMPANION_RATED' =>
+                  'Log watch',
                 'ALL_PARTICIPANTS_LOGGED' || 'RECAP_UPDATED' => 'View recap',
                 _ => n.type == FlixieNotification.communityInvite
                     ? (n.action == FlixieNotification.actionAccepted
@@ -219,6 +222,114 @@ class NotificationInboxCard extends StatelessWidget {
         : positive
             ? context.colors.success
             : context.colors.primaryText;
+    final tablet = MediaQuery.sizeOf(context).shortestSide >= 600 &&
+        MediaQuery.sizeOf(context).width >= 700;
+    if (tablet && (!needs || options.isEmpty)) {
+      return Semantics(
+          label: n.isRead ? null : 'Unread notification',
+          child: Material(
+              color: n.isRead ? Colors.transparent : context.colors.surface,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                  onTap: onOpen,
+                  onLongPress: onOptions,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            avatar,
+                            const SizedBox(width: 14),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  _NotificationHeadline(notification: n),
+                                  if (planLabel != null) ...[
+                                    const SizedBox(height: 5),
+                                    Text(planLabel,
+                                        style: TextStyle(
+                                            color: context.colors.primaryText,
+                                            fontSize: 12)),
+                                  ],
+                                  if (subtitle.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(subtitle,
+                                        style: TextStyle(
+                                            color: context.colors.light,
+                                            fontSize: 12,
+                                            height: 1.4)),
+                                  ],
+                                  if (needs && processing)
+                                    const Padding(
+                                        padding: EdgeInsets.only(top: 10),
+                                        child: SizedBox.square(
+                                            dimension: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2)))
+                                  else if (needs && onAccept != null)
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 10),
+                                        child: Wrap(
+                                            spacing: 8,
+                                            runSpacing: 6,
+                                            children: [
+                                              FilledButton(
+                                                  onPressed: onAccept,
+                                                  child: const Text('Accept')),
+                                              TextButton(
+                                                  onPressed: onDecline,
+                                                  child: const Text('Decline')),
+                                            ]))
+                                  else if (needs && onOpen != null)
+                                    Padding(
+                                        padding: const EdgeInsets.only(top: 10),
+                                        child: FilledButton(
+                                            onPressed: onOpen,
+                                            child: Text(cta)))
+                                  else if (n.isWatchPlanNotification &&
+                                      !cancelled &&
+                                      onOpen != null)
+                                    TextButton(
+                                        onPressed: onOpen, child: Text(cta)),
+                                ])),
+                            const SizedBox(width: 12),
+                            Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(date,
+                                      style: TextStyle(
+                                          color: context.colors.light,
+                                          fontSize: 11)),
+                                  IconButton(
+                                      onPressed: onOptions,
+                                      tooltip: 'Notification options',
+                                      icon: Icon(
+                                          n.isRead
+                                              ? Icons.more_horiz
+                                              : Icons.circle,
+                                          size: n.isRead ? 18 : 7,
+                                          color: context.colors.primaryText)),
+                                ]),
+                            if (path != null && path.isNotEmpty) ...[
+                              const SizedBox(width: 12),
+                              ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: CachedNetworkImage(
+                                      imageUrl: path.startsWith('http')
+                                          ? path
+                                          : 'https://image.tmdb.org/t/p/w185$path',
+                                      width: 44,
+                                      height: 66,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (_, __, ___) =>
+                                          const SizedBox(
+                                              width: 44, height: 66))),
+                            ],
+                          ])))));
+    }
     if (!needs) {
       final detail = cancelled
           ? 'This plan has been cancelled.'

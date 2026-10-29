@@ -97,10 +97,10 @@ Future<void> guestCollectingJourney(WidgetTester tester,
   await tester.pumpAndSettle();
   expect(
       find.text(
-          'Find films and shows. Save your next watch. No account needed.'),
+          'Find films and shows. Save your next watch.\nNo account needed.'),
       findsOneWidget);
   await capture?.call('home');
-  await tester.tap(find.text('Find a film or show'));
+  await tester.tap(find.text('Search films, shows and people'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Alien'));
   await tester.pumpAndSettle();
@@ -171,15 +171,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('More titles will appear here soon.'), findsOneWidget);
     await tester.scrollUntilVisible(
-        find.text('Couldn’t load communities. Retry'), 500);
+        find.text('Couldn’t load communities. Retry'), 500,
+        scrollable: find.byType(Scrollable).first);
     final catalogueReads = trendingReads;
     await tester.tap(find.text('Couldn’t load communities. Retry'));
     await tester.pumpAndSettle();
     expect(communityReads, 2);
     expect(trendingReads, catalogueReads);
-    await tester.scrollUntilVisible(
-        find.text('Keep my picks across devices'), -300);
-    expect(find.text('Keep my picks across devices'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Create free account'), -300,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Create free account'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

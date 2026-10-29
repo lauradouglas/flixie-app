@@ -33,7 +33,7 @@ class PersonEmptySection extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   message,
-                  style: TextStyle(color: context.colors.medium, fontSize: 12),
+                  style: TextStyle(color: context.colors.medium, fontSize: 14),
                 ),
               ],
             ),

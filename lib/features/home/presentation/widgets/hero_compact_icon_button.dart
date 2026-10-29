@@ -7,9 +7,11 @@ class HeroCompactIconButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.isBusy = false,
+    this.alignment = Alignment.center,
     this.foregroundColor = Colors.white,
   });
 
+  final Alignment alignment;
   final String tooltip;
   final IconData icon;
   final VoidCallback onPressed;
@@ -22,8 +24,14 @@ class HeroCompactIconButton extends StatelessWidget {
       message: tooltip,
       child: IconButton(
         onPressed: isBusy ? null : onPressed,
+        alignment: alignment,
+        padding: alignment == Alignment.center ? null : EdgeInsets.zero,
         style: IconButton.styleFrom(
           minimumSize: const Size.square(44),
+          padding: alignment == Alignment.center ? null : EdgeInsets.zero,
+          tapTargetSize: alignment == Alignment.center
+              ? null
+              : MaterialTapTargetSize.shrinkWrap,
           foregroundColor: foregroundColor,
           backgroundColor: Colors.transparent,
         ),

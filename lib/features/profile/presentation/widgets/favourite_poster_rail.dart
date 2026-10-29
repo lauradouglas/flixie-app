@@ -103,11 +103,15 @@ class FavouriteDisplayItem {
     required this.title,
     required this.imagePath,
     required this.route,
+    this.department,
+    this.featuredRoles = const [],
   });
 
   final String title;
   final String? imagePath;
   final String? route;
+  final String? department;
+  final List<String> featuredRoles;
 }
 
 class FavouritePosterRail extends StatelessWidget {
@@ -155,7 +159,10 @@ class FavouritePosterRail extends StatelessWidget {
                               ? '${items.length} favourites'
                               : '${items.length} of $limit favourites',
                           style: TextStyle(
-                              fontSize: 13, color: context.colors.light)),
+                              fontSize: circular ? 12 : 13,
+                              color: circular
+                                  ? context.colors.primaryText
+                                  : context.colors.light)),
                     ],
                   )),
                   IconButton(
@@ -166,9 +173,15 @@ class FavouritePosterRail extends StatelessWidget {
               ),
               Expanded(
                 child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  padding: EdgeInsets.fromLTRB(
+                      circular ? 12 : 20, 0, circular ? 12 : 20, 24),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, __) => circular
+                      ? Divider(
+                          height: 1,
+                          thickness: .5,
+                          color: context.colors.tabBarBorder)
+                      : const SizedBox(height: 8),
                   itemBuilder: (sheetContext, index) {
                     final item = items[index];
                     final raw = item.imagePath;
@@ -178,8 +191,13 @@ class FavouritePosterRail extends StatelessWidget {
                             ? raw
                             : 'https://image.tmdb.org/t/p/w185$raw';
                     return Material(
-                      color: context.colors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(14),
+                      color: circular
+                          ? item.featuredRoles.isEmpty
+                              ? Colors.transparent
+                              : context.colors.primaryText
+                                  .withValues(alpha: .08)
+                          : context.colors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(circular ? 4 : 14),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         onTap: item.route == null
@@ -190,7 +208,9 @@ class FavouritePosterRail extends StatelessWidget {
                                 router.push(item.route!);
                               },
                         child: Padding(
-                          padding: const EdgeInsets.all(10),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: circular ? 12 : 10,
+                              vertical: circular ? 6 : 10),
                           child: Row(children: [
                             if (!circular) ...[
                               SizedBox(
@@ -204,11 +224,10 @@ class FavouritePosterRail extends StatelessWidget {
                               const SizedBox(width: 10),
                             ],
                             ClipRRect(
-                              borderRadius:
-                                  BorderRadius.circular(circular ? 50 : 6),
+                              borderRadius: BorderRadius.circular(6),
                               child: SizedBox(
-                                  width: 44,
-                                  height: circular ? 44 : 66,
+                                  width: circular ? 40 : 44,
+                                  height: circular ? 60 : 66,
                                   child: url == null
                                       ? const Icon(Icons.movie_outlined)
                                       : Image.network(url,
@@ -219,14 +238,56 @@ class FavouritePosterRail extends StatelessWidget {
                             ),
                             const SizedBox(width: 14),
                             Expanded(
-                                child: Text(item.title,
-                                    style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: context.colors.textPrimary))),
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(item.title,
+                                      style: TextStyle(
+                                          fontSize: circular ? 15 : 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: context.colors.textPrimary)),
+                                  if (item.department?.isNotEmpty == true) ...[
+                                    const SizedBox(height: 4),
+                                    Text(item.department!,
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: context.colors.light)),
+                                  ],
+                                ])),
+                            if (item.featuredRoles.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                  width: 80,
+                                  child: Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: [
+                                        for (final role in item.featuredRoles)
+                                          Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.check,
+                                                    size: 16,
+                                                    color: context
+                                                        .colors.primaryText),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                    child: Text(role,
+                                                        style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: context
+                                                                .colors
+                                                                .primaryText))),
+                                              ]),
+                                      ])),
+                            ],
                             const SizedBox(width: 8),
                             Icon(Icons.chevron_right,
-                                size: 20, color: context.colors.light),
+                                size: 20,
+                                color: circular
+                                    ? context.colors.primaryText
+                                    : context.colors.light),
                           ]),
                         ),
                       ),
@@ -243,8 +304,7 @@ class FavouritePosterRail extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Expanded(
-              child: FlixieSectionHeader(title: title)),
+          Expanded(child: FlixieSectionHeader(title: title)),
           if (onRank != null)
             IconButton(
               tooltip:
@@ -255,8 +315,12 @@ class FavouritePosterRail extends StatelessWidget {
             ),
           TextButton(
             onPressed: onSeeAll ?? () => showAll(context),
-            child: Text(title.startsWith('Favourite ') ? 'All (${items.length})' : 'See all',
-                style: TextStyle(color: context.colors.primaryText, fontSize: 14)),
+            child: Text(
+                title.startsWith('Favourite ')
+                    ? 'All (${items.length})'
+                    : 'See all',
+                style:
+                    TextStyle(color: context.colors.primaryText, fontSize: 14)),
           ),
         ]),
         const SizedBox(height: 8),
@@ -334,14 +398,27 @@ class FavouritePosterRail extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(
-                          item.title,
-                          style: TextStyle(
-                            color: context.colors.light,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (!circular) ...[
+                                Text('${index + 1}',
+                                    style: TextStyle(
+                                        color: context.colors.primaryText,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800)),
+                                const SizedBox(width: 6),
+                              ],
+                              Expanded(
+                                  child: Text(item.title,
+                                      textAlign: circular
+                                          ? TextAlign.center
+                                          : TextAlign.start,
+                                      style: TextStyle(
+                                          color: context.colors.light,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700))),
+                            ]),
                       ],
                     ),
                   ),

@@ -28,6 +28,12 @@ class ProfileFavouritePeople extends StatelessWidget {
   FavouriteDisplayItem display(Map p) => FavouriteDisplayItem(
       title: name(p),
       imagePath: (p['profileImgUrl'] ?? p['profilePath'])?.toString(),
+      department: p['department']?.toString(),
+      featuredRoles: [
+        for (final role in ['director', 'actor', 'actress'])
+          if (id(p) != null && featured[role] == id(p))
+            '${role[0].toUpperCase()}${role.substring(1)}'
+      ],
       route: id(p) == null ? null : '/people/${id(p)}');
 
   Future<void> choose(BuildContext context, String role) async {
@@ -156,7 +162,10 @@ class ProfileFavouritePeople extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                       if (person != null)
-                        Text('Favourite $role',
+                        Text(
+                            role.isEmpty
+                                ? ''
+                                : '${role[0].toUpperCase()}${role.substring(1)}',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 13, color: context.colors.light)),

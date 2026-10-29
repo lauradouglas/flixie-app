@@ -24,7 +24,7 @@ class TrendingCarouselSkeleton extends StatelessWidget {
                             children: [
                               SizedBox(width: constraints.maxWidth * .08),
                               SizedBox(
-                                  width: constraints.maxWidth * .84,
+                                  width: constraints.maxWidth * .90,
                                   child: const Padding(
                                       padding:
                                           EdgeInsets.symmetric(horizontal: 6),

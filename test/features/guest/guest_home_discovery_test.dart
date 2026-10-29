@@ -86,12 +86,35 @@ void main() {
               child: RepaintBoundary(key: boundary, child: child!))));
       await tester.pumpAndSettle();
       expect(find.byType(GuestHomeWelcome), findsOneWidget);
+      final homeList = tester
+          .widgetList<ListView>(find.byType(ListView))
+          .firstWhere(
+              (list) => list.childrenDelegate is SliverChildListDelegate);
+      final sections = (homeList.childrenDelegate as SliverChildListDelegate)
+          .children
+          .map((widget) => widget.runtimeType.toString())
+          .toList();
+      final expectedOrder = [
+        'GuestHomeWelcome',
+        'GuestProviderExample',
+        'CuratedListsHomeSection',
+        'InCinemasSection',
+        'GuestDiaryTeaser',
+        'GuestWatchTogetherTeaser',
+        'GuestSignupSection',
+      ];
+      var previous = -1;
+      for (final section in expectedOrder) {
+        final index = sections.indexOf(section);
+        expect(index, greaterThan(previous),
+            reason: '$section follows the approved Home order');
+        previous = index;
+      }
       await tester.runAsync(() => precacheImage(
           const AssetImage('assets/icon/community_pips/pip-flixie-hoodie.png'),
           tester.element(find.byType(GuestHomeWelcome))));
       await tester.pump();
-      expect(find.text('Keep my picks across devices').hitTestable(),
-          findsNothing);
+      expect(find.text('Create free account').hitTestable(), findsNothing);
       expect(tester.takeException(), isNull);
       // Capture the phone/tablet opening viewport when explicitly requested.
       if (Platform.environment['GUEST_HOME_CAPTURE'] == '1') {
@@ -107,13 +130,29 @@ void main() {
       }
       await tester.scrollUntilVisible(find.text('In cinemas'), 300,
           scrollable: find.byType(Scrollable).first);
-      expect(find.text('Your picks, wherever you sign in.').hitTestable(),
-          findsNothing);
-      await tester.scrollUntilVisible(
-          find.text('Keep my picks across devices'), 300,
+      expect(find.text('Make yourself at home.').hitTestable(), findsNothing);
+      await tester.scrollUntilVisible(find.text('Create free account'), 300,
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Keep my picks across devices'));
+      await tester.scrollUntilVisible(
+          find.text('About badges & milestones'), 300,
+          scrollable: find.byType(Scrollable).first);
+      await tester.ensureVisible(find.text('About badges & milestones'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('About badges & milestones'));
+      await tester.pumpAndSettle();
+      expect(find.text('Badges & milestones'), findsOneWidget);
+      await tester.scrollUntilVisible(find.text('Keep browsing'), 200,
+          scrollable: find.byType(Scrollable).last);
+      await tester.tap(find.text('Keep browsing'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Create free account'), -200,
+          scrollable: find.byType(Scrollable).first);
+      await Scrollable.ensureVisible(
+          tester.element(find.text('Create free account')),
+          alignment: .5);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Create free account'));
       await tester.pumpAndSettle();
       expect(find.text('Signup destination'), findsOneWidget);
       expect(tester.takeException(), isNull);

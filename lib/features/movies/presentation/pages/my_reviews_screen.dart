@@ -252,7 +252,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
               _searchController.text.isNotEmpty
                   ? 'No reviews found'
                   : 'No reviews yet',
-              style: const TextStyle(color: Colors.grey, fontSize: 16),
+              style: const TextStyle(color: Colors.grey, fontSize: 14),
             ),
             if (_searchController.text.isEmpty) ...[
               const SizedBox(height: 8),
@@ -416,7 +416,8 @@ class _ReviewCardState extends State<ReviewCard> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              PipReaction(e.key, size: 24, previewable: true, count: e.value),
+                              PipReaction(e.key,
+                                  size: 24, previewable: true, count: e.value),
                               const SizedBox(width: 2),
                               Text(
                                 '${e.value}',

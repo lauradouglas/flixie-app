@@ -493,7 +493,7 @@ class _SignupJourneyPageState extends State<SignupJourneyPage> {
                 .headlineSmall
                 ?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 10),
-        Text(body, style: const TextStyle(fontSize: 16, height: 1.5)),
+        Text(body, style: const TextStyle(fontSize: 14, height: 1.5)),
         const SizedBox(height: 24)
       ]);
   Widget _suggestionList() {

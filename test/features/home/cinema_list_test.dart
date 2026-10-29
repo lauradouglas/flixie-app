@@ -7,7 +7,7 @@ import 'package:flixie_app/models/movie_short.dart';
 
 void main() {
   testWidgets(
-      'personal watchlist state, pending protection and optional TMDB rating',
+      'personal watchlist state, pending protection and optional star rating',
       (tester) async {
     var saves = 0;
     Future<void> show({bool pending = false}) => tester.pumpWidget(MaterialApp(
@@ -25,8 +25,16 @@ void main() {
           onTrailer: (_) {},
         ))));
     await show();
-    expect(find.text('TMDB 8.2/10'), findsOneWidget);
-    expect(find.textContaining('TMDB'), findsOneWidget);
+    expect(find.text('8.2'), findsOneWidget);
+    expect(find.textContaining('TMDB'), findsNothing);
+    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+    final outline = find.byIcon(Icons.bookmark_outline_rounded);
+    expect(outline, findsOneWidget);
+    expect(find.byIcon(Icons.bookmark_add_outlined), findsNothing);
+    expect(tester.getTopRight(outline).dx,
+        tester.getTopRight(find.byType(CinemaList)).dx);
+    expect(tester.getTopLeft(outline).dy,
+        lessThanOrEqualTo(tester.getTopLeft(find.text('The Odyssey')).dy));
     expect(find.byTooltip('Remove from watchlist'), findsOneWidget);
     await tester.tap(find.byTooltip('Remove from watchlist'));
     expect(saves, 1);

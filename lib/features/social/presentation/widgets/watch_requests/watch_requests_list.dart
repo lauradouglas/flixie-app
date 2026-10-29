@@ -177,7 +177,7 @@ class WatchRequestsList extends StatelessWidget {
                     controller.filter != WatchPlanFilter.active
                 ? 'No Watch Plans match'
                 : 'No Watch Plans yet',
-            style: TextStyle(color: context.colors.medium, fontSize: 16),
+            style: TextStyle(color: context.colors.medium, fontSize: 14),
           ),
         ],
       ),

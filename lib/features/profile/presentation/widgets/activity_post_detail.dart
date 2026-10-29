@@ -250,7 +250,7 @@ class _ActivityPostDetailState extends State<ActivityPostDetail> {
         else
           SelectableText(body!,
               style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   height: 1.5,
                   color: context.colors.textPrimary)),
       ],

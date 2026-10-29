@@ -364,7 +364,7 @@ class _ProfileEmptyAction extends StatelessWidget {
                   body,
                   style: TextStyle(
                     color: context.colors.medium,
-                    fontSize: 12,
+                    fontSize: 14,
                     height: 1.25,
                   ),
                 ),

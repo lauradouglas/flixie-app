@@ -97,7 +97,7 @@ class CommunityIdentityHeader extends StatelessWidget {
     );
     final description = Text(identity.blurb,
         style: TextStyle(
-            fontSize: 16, height: 1.45, color: context.colors.medium));
+            fontSize: 14, height: 1.45, color: context.colors.medium));
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       child: LayoutBuilder(builder: (context, constraints) {

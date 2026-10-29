@@ -26,7 +26,8 @@ class SignupJourney {
         'collection',
         'collection-plan',
         'community',
-        'discussion'
+        'discussion',
+        'curated-list'
       }.contains(action) ||
       path.startsWith('/people/');
   static bool supports(String? action, String? path) =>
@@ -41,6 +42,8 @@ class SignupJourney {
               .hasMatch(path ?? '')) ||
       (const {'collection', 'collection-plan'}.contains(action) &&
           RegExp(r'^/collections/[0-9]+$').hasMatch(path ?? '')) ||
+      (action == 'curated-list' &&
+          RegExp(r'^/flixie-lists/[a-zA-Z0-9-]+$').hasMatch(path ?? '')) ||
       (action == 'favorite' &&
           RegExp(r'^/people/[0-9]+$').hasMatch(path ?? '')) ||
       (const {

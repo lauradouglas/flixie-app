@@ -80,9 +80,10 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(movie.isShow ? 'TV show' : 'Movie',
-                          style: TextStyle(
-                              fontSize: 12, color: context.colors.medium)),
+                      if (movie.isShow)
+                        Text('TV show',
+                            style: TextStyle(
+                                fontSize: 12, color: context.colors.medium)),
                       TextButton(
                         onPressed: () => widget.onDetails(movie),
                         style: TextButton.styleFrom(
@@ -120,7 +121,7 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                                 : movie.overview!,
                             style: TextStyle(
                                 color: context.colors.light,
-                                fontSize: 15,
+                                fontSize: 12,
                                 height: 1.5)),
                       ],
                       if (widget.friendActivity != null) ...[
@@ -153,9 +154,12 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                                     dimension: 18,
                                     child: CircularProgressIndicator(
                                         strokeWidth: 2))
-                                : Icon(saved
-                                    ? Icons.bookmark
-                                    : Icons.bookmark_outline),
+                                : Icon(
+                                    saved
+                                        ? Icons.bookmark
+                                        : Icons.bookmark_outline,
+                                    color:
+                                        saved ? null : context.colors.warning),
                             label: Text(saved
                                 ? 'In your watchlist'
                                 : 'Add to watchlist')),
@@ -238,10 +242,14 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text(
-                        '${movie.isShow ? 'TV show' : 'Movie'}${year == null ? '' : ' · $year'}',
-                        style: TextStyle(
-                            color: context.colors.light, fontSize: 12)),
+                    if (movie.isShow || year != null)
+                      Text(
+                          [
+                            if (movie.isShow) 'TV show',
+                            if (year != null) '$year'
+                          ].join(' · '),
+                          style: TextStyle(
+                              color: context.colors.light, fontSize: 12)),
                     TextButton(
                         onPressed: () => widget.onDetails(movie),
                         style: TextButton.styleFrom(
@@ -275,7 +283,7 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                               .first,
                           style: TextStyle(
                               color: context.colors.light,
-                              fontSize: 13,
+                              fontSize: 12,
                               height: 1.4)),
                     ],
                     if (widget.friendActivity != null)
@@ -336,6 +344,7 @@ class _TabletTrendingGalleryState extends State<TabletTrendingGallery> {
                                   saved
                                       ? Icons.bookmark
                                       : Icons.bookmark_outline,
+                                  color: saved ? null : context.colors.warning,
                                   size: 18),
                           label: Text(saved
                               ? 'In your watchlist'

@@ -31,7 +31,7 @@ class TrendingCarousel extends StatefulWidget {
 }
 
 class _TrendingCarouselState extends State<TrendingCarousel> {
-  final _pages = PageController(viewportFraction: .84);
+  final _pages = PageController(viewportFraction: .90);
   int _selected = 0;
   @override
   void initState() {
@@ -105,7 +105,7 @@ class _TrendingCarouselState extends State<TrendingCarousel> {
 
       return Column(children: [
         ContentSizedCarousel(
-            viewportFraction: .84,
+            viewportFraction: .90,
             measurements: [
               for (var index = 0; index < movies.length; index++)
                 if (widget.friendActivity?.call(movies[index].homeKey)

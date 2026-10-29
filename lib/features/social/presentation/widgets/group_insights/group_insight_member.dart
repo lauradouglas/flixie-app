@@ -96,7 +96,7 @@ class InsightMemberCard extends StatelessWidget {
               children: [
                 Expanded(child: identity),
                 const SizedBox(width: 12),
-                Flexible(child: activity),
+                activity,
               ],
             );
           },

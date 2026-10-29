@@ -268,3 +268,83 @@ class HomeWatchPlanEmptyCard extends StatelessWidget {
         ),
       );
 }
+
+/// Portrait's horizontal plan preview keeps contextual actions from the live plan.
+class PortraitHomeWatchPlanCard extends StatelessWidget {
+  const PortraitHomeWatchPlanCard(
+      {super.key,
+      required this.state,
+      required this.onOpen,
+      required this.onCreate});
+  final HomeWatchPlanState state;
+  final VoidCallback onOpen, onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = state.plan.candidates
+        .where((c) => c.id == state.plan.selectedCandidateId)
+        .firstOrNull;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+      child: Material(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            InkWell(
+                onTap: onOpen,
+                child: WatchPlanPoster(
+                    path: selected?.posterPath ?? state.plan.movie?.posterPath,
+                    title: state.title,
+                    width: 68)),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(state.title,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  Text(state.eyebrow,
+                      style: TextStyle(
+                          fontSize: 12, color: context.colors.primaryText)),
+                  const SizedBox(height: 4),
+                  Text(state.supportingText,
+                      style: TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: context.colors.light)),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, runSpacing: 6, children: [
+                    FilledButton(
+                        onPressed: onOpen,
+                        style: FilledButton.styleFrom(
+                            backgroundColor: state.requiresAttention
+                                ? context.colors.warning
+                                : null,
+                            foregroundColor: state.requiresAttention
+                                ? context.colors.background
+                                : null,
+                            minimumSize: const Size(0, 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            textStyle: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700)),
+                        child: Text(state.actionLabel)),
+                    OutlinedButton.icon(
+                        onPressed: onCreate,
+                        style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 44),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            textStyle: const TextStyle(fontSize: 12)),
+                        icon: const Icon(Icons.event_outlined, size: 16),
+                        label: const Text('Make a Watch Plan')),
+                  ]),
+                ])),
+          ]),
+        ),
+      ),
+    );
+  }
+}

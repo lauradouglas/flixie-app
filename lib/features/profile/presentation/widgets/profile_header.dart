@@ -1,3 +1,4 @@
+import 'profile_milestone_badges.dart';
 import 'expandable_profile_bio.dart';
 import 'package:flutter/material.dart';
 
@@ -14,6 +15,7 @@ class ProfileHeader extends StatelessWidget {
     required this.displayName,
     required this.username,
     this.memberSince,
+    this.userId,
     this.onPreview,
     this.onPeople,
     this.bio,
@@ -22,6 +24,7 @@ class ProfileHeader extends StatelessWidget {
     this.profileBadges = const [],
   });
 
+  final String? userId;
   final String displayName;
   final String username;
   final String? memberSince;
@@ -92,7 +95,7 @@ class ProfileHeader extends StatelessWidget {
                                 ? '?'
                                 : displayName[0].toUpperCase(),
                             fallbackColor: _avatarColor,
-                            size: 76,
+                            size: 80,
                             profileBadges: profileBadges)),
                     Positioned(
                         right: 0,
@@ -119,36 +122,91 @@ class ProfileHeader extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text('@$username',
                     style:
-                        TextStyle(color: context.colors.light, fontSize: 14)),
+                        TextStyle(color: context.colors.light, fontSize: 13)),
               ])),
         ]),
-        if (profileBadges.isNotEmpty) ...[
+        if (profileBadges.isNotEmpty && userId == null) ...[
           const SizedBox(height: 12),
           ProfileBadgePills(badges: profileBadges, compact: true),
         ],
-        if (bio?.isNotEmpty == true) ...[
+        if (userId != null) ...[
           const SizedBox(height: 12),
+          ProfileMilestoneBadges(
+              key: ValueKey(userId),
+              userId: userId!,
+              editable: true,
+              identityBadges: profileBadges.isEmpty
+                  ? null
+                  : ProfileBadgePills(badges: profileBadges, compact: true)),
+        ],
+        if (bio?.isNotEmpty == true) ...[
+          SizedBox(height: userId == null ? 12 : 4),
           ExpandableProfileBio(text: bio!),
         ],
-        const SizedBox(height: 0),
-        Wrap(spacing: 4, children: [
-          TextButton.icon(
-              onPressed: () => _openEditSheet(context),
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label:
-                  const Text('Edit profile', style: TextStyle(fontSize: 13))),
-          if (onPreview != null)
+        const SizedBox(height: 16),
+        LayoutBuilder(builder: (context, box) {
+          final stacked = box.maxWidth < 300 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.4;
+          final actions = [
             TextButton.icon(
-                onPressed: onPreview,
-                icon: const Icon(Icons.visibility_outlined, size: 18),
-                label: const Text('Preview profile',
-                    style: TextStyle(fontSize: 13))),
-          if (onPeople != null)
-            TextButton.icon(
-                onPressed: onPeople,
-                icon: const Icon(Icons.people_outline, size: 18),
-                label: const Text('Friends', style: TextStyle(fontSize: 13))),
-        ]),
+                onPressed: () => _openEditSheet(context),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: Text('Edit profile',
+                    style: TextStyle(fontSize: 13, color: context.colors.light))),
+            if (onPreview != null)
+              TextButton.icon(
+                  onPressed: onPreview,
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                  label: Text('Preview profile',
+                      style: TextStyle(
+                          fontSize: 13, color: context.colors.light))),
+          ];
+          return Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                  color: context.colors.surface,
+                  borderRadius: BorderRadius.circular(14)),
+              child: stacked
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: actions)
+                  : IntrinsicHeight(
+                      child: Row(children: [
+                      Expanded(child: actions.first),
+                      if (actions.length > 1) ...[
+                        VerticalDivider(
+                            width: 1,
+                            indent: 12,
+                            endIndent: 12,
+                            color: context.colors.tabBarBorder),
+                        Expanded(child: actions.last),
+                      ],
+                    ])));
+        }),
+        if (onPeople != null) ...[
+          const SizedBox(height: 16),
+          Material(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                  onTap: onPeople,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(children: [
+                        Icon(Icons.people_outline,
+                            color: context.colors.primaryText, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Text('Friends',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: context.colors.white))),
+                        Icon(Icons.chevron_right,
+                            color: context.colors.light, size: 22),
+                      ])))),
+        ],
       ]),
     );
   }

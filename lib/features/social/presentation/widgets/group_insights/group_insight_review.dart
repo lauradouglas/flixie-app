@@ -50,32 +50,21 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
         border: Border.all(color: FlixieColors.primary.withValues(alpha: 0.18)),
       ),
       padding: const EdgeInsets.all(10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            onTap: review.movieId != null
-                ? () => context.push(movieDetailPath(review.movieId!))
-                : null,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(9),
-              child: SizedBox(
-                width: 62,
-                height: 92,
-                child: posterUrl == null
-                    ? Container(
-                        color: context.colors.tabBarBorder,
-                        alignment: Alignment.center,
-                        child: Icon(
-                          Icons.movie_outlined,
-                          size: 20,
-                          color: context.colors.medium,
-                        ),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: posterUrl,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: review.movieId != null
+                  ? () => context.push(movieDetailPath(review.movieId!))
+                  : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: SizedBox(
+                  width: 62,
+                  height: 93,
+                  child: posterUrl == null
+                      ? Container(
                           color: context.colors.tabBarBorder,
                           alignment: Alignment.center,
                           child: Icon(
@@ -83,152 +72,165 @@ class _InsightReviewCardState extends State<InsightReviewCard> {
                             size: 20,
                             color: context.colors.medium,
                           ),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: posterUrl,
+                          fit: BoxFit.contain,
+                          errorWidget: (_, __, ___) => Container(
+                            color: context.colors.tabBarBorder,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.movie_outlined,
+                              size: 20,
+                              color: context.colors.medium,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: profileAction,
+                        child: ProfileAvatarView(
+                          avatar: review.reviewerAvatar,
+                          fallbackText: review.reviewerName.isEmpty
+                              ? '?'
+                              : review.reviewerName[0].toUpperCase(),
+                          fallbackColor: FlixieColors.primary,
+                          size: 28,
+                          profileBadges: review.reviewerProfileBadges,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: profileAction,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                handle,
+                                style: TextStyle(
+                                  color: context.colors.light,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                insightsRelativeDate(review.createdAt),
+                                style: TextStyle(
+                                  color: context.colors.medium,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  GestureDetector(
+                    onTap: review.movieId != null
+                        ? () => context.push(movieDetailPath(review.movieId!))
+                        : null,
+                    child: Text(
+                      review.movieTitle,
+                      style: TextStyle(
+                        color: context.colors.light,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        size: 16,
+                        color: Color(0xFFFFC34D),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        hideMovieRatings(
+                          context,
+                          review.movieId,
+                          ownerId: review.userId,
+                        )
+                            ? 'Rate to see score'
+                            : '${review.rating.toStringAsFixed(1)}/10',
+                        style: TextStyle(
+                          color: context.colors.light,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                      if (review.recommended != null) ...[
+                        const SizedBox(width: 10),
+                        Icon(
+                          review.recommended!
+                              ? Icons.thumb_up_alt_rounded
+                              : Icons.thumb_down_alt_rounded,
+                          size: 14,
+                          color: review.recommended!
+                              ? const Color(0xFF55D69E)
+                              : context.colors.medium,
+                        ),
+                      ],
+                      if (review.containsSpoilers) ...[
+                        const Text(
+                          'SPOILER',
+                          style: TextStyle(
+                            color: Color(0xFFFFC34D),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .7,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (review.snippet.trim().isNotEmpty) ...[
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: review.containsSpoilers && !_spoilerRevealed
+                ? () => setState(() => _spoilerRevealed = true)
+                : null,
+            child: Text(
+              review.containsSpoilers && !_spoilerRevealed
+                  ? 'Tap to reveal review'
+                  : review.snippet.trim(),
+              style: TextStyle(
+                color: review.containsSpoilers && !_spoilerRevealed
+                    ? FlixieColors.primary
+                    : context.colors.medium,
+                height: 1.25,
+                fontSize: 12,
+                fontStyle: review.containsSpoilers && !_spoilerRevealed
+                    ? FontStyle.italic
+                    : FontStyle.normal,
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: profileAction,
-                      child: ProfileAvatarView(
-                        avatar: review.reviewerAvatar,
-                        fallbackText: review.reviewerName.isEmpty
-                            ? '?'
-                            : review.reviewerName[0].toUpperCase(),
-                        fallbackColor: FlixieColors.primary,
-                        size: 28,
-                        profileBadges: review.reviewerProfileBadges,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: profileAction,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              handle,
-                              style: TextStyle(
-                                color: context.colors.light,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
-                            ),
-                            Text(
-                              insightsRelativeDate(review.createdAt),
-                              style: TextStyle(
-                                color: context.colors.medium,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                GestureDetector(
-                  onTap: review.movieId != null
-                      ? () => context.push(movieDetailPath(review.movieId!))
-                      : null,
-                  child: Text(
-                    review.movieTitle,
-                    style: TextStyle(
-                      color: context.colors.light,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 16,
-                      color: Color(0xFFFFC34D),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      hideMovieRatings(
-                        context,
-                        review.movieId,
-                        ownerId: review.userId,
-                      )
-                          ? 'Rate to see score'
-                          : '${review.rating.toStringAsFixed(1)}/10',
-                      style: TextStyle(
-                        color: context.colors.light,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (review.recommended != null) ...[
-                      const SizedBox(width: 10),
-                      Icon(
-                        review.recommended!
-                            ? Icons.thumb_up_alt_rounded
-                            : Icons.thumb_down_alt_rounded,
-                        size: 14,
-                        color: review.recommended!
-                            ? const Color(0xFF55D69E)
-                            : context.colors.medium,
-                      ),
-                    ],
-                    if (review.containsSpoilers) ...[
-                      const Text(
-                        'SPOILER',
-                        style: TextStyle(
-                          color: Color(0xFFFFC34D),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: .7,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                if (review.snippet.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: review.containsSpoilers && !_spoilerRevealed
-                        ? () => setState(() => _spoilerRevealed = true)
-                        : null,
-                    child: Text(
-                      review.containsSpoilers && !_spoilerRevealed
-                          ? 'Tap to reveal review'
-                          : review.snippet.trim(),
-                      style: TextStyle(
-                        color: review.containsSpoilers && !_spoilerRevealed
-                            ? FlixieColors.primary
-                            : context.colors.medium,
-                        height: 1.25,
-                        fontSize: 12,
-                        fontStyle: review.containsSpoilers && !_spoilerRevealed
-                            ? FontStyle.italic
-                            : FontStyle.normal,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
         ],
-      ),
+      ]),
     );
   }
 }

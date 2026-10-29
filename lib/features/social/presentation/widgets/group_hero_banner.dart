@@ -106,7 +106,7 @@ class GroupHeroBanner extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: context.colors.medium,
-                        fontSize: 12,
+                        fontSize: 14,
                       ),
                     ),
                   ],

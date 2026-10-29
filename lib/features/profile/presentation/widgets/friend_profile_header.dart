@@ -1,3 +1,4 @@
+import 'profile_milestone_badges.dart';
 import '../widgets/expandable_profile_bio.dart';
 import 'package:flixie_app/features/social/data/community_service.dart';
 import 'package:flixie_app/features/social/presentation/widgets/community_follow_button.dart';
@@ -82,6 +83,7 @@ class FriendProfileHeader extends StatelessWidget {
                     badges: user.profileBadges, compact: true)),
         ])),
       ]),
+      ProfileMilestoneBadges(key: ValueKey(user.id), userId: user.id),
       if (controller.friendshipStatus == FriendshipStatus.friends) ...[
         const SizedBox(height: 2),
         Wrap(
@@ -317,7 +319,7 @@ class FriendProfileTotals extends StatelessWidget {
               const SizedBox(height: 4),
               Text(breakdowns[i],
                   style: TextStyle(
-                      color: context.colors.medium, fontSize: 13, height: 1.4)),
+                      color: context.colors.medium, fontSize: 14, height: 1.4)),
             ]),
           ),
       ]);

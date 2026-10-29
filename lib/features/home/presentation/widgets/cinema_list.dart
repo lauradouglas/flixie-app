@@ -50,8 +50,9 @@ class _CinemaListState extends State<CinemaList> {
         })
       else if (tablet)
         LayoutBuilder(builder: (context, box) {
-          final width =
-              ((box.maxWidth - 24) / (box.maxWidth >= 720 ? 3.2 : 2.2))
+          final width = HomeTabletLayout.portrait(context)
+              ? ((box.maxWidth - 12) / 1.85).clamp(400.0, 520.0)
+              : ((box.maxWidth - 24) / (box.maxWidth >= 720 ? 3.2 : 2.2))
                   .clamp(340.0, 420.0);
           return SingleChildScrollView(
               key: const ValueKey('tablet-cinema-rail'),
@@ -133,17 +134,80 @@ class _CinemaListState extends State<CinemaList> {
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Expanded(
-                                                    child: Padding(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .only(top: 6),
-                                                        child: Text(movie.name,
-                                                            style: const TextStyle(
-                                                                fontSize: 14,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w800)))),
+                                                    child: Column(
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                      Text(movie.name,
+                                                          style: const TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w800)),
+                                                      const SizedBox(height: 4),
+                                                      Wrap(
+                                                          spacing: 10,
+                                                          runSpacing: 4,
+                                                          crossAxisAlignment:
+                                                              WrapCrossAlignment
+                                                                  .center,
+                                                          children: [
+                                                            if (year != null)
+                                                              Text(year,
+                                                                  style: TextStyle(
+                                                                      color: context
+                                                                          .colors
+                                                                          .light,
+                                                                      fontSize:
+                                                                          12)),
+                                                            if (!hideMovieRatings(
+                                                                    context,
+                                                                    movie.id) &&
+                                                                (movie.voteAverage ??
+                                                                        0) >
+                                                                    0)
+                                                              Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    Icon(
+                                                                        Icons
+                                                                            .star_rounded,
+                                                                        color: context
+                                                                            .colors
+                                                                            .warning,
+                                                                        size:
+                                                                            20),
+                                                                    const SizedBox(
+                                                                        width:
+                                                                            4),
+                                                                    Text(
+                                                                        movie
+                                                                            .voteAverage!
+                                                                            .toStringAsFixed(
+                                                                                1),
+                                                                        style: TextStyle(
+                                                                            color: context
+                                                                                .colors.warning,
+                                                                            fontSize:
+                                                                                14,
+                                                                            fontWeight:
+                                                                                FontWeight.w800)),
+                                                                  ]),
+                                                          ]),
+                                                    ])),
                                                 IconButton(
+                                                    alignment:
+                                                        Alignment.topRight,
+                                                    padding: EdgeInsets.zero,
+                                                    constraints:
+                                                        const BoxConstraints(
+                                                            minWidth: 44,
+                                                            minHeight: 44),
+                                                    color:
+                                                        context.colors.warning,
                                                     tooltip: saved
                                                         ? 'Remove from watchlist'
                                                         : 'Watchlist',
@@ -165,11 +229,6 @@ class _CinemaListState extends State<CinemaList> {
                                                                     .bookmark_outline,
                                                             size: 20)),
                                               ]),
-                                          Text(
-                                              'Movie${year == null ? '' : ' · $year'}',
-                                              style: TextStyle(
-                                                  color: context.colors.light,
-                                                  fontSize: 12)),
                                           if (synopsis?.isNotEmpty == true) ...[
                                             const SizedBox(height: 12),
                                             Text(synopsis!,
@@ -186,27 +245,6 @@ class _CinemaListState extends State<CinemaList> {
                                         crossAxisAlignment:
                                             WrapCrossAlignment.center,
                                         children: [
-                                          if (!hideMovieRatings(
-                                                  context, movie.id) &&
-                                              (movie.voteAverage ?? 0) > 0)
-                                            Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.star_rounded,
-                                                      color: context
-                                                          .colors.warning,
-                                                      size: 18),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                      movie.voteAverage!
-                                                          .toStringAsFixed(1),
-                                                      style: TextStyle(
-                                                          color: context
-                                                              .colors.warning,
-                                                          fontSize: 13,
-                                                          fontWeight:
-                                                              FontWeight.w800)),
-                                                ]),
                                           if (movie.trailer?.key
                                                   ?.trim()
                                                   .isNotEmpty ==
@@ -275,14 +313,32 @@ class _CinemaListState extends State<CinemaList> {
               )),
           const SizedBox(height: 4),
           Wrap(spacing: 8, runSpacing: 4, children: [
-            Text('Movie${year == null ? '' : ' · $year'}',
-                style: TextStyle(color: colors.medium, fontSize: 12)),
+            if (year != null)
+              Text(year, style: TextStyle(color: colors.medium, fontSize: 12)),
             if ((movie.voteAverage ?? 0) > 0)
-              Text('TMDB ${movie.voteAverage!.toStringAsFixed(1)}/10',
-                  style: TextStyle(color: colors.light, fontSize: 12)),
+              Semantics(
+                  label:
+                      'Rating ${movie.voteAverage!.toStringAsFixed(1)} out of 10',
+                  child: ExcludeSemantics(
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.star_rounded, size: 15, color: colors.warning),
+                    const SizedBox(width: 3),
+                    Text(movie.voteAverage!.toStringAsFixed(1),
+                        style: TextStyle(
+                            color: colors.warning,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
+                  ]))),
           ]),
         ])),
         IconButton(
+            color: colors.warning,
+            alignment: Alignment.topRight,
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+                minimumSize: const Size.square(44),
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
             tooltip: widget.savedIds.contains(movie.homeKey)
                 ? 'Remove from watchlist'
                 : 'Watchlist',
@@ -296,17 +352,17 @@ class _CinemaListState extends State<CinemaList> {
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : Icon(widget.savedIds.contains(movie.homeKey)
                     ? Icons.bookmark_rounded
-                    : Icons.bookmark_add_outlined)),
+                    : Icons.bookmark_outline_rounded)),
       ]),
       if (movie.tagline?.trim().isNotEmpty == true) ...[
         const SizedBox(height: 8),
         Text(movie.tagline!,
-            style: TextStyle(color: colors.light, fontSize: 13, height: 1.4)),
+            style: TextStyle(color: colors.light, fontSize: 12, height: 1.4)),
       ],
       if (movie.overview?.trim().isNotEmpty == true) ...[
         const SizedBox(height: 8),
         Text(movie.overview!.trim().split(RegExp(r'(?<=[.!?])\s+')).first,
-            style: TextStyle(color: colors.light, fontSize: 13, height: 1.4)),
+            style: TextStyle(color: colors.light, fontSize: 12, height: 1.4)),
       ],
       if (movie.trailer?.key?.trim().isNotEmpty == true)
         TextButton.icon(

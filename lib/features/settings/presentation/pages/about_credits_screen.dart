@@ -9,6 +9,9 @@ import 'package:flixie_app/core/widgets/flixie_page.dart';
 class AboutCreditsScreen extends StatelessWidget {
   const AboutCreditsScreen({super.key});
 
+  static final Uri _instagramUri =
+      Uri.parse('https://www.instagram.com/flixie_co/');
+
   static final Uri _tmdbUri = Uri.parse('https://www.themoviedb.org');
   static final Uri _tmdbTermsUri =
       Uri.parse('https://www.themoviedb.org/api-terms-of-use');
@@ -57,7 +60,12 @@ class AboutCreditsScreen extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(color: context.colors.medium, fontSize: 12),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
+          _CreditLink(
+            label: 'Follow Flixie on Instagram · @flixie_co',
+            onTap: () => _open(context, _instagramUri),
+          ),
+          const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -165,27 +173,29 @@ class _CreditLink extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: FlixieColors.primary,
-                  fontWeight: FontWeight.w700,
+      child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: FlixieColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
+                const Icon(
+                  Icons.open_in_new_rounded,
+                  color: FlixieColors.primary,
+                  size: 18,
+                ),
+              ],
             ),
-            const Icon(
-              Icons.open_in_new_rounded,
-              color: FlixieColors.primary,
-              size: 18,
-            ),
-          ],
-        ),
-      ),
+          )),
     );
   }
 }

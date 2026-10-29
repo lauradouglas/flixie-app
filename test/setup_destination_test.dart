@@ -1,7 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flixie_app/core/auth/setup_destination.dart';
+import 'package:flixie_app/features/authentication/models/signup_journey.dart';
 
 void main() {
+  test('curated list signup returns to the UUID list as a handoff', () {
+    const path = '/flixie-lists/ac010000-0000-4000-a000-000000000002';
+    expect(setupDestination(path), path);
+    expect(SignupJourney.supports('curated-list', path), isTrue);
+    expect(
+        const SignupJourney(
+                userId: 'fixture', action: 'curated-list', path: path)
+            .handoff,
+        isTrue);
+    expect(SignupJourney.supports('curated-list', 'https://example.com$path'),
+        isFalse);
+  });
   test(
       'game signup returns to the game without carrying arbitrary query values',
       () {

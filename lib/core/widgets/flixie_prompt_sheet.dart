@@ -5,6 +5,8 @@ Future<T?> showFlixiePromptSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   bool isDismissible = true,
+  double maxHeightFraction = 0.75,
+  Color? backgroundColor,
 }) {
   return showModalBottomSheet<T>(
     context: context,
@@ -14,14 +16,14 @@ Future<T?> showFlixiePromptSheet<T>({
     isDismissible: isDismissible,
     enableDrag: isDismissible,
     showDragHandle: isDismissible,
-    backgroundColor: context.colors.surface,
+    backgroundColor: backgroundColor ?? context.colors.surface,
     constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (context) => ConstrainedBox(
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.75),
+      constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * maxHeightFraction),
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
@@ -59,7 +61,7 @@ class FlixiePromptSheetContent extends StatelessWidget {
           const SizedBox(height: 16),
           DefaultTextStyle.merge(
             style: TextStyle(
-                fontSize: 16, height: 1.5, color: context.colors.light),
+                fontSize: 14, height: 1.5, color: context.colors.light),
             child: content,
           ),
           const SizedBox(height: 24),

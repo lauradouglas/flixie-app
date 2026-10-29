@@ -743,3 +743,17 @@ trending feature/poster surface and a single highest-priority watch-plan preview
 See all opens the existing plans screen. Companion sections and poster/card sizes
 adapt within the feature-local tablet scope; phone and other page gutters retain
 their existing layout.
+
+
+## Collectible milestone badges
+
+Profile owns `models/milestone_badge.dart`, `data/milestone_badge_service.dart` and the badge picker/display widgets. `ProfileMilestoneBadges` binds requests to viewer/subject generations, refreshes own-profile awards after activity changes and persists at most three ordered selections through the badge endpoint. It is separate from role badges and avatar borders. Guest Home reuses `BadgesExplainer` with labelled synthetic examples. The backend derives film eligibility from the existing lifetime milestone rules, persists awards independently of later diary edits and enforces earned-only selection, owner writes and existing milestone visibility. See `scripts/seed-dev-milestone-badges.ts` in the backend for guarded local display fixtures.
+
+
+Guest community discovery: `features/guest/presentation/widgets/guest_communities_section.dart` owns the genre preview, responsive tile rows and bounded browse-all choice sheet. Guest Home still owns the existing community request/retry and join/signup intent. The widget receives catalogue records and a selection callback, uses shared visibility/icon/palette rules and derives the count from the available catalogue. It introduces no new API, membership write, cache or account state.
+
+
+Guest watch-together education is owned by `features/guest/presentation/widgets/guest_watch_together_teaser.dart`: a labelled fictional plan, bundled poster, individually badged avatar examples and a bounded explanatory prompt sheet. It performs no API reads, membership writes or live invitations. Guest Home only composes the widget.
+
+
+Around Flixie page entry uses the existing `_pushPage` route policy (instant iOS entry with interactive back). Like its previous direct builder, it does not wait on private library hydration: the feed reads only `/guest/community/activity`. Full feed rows are created by ListView.builder; the embedded preview remains bounded to three. Pagination, retry, public visibility and each activity owner’s profile badges retain their existing pipeline.

@@ -32,7 +32,7 @@ void main() {
     ]);
     addTearDown(router.dispose);
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-    await tester.tap(find.text('Play with Pip'));
+    await tester.tap(find.text('Fancy a quick game?'));
     await tester.pumpAndSettle();
     expect(find.byType(PipGamesScreen), findsOneWidget);
     await tester.tap(find.text('PIP PAIRS'));

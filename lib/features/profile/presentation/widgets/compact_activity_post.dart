@@ -287,7 +287,7 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
           else
             LayoutBuilder(builder: (context, constraints) {
               final style = TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   color: context.colors.textPrimary,
                   height: 1.45);
               final painter = TextPainter(
@@ -340,24 +340,25 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                     Semantics(
                         label:
                             '${ActivityReaction.fromEmoji(entry.key)?.label ?? 'Reaction'}: ${entry.value} reactions',
+                        selected: entry.key == widget.reactions.mine,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 7),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           decoration: BoxDecoration(
-                            color: context.colors.surface,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: entry.key == widget.reactions.mine
-                                    ? context.colors.primaryText
-                                    : Colors.transparent),
-                          ),
+                              color: context.colors.surface,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: entry.key == widget.reactions.mine
+                                      ? context.colors.primaryText
+                                      : Colors.transparent)),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                             PipReaction(entry.key,
-                                previewable: true, count: entry.value),
+                                size: 24,
+                                previewable: true,
+                                count: entry.value),
                             const SizedBox(width: 6),
                             Text('${entry.value}',
-                                style:
-                                    const TextStyle(fontSize: 13, height: 1)),
+                                style: TextStyle(
+                                    fontSize: 12, color: context.colors.light)),
                           ]),
                         )),
                 if (widget.onComment != null)
@@ -365,9 +366,11 @@ class _CompactActivityPostState extends State<CompactActivityPost> {
                       onPressed: widget.onComment,
                       icon: Icon(Icons.chat_bubble_outline,
                           color: secondary, size: 20),
-                      label: Text(widget.commentCount == null
-                          ? (widget.publicPost ? 'View post' : 'Comments')
-                          : '${widget.commentCount} ${widget.commentCount == 1 ? 'comment' : 'comments'}'),
+                      label: Text(
+                          widget.commentCount == null
+                              ? (widget.publicPost ? 'View post' : 'Comments')
+                              : '${widget.commentCount} ${widget.commentCount == 1 ? 'comment' : 'comments'}',
+                          style: const TextStyle(fontSize: 12)),
                       style: TextButton.styleFrom(
                           foregroundColor: context.colors.primaryText,
                           minimumSize: const Size(44, 44))),

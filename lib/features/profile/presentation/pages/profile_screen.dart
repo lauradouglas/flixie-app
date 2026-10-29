@@ -116,6 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SliverToBoxAdapter(
                 child: ProfileHeader(
               displayName: displayName,
+              userId: userId,
               username: username,
               bio: bio,
               iconColor: dbUser.iconColor,
@@ -142,9 +143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: ProfileDiaryScreen(
                             controller: _diary, embedded: true))
                     : _data.selectedTab == ProfileTab.activity
-                    ? _activityTab()
-                    : SliverToBoxAdapter(
-                        child: _data.selectedTab == ProfileTab.stats
+                        ? _activityTab()
+                        : SliverToBoxAdapter(
+                            child: _data.selectedTab == ProfileTab.stats
                                 ? ProfileStatsTab(
                                     wrapped: _data.wrapped,
                                     milestones: _data.milestones,

@@ -143,7 +143,7 @@ class _AccountDeletionProgressScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: context.colors.light,
-                      fontSize: 15,
+                      fontSize: 14,
                       height: 1.5,
                     ),
                   ),

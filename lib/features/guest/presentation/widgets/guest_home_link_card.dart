@@ -28,10 +28,12 @@ class GuestHomeLinkCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(children: [
-            Icon(icon, color: colors.primary, size: 28),
-            const SizedBox(width: 16),
+            SizedBox(
+                width: 28,
+                child: Icon(icon, color: colors.primaryText, size: 24)),
+            const SizedBox(width: 12),
             Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,7 +44,7 @@ class GuestHomeLinkCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           fontSize: 14)),
                   if (subtitle != null) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 5),
                     Text(subtitle!,
                         style: TextStyle(
                             color: colors.light, fontSize: 12, height: 1.3)),
@@ -57,9 +59,7 @@ class GuestHomeLinkCard extends StatelessWidget {
                   ],
                 ])),
             const SizedBox(width: 8),
-            Icon(Icons.arrow_forward,
-                color: actionLabel == null ? colors.light : colors.primary,
-                size: 20),
+            Icon(Icons.arrow_forward, color: colors.primaryText, size: 20),
           ]),
         ),
       ),

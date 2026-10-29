@@ -480,7 +480,8 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
         child: ListView(
           key: PageStorageKey('community-feed-${widget.initialFollowing}'),
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          padding: EdgeInsets.fromLTRB(
+              16, widget.showAudienceSelector ? 12 : 0, 16, 28),
           children: [
             if (widget.showAudienceSelector)
               Wrap(
@@ -513,43 +514,55 @@ class CommunityActivityFeedState extends State<CommunityActivityFeed>
                       onPressed: _refresh,
                       icon: const Icon(Icons.arrow_upward),
                       label: const Text('New posts available'))),
-            Row(children: [
-              Expanded(
-                  child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(children: [
-                        for (final entry in const {
-                          'all': 'All',
-                          'films': 'Films',
-                          'shows': 'Shows',
-                          'lists': 'Lists'
-                        }.entries)
-                          Semantics(
-                              selected: !_savedOnly && _filter == entry.key,
-                              child: TextButton(
-                                  onPressed: () =>
-                                      _query(filter: entry.key, saved: false),
-                                  style: TextButton.styleFrom(
-                                      foregroundColor: !_savedOnly && _filter == entry.key
-                                          ? context.colors.textPrimary
-                                          : context.colors.light,
-                                      shape: const RoundedRectangleBorder()),
-                                  child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 10),
-                                      decoration: BoxDecoration(
-                                          border: Border(
-                                              bottom: BorderSide(
-                                                  width: 2,
-                                                  color: !_savedOnly && _filter == entry.key ? context.colors.primaryText : Colors.transparent))),
-                                      child: Text(entry.value)))),
-                      ]))),
-              if (widget.showSettingsButton)
-                IconButton(
-                    tooltip: 'Around Flixie sharing',
-                    onPressed: showSettings,
-                    icon: const Icon(Icons.tune)),
-            ]),
+            Container(
+                margin: const EdgeInsets.only(top: 8, bottom: 12),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                    color: context.colors.surface,
+                    borderRadius: BorderRadius.circular(12)),
+                child: Row(children: [
+                  Expanded(
+                      child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(children: [
+                            for (final entry in const {
+                              'all': 'All',
+                              'films': 'Films',
+                              'shows': 'Shows',
+                              'lists': 'Lists'
+                            }.entries)
+                              Semantics(
+                                  selected: !_savedOnly && _filter == entry.key,
+                                  child: TextButton(
+                                      onPressed: () => _query(
+                                          filter: entry.key, saved: false),
+                                      style: TextButton.styleFrom(
+                                          minimumSize: const Size(64, 44),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          visualDensity: VisualDensity.standard,
+                                          foregroundColor: !_savedOnly &&
+                                                  _filter == entry.key
+                                              ? context.colors.white
+                                              : context.colors.light,
+                                          backgroundColor:
+                                              !_savedOnly && _filter == entry.key
+                                                  ? context.colors.primaryText
+                                                      .withValues(alpha: .12)
+                                                  : Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8))),
+                                      child: Text(entry.value, style: TextStyle(fontSize: 14, fontWeight: !_savedOnly && _filter == entry.key ? FontWeight.w700 : FontWeight.w400)))),
+                          ]))),
+                  if (widget.showSettingsButton)
+                    IconButton(
+                        style: IconButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                        tooltip: 'Around Flixie sharing',
+                        onPressed: showSettings,
+                        icon: const Icon(Icons.tune)),
+                ])),
             OverflowBar(
                 alignment: MainAxisAlignment.spaceBetween,
                 overflowAlignment: OverflowBarAlignment.end,

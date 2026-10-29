@@ -41,16 +41,19 @@ class _ProfileAvatarViewState extends State<ProfileAvatarView> {
   Future<String>? _url;
   bool _iconFailed = false;
 
-  double get _frameWidth => widget.profileBadges.contains('FOUNDER')
-      ? 4
-      : widget.profileBadges.any(const {
-          'OG_USER',
-          'VERIFIED',
-          'EARLY_ADOPTER',
-          'FOUNDING_FILM_FRIEND'
-        }.contains)
-          ? 3
-          : 0;
+  double get _frameWidth =>
+      widget.profileBadges.contains('BORDER_CHRISTMAS_LIGHTS')
+          ? widget.size * .09
+          : widget.profileBadges.contains('FOUNDER')
+              ? 4
+              : widget.profileBadges.any(const {
+                  'OG_USER',
+                  'VERIFIED',
+                  'EARLY_ADOPTER',
+                  'FOUNDING_FILM_FRIEND'
+                }.contains)
+                  ? 3
+                  : 0;
 
   // The requested size includes the badge ring, rather than growing around it.
   double get _imageSize =>

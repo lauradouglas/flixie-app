@@ -193,7 +193,7 @@ void showShowEpisodeSheet(BuildContext context, TvEpisode episode,
                           episode.overview!,
                           style: TextStyle(
                             color: context.colors.light,
-                            fontSize: 15,
+                            fontSize: 14,
                             height: 1.42,
                           ),
                         ),

@@ -95,6 +95,7 @@ class GuestAccess {
       [
         '/',
         '/search',
+        '/flixie-lists',
         '/guest-watchlist',
         '/guest-diary',
         '/profile',
@@ -108,6 +109,7 @@ class GuestAccess {
         '/play/space-premiere',
         '/play/popcorn-catch'
       ].contains(path) ||
+      RegExp(r'^/flixie-lists/[a-zA-Z0-9-]+$').hasMatch(path) ||
       RegExp(r'^/(movies|shows|people|collections)/[0-9]+$').hasMatch(path) ||
       RegExp(r'^/watch-invites/[A-Za-z0-9_-]{43}$').hasMatch(path);
 

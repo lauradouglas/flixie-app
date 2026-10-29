@@ -6,11 +6,11 @@ abstract final class FlixiePillStyle {
   static const radius = BorderRadius.all(Radius.circular(12));
   static const shape = RoundedRectangleBorder(borderRadius: radius);
   static const iconColor = Color(0xFF7C4DFF);
-  static const selectedFill = Color(0xFFD6BFFF);
+  static const selectedFill = Color(0xFFB9A0FF);
   static const selectedText = Color(0xFF271140);
 
   static Color fill(Brightness brightness) => brightness == Brightness.dark
-      ? const Color(0xFF2B1E40)
+      ? const Color(0xFF252638)
       : const Color(0xFFEEE7F6);
   static Color foreground(Brightness brightness) =>
       brightness == Brightness.dark

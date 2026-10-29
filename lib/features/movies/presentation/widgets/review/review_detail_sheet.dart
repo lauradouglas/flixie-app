@@ -397,7 +397,7 @@ class _ReviewDetailSheetState extends State<ReviewDetailSheet> {
                         Text(review.body,
                             style: TextStyle(
                                 color: context.colors.light,
-                                fontSize: 16,
+                                fontSize: 14,
                                 height: 1.5)),
                       const SizedBox(height: 24),
                       if (widget.currentUserId != null &&

@@ -42,7 +42,7 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
-    expect(find.text('Sign up').hitTestable(), findsOneWidget);
+    expect(find.text('Join free').hitTestable(), findsOneWidget);
     expect(find.text('Sign in').hitTestable(), findsOneWidget);
     expect(find.text('Your watchlist · 1 pick'), findsOneWidget);
     expect(find.text('Saved on this device'), findsOneWidget);
@@ -51,7 +51,7 @@ void main() {
         paths.any((p) =>
             p.contains('/trending/all/') || p.contains('/trending/show/')),
         isFalse);
-    await tester.tap(find.text('Sign up'));
+    await tester.tap(find.text('Join free'));
     await tester.pumpAndSettle();
     expect(find.text('Account setup'), findsOneWidget);
     expect(GuestAccess.action, 'guest-watchlist');

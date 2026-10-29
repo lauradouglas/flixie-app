@@ -134,7 +134,7 @@ Future<bool?> showWatchPlanCalendarSheet({
                 'Keep the plan handy by adding it to your phone calendar.',
                 style: TextStyle(
                   color: context.colors.medium,
-                  fontSize: 15,
+                  fontSize: 14,
                   height: 1.35,
                 ),
               ),

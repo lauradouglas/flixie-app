@@ -1,3 +1,5 @@
+import 'package:flixie_app/app/theme/flixie_pill_style.dart';
+import 'package:flixie_app/core/widgets/genre_icon.dart';
 import 'package:flixie_app/core/widgets/flixie_pill.dart';
 import 'package:flixie_app/core/widgets/flixie_refresh.dart';
 import 'package:flixie_app/core/widgets/flixie_prompt_sheet.dart';
@@ -115,50 +117,36 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
   Widget _row(GenreCommunity g) {
     final busy = _busy.contains(g.id);
     final light = Theme.of(context).brightness == Brightness.light;
-    final joinedFill = light
-        ? Theme.of(context).colorScheme.secondaryContainer
-        : const Color(0xFF203E38);
     final joinedInk = light
         ? Theme.of(context).colorScheme.onSecondaryContainer
         : const Color(0xFFA3ECDF);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
-    final button = AnimatedContainer(
-        duration: duration,
-        decoration: BoxDecoration(
-            color: g.joined ? joinedFill : Colors.transparent,
-            borderRadius: BorderRadius.circular(11)),
-        child: OutlinedButton(
-            onPressed: busy ? null : () => _confirm(g),
-            style: OutlinedButton.styleFrom(
-                minimumSize: const Size(94, 44),
-                foregroundColor: g.joined ? joinedInk : context.colors.white,
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                elevation: 0,
-                side: BorderSide(
-                    color: g.joined
-                        ? (light
-                            ? joinedInk.withValues(alpha: 0.25)
-                            : const Color(0xFF37645A))
-                        : (light
-                            ? context.colors.primary
-                            : const Color(0xFF8266AC)),
-                    width: 1),
-                textStyle:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(11))),
-            child: AnimatedSwitcher(
-                duration: duration,
-                child: Text(
-                    busy
-                        ? 'Saving…'
-                        : g.joined
-                            ? '✓ Joined'
-                            : 'Join',
-                    key: ValueKey('$busy:${g.joined}')))));
+    final button = TextButton(
+        onPressed: busy ? null : () => _confirm(g),
+        style: TextButton.styleFrom(
+            minimumSize: const Size(80, 44),
+            foregroundColor: g.joined ? joinedInk : context.colors.primaryText,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            textStyle:
+                const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        child: AnimatedSwitcher(
+            duration: duration,
+            child: Row(
+                key: ValueKey('$busy:${g.joined}'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!busy && !g.joined) ...[
+                    const Icon(Icons.add, size: 18),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(busy
+                      ? 'Saving…'
+                      : g.joined
+                          ? '✓ Joined'
+                          : 'Join'),
+                ])));
     final title = InkWell(
         onTap: () async {
           await context.push('/genre-communities/${g.id}');
@@ -167,18 +155,33 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
         child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(children: [
-              CommunityIcon(id: g.id, size: 34),
+              IconTheme(
+                  data: IconThemeData(
+                      color: FlixiePillStyle.genreColors(
+                              g.name, Theme.of(context).brightness)
+                          .$2),
+                  child: GenreIcon(g.name, size: 22)),
               const SizedBox(width: 12),
               Expanded(
-                  child: Text(g.name,
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.w800))),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(g.name,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text(CommunityIdentity.forId(g.id).blurb,
+                        style: TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: context.colors.light)),
+                  ])),
             ])));
     return Padding(
         key: ValueKey('community:${g.id}'),
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const SizedBox(height: 20),
+          const SizedBox(height: 2),
           LayoutBuilder(
               builder: (context, constraints) => constraints.maxWidth < 280 ||
                       MediaQuery.textScalerOf(context).scale(15) > 22
@@ -193,11 +196,6 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
                       const SizedBox(width: 12),
                       button
                     ])),
-          Padding(
-              padding: const EdgeInsets.only(left: 46, top: 8),
-              child: Text(CommunityIdentity.forId(g.id).blurb,
-                  style: TextStyle(
-                      fontSize: 13, height: 1.5, color: context.colors.light))),
           if (_failed.containsKey(g.id) || _undo.containsKey(g.id))
             Semantics(
                 liveRegion: true,
@@ -224,11 +222,7 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
                                   ? 'Retry'
                                   : 'Undo')),
                         ]))),
-          const SizedBox(height: 20),
-          Divider(
-              height: 1,
-              thickness: .5,
-              color: context.colors.medium.withValues(alpha: .3)),
+          const SizedBox(height: 2),
         ]));
   }
 
@@ -252,11 +246,20 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text('Find your film people.',
-                          style: TextStyle(
-                              color: context.colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700)),
+                      Row(children: [
+                        Expanded(
+                            child: Text('Find your film people.',
+                                style: TextStyle(
+                                    color: context.colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700))),
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                            onPressed: () => context.push('/plans'),
+                            icon: const Icon(Icons.event_outlined, size: 19),
+                            label: const Text('Plans',
+                                style: TextStyle(fontSize: 14))),
+                      ]),
                       const SizedBox(height: 6),
                       Text(
                           'Big opinions. Shared obsessions. A little corner for every kind of fan.',
@@ -265,9 +268,18 @@ class _GenreCommunitiesViewState extends State<GenreCommunitiesView> {
                       TextField(
                           controller: _searchController,
                           onChanged: (value) => setState(() => _search = value),
-                          decoration: const InputDecoration(
+                          style: const TextStyle(fontSize: 14),
+                          decoration: InputDecoration(
                               hintText: 'Search communities',
-                              prefixIcon: Icon(Icons.search))),
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              filled: true,
+                              fillColor: context.colors.surface,
+                              enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none))),
                       const SizedBox(height: 8),
                       Wrap(spacing: 8, children: [
                         FlixiePill.choice(

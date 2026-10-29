@@ -20,7 +20,7 @@ ButtonStyle _threadLinkStyle(BuildContext context, {bool parent = false}) =>
 
 TextStyle discussionBodyStyle(BuildContext context) => TextStyle(
     fontFamily: 'Manrope',
-    fontSize: 15,
+    fontSize: 14,
     height: 1.7,
     fontWeight: FontWeight.w400,
     letterSpacing: 0,

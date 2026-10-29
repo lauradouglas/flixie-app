@@ -20,6 +20,10 @@ String? setupDestination(String value) {
   ].contains(path)) {
     return path;
   }
+  if (path == '/flixie-lists' ||
+      RegExp(r'^/flixie-lists/[a-zA-Z0-9-]+$').hasMatch(path)) {
+    return uri.toString();
+  }
   if (path == '/watchlist') return '/watchlist';
   if (path == '/social') return '/social';
   if (path == '/search' && uri.queryParameters['focus'] == '1') {

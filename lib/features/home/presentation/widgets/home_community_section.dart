@@ -1,3 +1,4 @@
+import '../../domain/home_community_selection.dart';
 import 'home_tablet_layout.dart';
 import 'home_community_preview.dart';
 import 'package:flixie_app/features/social/data/starred_people.dart';
@@ -74,8 +75,8 @@ class HomeCommunitySectionState extends State<HomeCommunitySection> {
       final page = await widget.service
           .load(sort: 'for-you', limit: widget.previewLimit);
       if (mounted && generation == _generation) {
-        setState(() => _items = page.items
-            .where((item) => !SafetyService.isBlocked(item.userId))
+        setState(() => _items = selectHomeCommunityItems(page.items
+                .where((item) => !SafetyService.isBlocked(item.userId)))
             .take(widget.previewLimit)
             .toList());
       }
@@ -118,7 +119,20 @@ class HomeCommunitySectionState extends State<HomeCommunitySection> {
                 TextButton(
                     onPressed: () => _open('/friends-activity?tab=community'),
                     child: const Text('Explore Around Flixie'))
-              ] else
+              ] else if (HomeTabletLayout.portrait(context))
+                LayoutBuilder(
+                    builder: (context, box) => Wrap(spacing: 16, children: [
+                          for (final item in _items)
+                            SizedBox(
+                                width: (box.maxWidth - 16) / 2,
+                                child: HomeCommunityPreview(
+                                    item: item,
+                                    onOpen: () =>
+                                        _open(widget.service.postPath(item)),
+                                    onProfile: () => _open(
+                                        '/community/profiles/${item.userId}'))),
+                        ]))
+              else
                 for (final item in _items)
                   if (HomeTabletLayout.active(context))
                     HomeCommunityPreview(

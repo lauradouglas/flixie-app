@@ -226,7 +226,7 @@ class ChatBubble extends StatelessWidget {
     if (link == null) {
       return Text(
         message,
-        style: TextStyle(color: textColor, fontSize: 15),
+        style: TextStyle(color: textColor, fontSize: 14),
       );
     }
 
@@ -240,7 +240,7 @@ class ChatBubble extends StatelessWidget {
         if (bodyText.isNotEmpty)
           Text(
             bodyText,
-            style: TextStyle(color: textColor, fontSize: 15),
+            style: TextStyle(color: textColor, fontSize: 14),
           ),
         if (bodyText.isNotEmpty) const SizedBox(height: 8),
         InkWell(
@@ -414,7 +414,7 @@ class ChatBubble extends StatelessWidget {
           Text(payload.message,
               style: TextStyle(
                   color: context.colors.textPrimary,
-                  fontSize: 16,
+                  fontSize: 14,
                   height: 1.4)),
         ],
       ],

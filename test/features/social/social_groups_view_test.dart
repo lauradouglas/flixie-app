@@ -56,22 +56,34 @@ void main() {
               theme: AppTheme.darkTheme,
               home: const Scaffold(body: SocialGroupsView()))));
       await t.pumpAndSettle();
-      await t.tap(find.text('Create').first);
+      await t.tap(find.byIcon(Icons.notifications_none_rounded));
+      await t.pumpAndSettle();
+      expect(find.text('No pending invites'), findsOneWidget);
+      await t.tap(find.text('Back to groups'));
+      await t.pumpAndSettle();
+      expect(find.text('No pending invites'), findsNothing);
+      await t.tap(find.text('Create group').first);
       await t.pumpAndSettle();
       await t.enterText(find.byType(TextFormField).first, 'Alien Crew');
-      await t.ensureVisible(find.text('Next'));
-      await t.tap(find.text('Next'));
+      await t.ensureVisible(find.text('Continue'));
+      await t.tap(find.text('Continue'));
       await t.pumpAndSettle();
-      expect(find.text('Add Members'), findsOneWidget);
+      expect(find.text('Invite friends'), findsOneWidget);
+      await t.tap(find.byTooltip('Back to group details'));
+      await t.pumpAndSettle();
+      expect(find.text('Alien Crew'), findsOneWidget);
+      await t.ensureVisible(find.text('Continue'));
+      await t.tap(find.text('Continue'));
+      await t.pumpAndSettle();
       if (switchAccount) {
         auth.viewer = 'other';
         auth.notifyOnly();
         await t.pumpAndSettle();
-        expect(find.text('Add Members'), findsNothing);
+        expect(find.text('Invite friends'), findsNothing);
         expect(writes, isEmpty);
       } else {
-        await t.tap(find.text('Skip'));
-        await t.tap(find.text('Skip'));
+        await t.tap(find.widgetWithText(FilledButton, 'Create group').last);
+        await t.tap(find.widgetWithText(FilledButton, 'Create group').last);
         expect(writes, hasLength(1));
         expect(writes.single['members'], [
           {'memberId': 'viewer', 'role': 'OWNER', 'inviteStatus': 'ACCEPTED'}
@@ -86,7 +98,7 @@ void main() {
             200));
         await t.pumpAndSettle();
         expect(auth.groups!.single.id, 'created');
-        expect(find.text('Add Members'), findsNothing);
+        expect(find.text('Invite friends'), findsNothing);
       }
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox());
@@ -177,8 +189,8 @@ void main() {
           {'inviteStatus': 'DECLINED'}
         ]);
         expect(find.byType(GroupInvitationCard), findsOneWidget);
-        await t.ensureVisible(find.text('Your groups'));
-        await t.tap(find.text('Your groups'));
+        await t.ensureVisible(find.text('Back to groups'));
+        await t.tap(find.text('Back to groups'));
         await t.pumpAndSettle();
         expect(find.text('Alien Fans'), findsNothing);
         final avatar =

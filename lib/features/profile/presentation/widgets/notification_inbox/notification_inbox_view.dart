@@ -142,7 +142,9 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
 
   @override
   Widget build(BuildContext context) {
-    return widget.loading
+    final tablet = MediaQuery.sizeOf(context).shortestSide >= 600 &&
+        MediaQuery.sizeOf(context).width >= 700;
+    final content = widget.loading
         ? const ContentListSkeleton(label: 'Loading notifications')
         : widget.error != null
             ? _buildError()
@@ -151,6 +153,14 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
                 _buildFilterChips(),
                 Expanded(child: _buildContent()),
               ]);
+    return tablet
+        ? Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+                key: const ValueKey('tablet-notification-inbox'),
+                constraints: const BoxConstraints(maxWidth: 880),
+                child: content))
+        : content;
   }
 
   Widget _buildError() {
@@ -181,6 +191,36 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
       (_NotificationFilter.activity, 'Activity'),
     ];
 
+    if (MediaQuery.sizeOf(context).shortestSide >= 600 &&
+        MediaQuery.sizeOf(context).width >= 700) {
+      return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Align(
+              alignment: Alignment.centerLeft,
+              child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SegmentedButton<_NotificationFilter>(
+                      showSelectedIcon: false,
+                      style: SegmentedButton.styleFrom(
+                          minimumSize: const Size(110, 44),
+                          selectedBackgroundColor: FlixieColors.primary,
+                          selectedForegroundColor: Colors.white,
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                      segments: [
+                        for (final (filter, label) in filters)
+                          ButtonSegment(
+                              value: filter,
+                              label: Text(
+                                  filter == _NotificationFilter.requests &&
+                                          _countForFilter(filter) > 0
+                                      ? '$label ${_countForFilter(filter)}'
+                                      : label))
+                      ],
+                      selected: {_filter},
+                      onSelectionChanged: (value) =>
+                          setState(() => _filter = value.single)))));
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Container(
@@ -356,7 +396,7 @@ class _NotificationInboxViewState extends State<NotificationInboxView> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: context.colors.medium,
-                          fontSize: 13,
+                          fontSize: 14,
                           height: 1.5,
                         ),
                       ),

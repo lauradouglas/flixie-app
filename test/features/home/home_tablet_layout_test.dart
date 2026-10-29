@@ -1,3 +1,8 @@
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flixie_app/features/pip/models/pip_collection.dart';
+import 'package:flixie_app/features/pip/presentation/controllers/pip_collection_controller.dart';
+import '../pip/pip_collection_test.dart' show FakePips;
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -25,6 +30,44 @@ const movies = [
 ];
 
 void main() {
+  testWidgets('portrait picker uses active Pip and preserves pick action',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final service = FakePips()
+      ..value =
+          const PipCollection(activePip: 'cinemaClub', cinemaUnlocked: true);
+    final controller = PipCollectionController(service: service);
+    controller.syncUser('fixture', 0);
+    await tester.pumpAndSettle();
+    var picks = 0;
+    await tester.pumpWidget(ChangeNotifierProvider.value(
+        value: controller,
+        child: MaterialApp(
+            home: Scaffold(
+                body: HomeTabletScope(
+                    portrait: true,
+                    child: FindTonightsFilmSection(onPick: () => picks++))))));
+    await tester.pumpAndSettle();
+    final image = tester.widget<Image>(
+        find.byKey(const ValueKey('portrait-picker-selected-pip')));
+    expect((image.image as AssetImage).assetName,
+        PipCollection.asset('cinemaClub'));
+    await controller.select('classic');
+    await tester.pumpAndSettle();
+    expect(
+        (tester
+                .widget<Image>(
+                    find.byKey(const ValueKey('portrait-picker-selected-pip')))
+                .image as AssetImage)
+            .assetName,
+        PipCollection.asset('classic'));
+    await tester.tap(find.text('Pick for me'));
+    expect(picks, 1);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+  });
+
   setUpAll(() async {
     await (FontLoader('Manrope')
           ..addFont(
@@ -83,6 +126,19 @@ void main() {
             tester.getTopLeft(find.text('Activity fixture')).dx,
             greaterThanOrEqualTo(
                 tester.getTopLeft(find.text('Plans fixture')).dx));
+      } else if (spec.name == 'portrait') {
+        expect(find.byKey(const ValueKey('home-tablet-portrait-layout')),
+            findsOneWidget);
+        expect(tester.getTopLeft(find.text('Plans fixture')).dy,
+            greaterThan(tester.getTopLeft(find.text('Cinema fixture')).dy));
+        expect(tester.getTopLeft(find.text('Pick for me')).dx,
+            greaterThan(tester.getTopLeft(find.text('Plans fixture')).dx));
+        expect(tester.getTopLeft(find.text('Pip fixture')).dx,
+            tester.getTopLeft(find.text('Plans fixture')).dx);
+        expect(tester.getTopLeft(find.text('Pip fixture')).dy,
+            greaterThan(tester.getTopLeft(find.text('Plans fixture')).dy));
+        expect(tester.getTopLeft(find.text('Activity fixture')).dy,
+            greaterThan(tester.getBottomLeft(find.text('Pip fixture')).dy));
       } else {
         expect(find.text('Plans fixture'), findsNothing);
         expect(tester.getTopLeft(find.text('Cinema fixture')).dy,

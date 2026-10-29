@@ -44,6 +44,12 @@ void main() {
                 onFriendsRetry: () {}),
           ))),
         ));
+        expect(find.text('Movie'), findsNothing);
+        final bookmark = find.byIcon(Icons.bookmark_outline_rounded);
+        expect(tester.getTopLeft(bookmark).dy,
+            tester.getTopLeft(find.text('Alien')).dy);
+        expect(tester.getTopRight(bookmark).dx,
+            greaterThan(tester.getTopRight(find.text('Alien')).dx));
         await tester.ensureVisible(find.byTooltip('Watchlist'));
         await tester.tap(find.byTooltip('Watchlist'));
         expect(saved, true);

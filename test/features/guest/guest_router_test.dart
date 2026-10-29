@@ -3,6 +3,8 @@ import 'package:flixie_app/features/pip_games/presentation/pages/pip_games_scree
 import 'package:flixie_app/features/pip_games/audio/game_audio.dart';
 import '../../support/fake_game_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flixie_app/features/guest/presentation/guest_community_feed.dart';
 import 'package:flixie_app/features/guest/data/first_open_store.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
@@ -25,6 +27,8 @@ import '../movies/movie_detail_action_flow_test.dart'
     show ActionAuth, ActionAnalytics;
 
 class GuestAuth extends ActionAuth {
+  @override
+  int get activityVersion => 0;
   @override
   AuthStatus get status => AuthStatus.unauthenticated;
   @override
@@ -103,9 +107,11 @@ void main() {
                       {'id': 27, 'name': 'Horror'}
                     ]
                   }
-                : [
-                    {'id': 348, 'title': 'Alien', 'mediaType': 'MOVIE'}
-                  ]),
+                : request.url.path == '/guest/community/activity'
+                    ? {'items': [], 'nextCursor': null}
+                    : [
+                        {'id': 348, 'title': 'Alien', 'mediaType': 'MOVIE'}
+                      ]),
             200);
       }));
       final auth = GuestAuth(), analytics = ActionAnalytics();
@@ -157,6 +163,22 @@ void main() {
           image.dispose();
         });
       }
+      // Public discovery uses the same immediate iOS entry as nearby pages,
+      // while keeping a real route to pop back from.
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        router.push('/around-flixie');
+        await tester.pumpAndSettle();
+        final route =
+            ModalRoute.of(tester.element(find.byType(GuestCommunityFeed)))!;
+        expect(route.transitionDuration, Duration.zero);
+        expect(route.canPop, isTrue);
+        router.pop();
+        await tester.pumpAndSettle();
+        expect(find.byType(GuestHomeScreen), findsOneWidget);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
       // All three games are genuinely reachable without a signup redirect.
       await tester.scrollUntilVisible(
           find.text('Take a break with Pip’s games'), 400,
@@ -165,6 +187,10 @@ void main() {
                   of: find.byType(GuestHomeScreen),
                   matching: find.byType(Scrollable))
               .first);
+      await Scrollable.ensureVisible(
+          tester.element(find.text('Take a break with Pip’s games')),
+          alignment: .5);
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Take a break with Pip’s games'));
       await tester.pumpAndSettle();
       expect(find.byType(PipGamesScreen), findsOneWidget);
@@ -189,7 +215,7 @@ void main() {
       expect(find.text('Already a member? Sign in'), findsOneWidget);
       await tester.tap(find.text('Home'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Sign up'));
+      await tester.tap(find.text('Join free'));
       await tester.pumpAndSettle();
       expect(find.text('Already have an account?'), findsOneWidget);
       await tester.ensureVisible(find.text('Sign In'));

@@ -1,3 +1,5 @@
+import 'package:flixie_app/features/curated_lists/presentation/pages/curated_list_page.dart';
+import 'package:flixie_app/features/curated_lists/presentation/pages/curated_lists_page.dart';
 import 'package:flixie_app/models/watch_request.dart';
 import 'package:flixie_app/features/guest/data/guest_diary_store.dart';
 import 'package:flixie_app/features/guest/presentation/guest_diary_page.dart';
@@ -92,8 +94,10 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
 );
 
 Widget _withLibraryReadiness(GoRouterState state, Widget child) {
-  // Diary reads its own watch entries; it does not consume library collections.
-  if (state.uri.path == '/profile/diary') return child;
+  // Diary and public discovery do not consume the viewer’s library collections.
+  if (state.uri.path == '/profile/diary' || state.uri.path == '/around-flixie') {
+    return child;
+  }
   final needsLibrary = RegExp(
           r'^/(around-flixie|community|genre-communities|private-communities|trending|search|social|plans|watch-requests|group|messages|chat|notifications|friends|watchlist|profile|stats|wrapped|history|watch-history|my-reviews|movie|show|people|person|collection|settings|pick-for-us)')
       .hasMatch(state.uri.path);
@@ -473,6 +477,14 @@ GoRouter buildRouter(
     },
     routes: [
       GoRoute(
+          path: '/flixie-lists',
+          pageBuilder: (_, state) =>
+              _pushPage(state, const CuratedListsPage())),
+      GoRoute(
+          path: '/flixie-lists/:id',
+          pageBuilder: (_, state) => _pushPage(
+              state, CuratedListPage(id: state.pathParameters['id']!))),
+      GoRoute(
           path: '/guest-diary',
           builder: (_, state) =>
               GuestDiaryPage(draftId: state.uri.queryParameters['draft'])),
@@ -481,7 +493,8 @@ GoRouter buildRouter(
           builder: (_, __) => const SignupJourneyPage()),
       GoRoute(
           path: '/around-flixie',
-          builder: (_, __) => const GuestCommunityFeed()),
+          pageBuilder: (_, state) =>
+              _pushPage(state, const GuestCommunityFeed())),
       GoRoute(
           path: '/build-your-taste',
           pageBuilder: (_, state) => _pushPage(state, const BuildTastePage())),

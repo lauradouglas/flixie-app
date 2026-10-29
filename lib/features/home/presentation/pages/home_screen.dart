@@ -1,3 +1,4 @@
+import 'package:flixie_app/features/curated_lists/presentation/widgets/curated_lists_home_section.dart';
 import '../widgets/home_cinema_country_action.dart';
 import 'package:flixie_app/features/pip/presentation/widgets/pip_companion.dart';
 import 'package:flixie_app/core/reviews/app_review_service.dart';
@@ -89,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   late final HomeController _home;
   bool _didCreateController = false;
+  final _curatedListsKey = GlobalKey<CuratedListsHomeSectionState>();
   final _cinemasKey = GlobalKey<InCinemasSectionState>();
   final _communityKey = GlobalKey<HomeCommunitySectionState>();
   List<MovieShort> get _featuredMovies => _home.trending.value.data;
@@ -113,6 +115,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   );
   final PageController _tabletForYouPageController =
       PageController(viewportFraction: .56);
+  final PageController _portraitForYouPageController =
+      PageController(viewportFraction: .5);
   final ScrollController _watchPlansScrollController = ScrollController();
   final ScrollController _homeScrollController = ScrollController();
   final GlobalKey _forYouSectionKey = GlobalKey();
@@ -177,6 +181,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _home.dispose();
     TabRefreshController.home.removeListener(_onHomeTabRefresh);
     _forYouPageController.dispose();
+    _portraitForYouPageController.dispose();
     _tabletForYouPageController.dispose();
     _watchPlansScrollController.dispose();
     _homeScrollController.dispose();
@@ -214,6 +219,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _refreshAll() async {
     await Future.wait([
+      if (_curatedListsKey.currentState != null)
+        _curatedListsKey.currentState!.refresh(),
       if (_cinemasKey.currentState != null) _cinemasKey.currentState!.refresh(),
       _loadAll(refreshRecommendations: true, showFullLoading: false),
       if (_communityKey.currentState != null)
@@ -658,6 +665,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     builder: (context) => _buildGreetingAndPlans(
                         showPlans: !HomeTabletLayout.active(context))),
                 discovery: _buildTrendingSection(),
+                curatedLists: _initialHomeRevealed
+                    ? Builder(
+                        builder: (context) => CuratedListsHomeSection(
+                            key: _curatedListsKey,
+                            horizontalPadding:
+                                HomeTabletLayout.active(context) ? 0 : 16))
+                    : const SizedBox.shrink(),
                 cinemas: _initialHomeRevealed
                     ? _buildInCinemasSection()
                     : const SizedBox.shrink(),
@@ -671,8 +685,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         builder: (context) => HomeCommunitySection(
                             key: _communityKey,
                             userId: userId,
-                            previewLimit:
-                                HomeTabletLayout.active(context) ? 5 : 3))
+                            previewLimit: HomeTabletLayout.portrait(context)
+                                ? 6
+                                : HomeTabletLayout.active(context)
+                                    ? 5
+                                    : 3))
                     : const SizedBox.shrink(),
                 games: Builder(
                     builder: (context) => PipGamesHomeEntry(
@@ -787,6 +804,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       listenable: _home.watchPlans,
       builder: (context, _) {
         final user = context.watch<AuthProvider>().dbUser;
+        if (HomeTabletLayout.portrait(context)) {
+          final state = user == null
+              ? null
+              : selectHomeWatchPlanState(_watchPlansToShow, user.id);
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                HomeSectionHeader(
+                    title: 'Watch together',
+                    tabletPadding: EdgeInsets.zero,
+                    onSeeAll: () => context.push('/plans')),
+                if (state != null && user != null)
+                  Expanded(
+                      child: PortraitHomeWatchPlanCard(
+                          state: state,
+                          onOpen: () => _openHomeWatchPlan(state, user),
+                          onCreate: _openWatchPlanCreation))
+                else
+                  Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: OutlinedButton.icon(
+                          onPressed: _openWatchPlanCreation,
+                          icon: const Icon(Icons.group_add_outlined),
+                          label: const Text('Make a Watch Plan'))),
+              ]);
+        }
         return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1024,9 +1067,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               padding: EdgeInsets.only(
                   left: HomeTabletLayout.active(context) ? 0 : 16),
               child: PageView.builder(
-                controller: HomeTabletLayout.active(context)
-                    ? _tabletForYouPageController
-                    : _forYouPageController,
+                controller: HomeTabletLayout.portrait(context)
+                    ? _portraitForYouPageController
+                    : HomeTabletLayout.active(context)
+                        ? _tabletForYouPageController
+                        : _forYouPageController,
                 padEnds: false,
                 itemCount: movies.length,
                 onPageChanged: (index) {

@@ -125,6 +125,49 @@ class _SocialPeopleViewState extends State<SocialPeopleView> {
                 (data?.requestedFriends.isEmpty ?? true))
               const SocialInviteEmptyState(),
             PeopleDirectory(
+              actions: LayoutBuilder(builder: (context, box) {
+                final buttons = [
+                  FilledButton.tonalIcon(
+                      onPressed: _showAddFriendSheet,
+                      icon: Icon(Icons.person_search_outlined,
+                          size: 19, color: context.colors.primaryText),
+                      label: const Text('Find friends',
+                          style: TextStyle(fontSize: 14))),
+                  FilledButton.tonalIcon(
+                      onPressed: () =>
+                          context.push('/invite-friend?from=social'),
+                      icon: Icon(Icons.person_add_alt_1_outlined,
+                          size: 19, color: context.colors.primaryText),
+                      label:
+                          const Text('Invite', style: TextStyle(fontSize: 14))),
+                ];
+                final styled = buttons
+                    .map((button) => FilledButtonTheme(
+                        data: FilledButtonThemeData(
+                            style: FilledButton.styleFrom(
+                                backgroundColor: context.colors.surface,
+                                foregroundColor: context.colors.white,
+                                minimumSize: const Size(0, 44),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)))),
+                        child: button))
+                    .toList();
+                if (MediaQuery.textScalerOf(context).scale(1) > 1.4 ||
+                    box.maxWidth < 300) {
+                  return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        styled.first,
+                        const SizedBox(height: 8),
+                        styled.last
+                      ]);
+                }
+                return Row(children: [
+                  Expanded(child: styled.first),
+                  const SizedBox(width: 12),
+                  Expanded(child: styled.last)
+                ]);
+              }),
               active: widget.active,
               userId: context.read<AuthProvider>().dbUser?.id ?? '',
               friends: friends,
